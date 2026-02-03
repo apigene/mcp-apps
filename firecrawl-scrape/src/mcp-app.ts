@@ -17,6 +17,12 @@
    ============================================ */
 
 /* ============================================
+   EXTERNAL DEPENDENCIES
+   ============================================ */
+// Anime.js is loaded globally, check availability before use
+declare const anime: any;
+
+/* ============================================
    COMMON UTILITY FUNCTIONS
    ============================================ */
 
@@ -42,6 +48,14 @@ function extractData(msg: any) {
 function unwrapData(data: any): any {
   if (!data) return null;
   
+  console.log('[Firecrawl] Unwrapping data:', data);
+  
+  // Handle direct Firecrawl response format: {success: true, data: {...}}
+  if (data.success && data.data) {
+    console.log('[Firecrawl] Detected success/data format');
+    return data;
+  }
+  
   // Handle nested content structure from Firecrawl
   if (data.content && Array.isArray(data.content)) {
     // Extract from content array
@@ -59,9 +73,13 @@ function unwrapData(data: any): any {
     return data.structuredContent.message.response_content;
   }
   
-  // Direct data structure
+  // Direct data structure (but keep the wrapper if it has success flag)
+  if (data.data && !data.success) {
+    return { data: data.data };
+  }
+  
   if (data.data) {
-    return data.data;
+    return data;
   }
   
   // Standard table format { columns: [], rows: [] }
@@ -165,10 +183,111 @@ function formatMetadataValue(value: any): string {
 }
 
 /**
+ * Convert markdown to HTML (simple converter, no scripts)
+ */
+function convertMarkdownToHTML(markdown: string): string {
+  if (!markdown) return '';
+  
+  let html = markdown;
+  
+  // Headers (process in order from most specific to least)
+  html = html.replace(/^###### (.*$)/gim, '<h6>$1</h6>');
+  html = html.replace(/^##### (.*$)/gim, '<h5>$1</h5>');
+  html = html.replace(/^#### (.*$)/gim, '<h4>$1</h4>');
+  html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
+  html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
+  html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
+  
+  // Bold and italic
+  html = html.replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>');
+  html = html.replace(/\*(.*?)\*/gim, '<em>$1</em>');
+  
+  // Links
+  html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/gim, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  
+  // Code blocks
+  html = html.replace(/```([\s\S]*?)```/gim, '<pre><code>$1</code></pre>');
+  html = html.replace(/`([^`]+)`/gim, '<code>$1</code>');
+  
+  // Lists
+  const lines = html.split('\n');
+  let inList = false;
+  let result: string[] = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    const isListItem = /^[-*+]\s+(.+)$/.test(line);
+    
+    if (isListItem) {
+      if (!inList) {
+        result.push('<ul>');
+        inList = true;
+      }
+      const content = line.replace(/^[-*+]\s+/, '');
+      result.push(`<li>${content}</li>`);
+    } else {
+      if (inList) {
+        result.push('</ul>');
+        inList = false;
+      }
+      if (line) {
+        // Check if it's already a header
+        if (!line.match(/^<h[1-6]>/)) {
+          result.push(`<p>${line}</p>`);
+        } else {
+          result.push(line);
+        }
+      } else {
+        result.push('');
+      }
+    }
+  }
+  
+  if (inList) {
+    result.push('</ul>');
+  }
+  
+  html = result.join('\n');
+  
+  // Clean up empty paragraphs
+  html = html.replace(/<p><\/p>/gim, '');
+  html = html.replace(/<p>\s*<\/p>/gim, '');
+  
+  return html;
+}
+
+/**
  * Prepare HTML for iframe display
  */
 function prepareHtmlForIframe(html: string): string {
+  if (!html) return '';
+  
   let preparedHtml = html;
+  
+  // Aggressively remove ALL script tags (including malformed ones)
+  // Use multiple passes to catch all variations
+  preparedHtml = preparedHtml.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+  preparedHtml = preparedHtml.replace(/<script[^>]*>/gi, '');
+  preparedHtml = preparedHtml.replace(/<\/script>/gi, '');
+  
+  // Remove script tags with various attributes
+  preparedHtml = preparedHtml.replace(/<script\s+[^>]*>/gi, '');
+  
+  // Remove inline event handlers
+  preparedHtml = preparedHtml.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '');
+  preparedHtml = preparedHtml.replace(/\s*on\w+\s*=\s*[^>\s]*/gi, '');
+  
+  // Remove javascript: URLs
+  preparedHtml = preparedHtml.replace(/javascript\s*:/gi, '');
+  
+  // Remove any remaining references to anime or window.anime
+  preparedHtml = preparedHtml.replace(/\bwindow\s*\.\s*anime\b/gi, 'null');
+  preparedHtml = preparedHtml.replace(/\banime\s*=/gi, 'var _anime_removed =');
+  preparedHtml = preparedHtml.replace(/\banimejs\b/gi, 'null');
+  
+  // Remove any eval or Function constructors
+  preparedHtml = preparedHtml.replace(/\beval\s*\(/gi, '/* eval removed */ null(');
+  preparedHtml = preparedHtml.replace(/\bFunction\s*\(/gi, '/* Function removed */ null(');
   
   // Check if HTML already has a viewport meta tag
   const hasViewport = /<meta[^>]*name=["']viewport["'][^>]*>/i.test(preparedHtml);
@@ -229,7 +348,7 @@ function prepareHtmlForIframe(html: string): string {
 }
 
 /**
- * Switch tab
+ * Switch tab with animation
  */
 (window as any).switchTab = function(tabName: string, buttonElement: HTMLElement) {
   // Update tab buttons
@@ -240,13 +359,54 @@ function prepareHtmlForIframe(html: string): string {
     buttonElement.classList.add('active');
   }
 
-  // Update tab content
-  document.querySelectorAll('.tab-content').forEach(content => {
-    content.classList.remove('active');
-  });
+  // Animate tab switch
+  const activeContent = document.querySelector('.tab-content.active');
   const targetTab = document.getElementById(`${tabName}-tab`);
-  if (targetTab) {
-    targetTab.classList.add('active');
+  
+  // Check if anime is available and we're in the main document (not iframe)
+  const isAnimeAvailable = typeof window !== 'undefined' && 
+                          typeof (window as any).anime !== 'undefined' &&
+                          window.self === window.top; // Not in iframe
+  
+  if (activeContent && targetTab && isAnimeAvailable) {
+    try {
+      // Fade out current tab
+      (window as any).anime({
+        targets: activeContent,
+        opacity: [1, 0],
+        translateY: [0, -10],
+        duration: 200,
+        easing: 'easeInOutQuad',
+        complete: () => {
+          activeContent.classList.remove('active');
+          targetTab.classList.add('active');
+          
+          // Fade in new tab
+          (window as any).anime({
+            targets: targetTab,
+            opacity: [0, 1],
+            translateY: [10, 0],
+            duration: 300,
+            easing: 'easeOutQuad'
+          });
+        }
+      });
+    } catch (e) {
+      // Fallback if animation fails
+      console.warn('Animation failed, using fallback:', e);
+      activeContent.classList.remove('active');
+      if (targetTab) {
+        targetTab.classList.add('active');
+      }
+    }
+  } else {
+    // Fallback without animation
+    document.querySelectorAll('.tab-content').forEach(content => {
+      content.classList.remove('active');
+    });
+    if (targetTab) {
+      targetTab.classList.add('active');
+    }
   }
 
   // Notify size change when switching tabs
@@ -315,22 +475,48 @@ function renderData(data: any) {
   }
 
   try {
+    // Debug logging
+    console.log('[Firecrawl] Received data:', data);
+    
     // Unwrap nested data structures
     const unwrapped = unwrapData(data);
-    const scrapeData = unwrapped?.data || unwrapped;
+    console.log('[Firecrawl] Unwrapped data:', unwrapped);
     
-    if (!scrapeData) {
+    // Handle different data structures
+    let scrapeData = null;
+    
+    // Check if unwrapped has a data property (e.g., {success: true, data: {...}})
+    if (unwrapped && typeof unwrapped === 'object') {
+      if (unwrapped.data && typeof unwrapped.data === 'object') {
+        scrapeData = unwrapped.data;
+      } else if (unwrapped.success && unwrapped.data) {
+        scrapeData = unwrapped.data;
+      } else {
+        scrapeData = unwrapped;
+      }
+    } else {
+      scrapeData = unwrapped;
+    }
+    
+    console.log('[Firecrawl] Scrape data:', scrapeData);
+    
+    if (!scrapeData || (typeof scrapeData === 'object' && Object.keys(scrapeData).length === 0)) {
+      console.warn('[Firecrawl] No scrape data found after unwrapping');
       showEmpty('No scrape data found');
       return;
     }
 
     const metadata = scrapeData.metadata || {};
-    const html = scrapeData.html;
-    const url = scrapeData.url || scrapeData.sourceURL || 'Unknown URL';
+    const html = scrapeData.html || null;
+    const markdown = scrapeData.markdown || null;
+    const url = scrapeData.url || scrapeData.sourceURL || metadata.url || 'Unknown URL';
     const statusCode = scrapeData.statusCode || scrapeData.status_code || 200;
-    const contentType = scrapeData.contentType || 'text/html';
-    const cachedAt = scrapeData.cachedAt;
-    const creditsUsed = scrapeData.creditsUsed;
+    const contentType = scrapeData.contentType || scrapeData.content_type || 'text/html';
+    const cachedAt = scrapeData.cachedAt || scrapeData.cached_at;
+    const creditsUsed = scrapeData.creditsUsed || scrapeData.credits_used;
+    
+    // Keep contentHtml for HTML content, markdown will be rendered separately
+    let contentHtml = html;
 
     // Extract OG image URL
     const ogImage = metadata['og:image'] || metadata.ogImage || null;
@@ -346,41 +532,93 @@ function renderData(data: any) {
     if (metadata.keywords) metadataItems.push({ label: 'Keywords', value: formatMetadataValue(metadata.keywords) });
     if (metadata.generator) metadataItems.push({ label: 'Generator', value: metadata.generator });
 
-    // Build HTML
+    // Build HTML with enhanced structure
     let htmlContent = `
       <div class="container">
-        <div class="header">
-          <h1>${escapeHtml(metadata.title || 'Scraped Website')}</h1>
-          <div class="url">${escapeHtml(url)}</div>
+        <div class="header-card">
+          <div class="header-content">
+            <div class="header-icon">
+              <span class="material-icons">language</span>
+            </div>
+            <div class="header-text">
+              <h1 class="header-title">${escapeHtml(metadata.title || 'Scraped Website')}</h1>
+              <div class="url-bar">
+                <span class="material-icons url-icon">link</span>
+                <span class="url-text">${escapeHtml(url)}</span>
+              </div>
+            </div>
+            <div class="status-indicator">
+              <div class="status-badge ${statusCode >= 400 ? 'error' : 'success'}">
+                <span class="material-icons status-icon">${statusCode >= 400 ? 'error' : 'check_circle'}</span>
+                <span>${statusCode}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         ${ogImage ? `
-        <div class="og-image-preview">
-          <h3>Open Graph Image</h3>
+        <div class="og-image-preview animate-item">
+          <div class="section-header">
+            <span class="material-icons section-icon">image</span>
+            <h3>Open Graph Image</h3>
+          </div>
           <div class="og-image-container">
-            <img src="${escapeHtml(ogImage)}" alt="Open Graph Image" onerror="this.parentElement.innerHTML='<div class=\\'og-image-error\\'>Failed to load image</div>'">
+            <img src="${escapeHtml(ogImage)}" alt="Open Graph Image" onerror="this.parentElement.innerHTML='<div class=\\'og-image-error\\'><span class=\\'material-icons\\'>broken_image</span><p>Failed to load image</p></div>'">
           </div>
         </div>
         ` : ''}
 
-        <div class="metadata-card">
-          <h2>Metadata</h2>
+        <div class="metadata-card animate-item">
+          <div class="section-header">
+            <span class="material-icons section-icon">info</span>
+            <h2>Metadata</h2>
+          </div>
           <div class="info-grid">
             <div class="info-item">
-              <span class="status-badge ${statusCode >= 400 ? 'error' : ''}">${statusCode}</span>
-              <span>Status Code</span>
+              <span class="material-icons info-icon">http</span>
+              <div class="info-content">
+                <span class="info-label">Status Code</span>
+                <span class="status-badge-inline ${statusCode >= 400 ? 'error' : 'success'}">${statusCode}</span>
+              </div>
             </div>
-            ${contentType ? `<div class="info-item"><span>Content Type:</span><span>${escapeHtml(contentType)}</span></div>` : ''}
-            ${cachedAt ? `<div class="info-item"><span>Cached:</span><span>${escapeHtml(new Date(cachedAt).toLocaleString())}</span></div>` : ''}
-            ${creditsUsed ? `<div class="info-item"><span>Credits Used:</span><span>${creditsUsed}</span></div>` : ''}
+            ${contentType ? `
+            <div class="info-item">
+              <span class="material-icons info-icon">description</span>
+              <div class="info-content">
+                <span class="info-label">Content Type</span>
+                <span class="info-value">${escapeHtml(contentType)}</span>
+              </div>
+            </div>
+            ` : ''}
+            ${cachedAt ? `
+            <div class="info-item">
+              <span class="material-icons info-icon">schedule</span>
+              <div class="info-content">
+                <span class="info-label">Cached</span>
+                <span class="info-value">${escapeHtml(new Date(cachedAt).toLocaleString())}</span>
+              </div>
+            </div>
+            ` : ''}
+            ${creditsUsed ? `
+            <div class="info-item">
+              <span class="material-icons info-icon">star</span>
+              <div class="info-content">
+                <span class="info-label">Credits Used</span>
+                <span class="info-value">${creditsUsed}</span>
+              </div>
+            </div>
+            ` : ''}
           </div>
           ${metadataItems.length > 0 ? `
             <div class="metadata-grid">
-              ${metadataItems.map(item => `
-                <div class="metadata-item">
-                  <div class="metadata-label">${escapeHtml(item.label)}</div>
+              ${metadataItems.map((item, index) => `
+                <div class="metadata-item animate-item" style="animation-delay: ${index * 0.05}s">
+                  <div class="metadata-label">
+                    <span class="material-icons metadata-icon">label</span>
+                    ${escapeHtml(item.label)}
+                  </div>
                   <div class="metadata-value">
-                    ${item.isLink ? `<a href="${escapeHtml(item.value)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.value)}</a>` : escapeHtml(item.value)}
+                    ${item.isLink ? `<a href="${escapeHtml(item.value)}" target="_blank" rel="noopener noreferrer"><span class="material-icons link-icon">open_in_new</span>${escapeHtml(item.value)}</a>` : escapeHtml(item.value)}
                   </div>
                 </div>
               `).join('')}
@@ -389,43 +627,47 @@ function renderData(data: any) {
         </div>
     `;
 
-    // Add HTML content section if HTML exists
-    if (html) {
-      htmlContent += `
-        <div class="content-section">
-          <div class="tabs">
-            <button class="tab active" onclick="switchTab('preview', this)">Preview</button>
-            <button class="tab" onclick="switchTab('raw', this)">Raw HTML</button>
-          </div>
-          
-          <div id="preview-tab" class="tab-content active">
-            <div class="html-container">
-              <div class="iframe-controls">
-                <div class="zoom-control">
-                  <button class="zoom-btn" onclick="adjustZoom(-0.1)">-</button>
-                  <span class="zoom-value" id="zoom-value">100%</span>
-                  <button class="zoom-btn" onclick="adjustZoom(0.1)">+</button>
-                  <button class="zoom-btn" onclick="resetZoom()">Reset</button>
-                </div>
-              </div>
-              <div id="iframe-wrapper" style="overflow: auto; max-height: 800px;">
-                <iframe id="html-preview-iframe" class="html-viewer" sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"></iframe>
-              </div>
+    // Add content section - render markdown directly, skip iframe/scripts
+    if (markdown || contentHtml) {
+      // If we have markdown, render it directly without iframe
+      if (markdown) {
+        htmlContent += `
+          <div class="content-section animate-item">
+            <div class="section-header">
+              <span class="material-icons section-icon">article</span>
+              <h2>Content</h2>
+            </div>
+            <div class="markdown-render-container">
+              ${convertMarkdownToHTML(markdown)}
             </div>
           </div>
-          
-          <div id="raw-tab" class="tab-content">
-            <div class="raw-html">${escapeHtml(html)}</div>
+        `;
+      } else if (contentHtml) {
+        // For HTML content, render directly without iframe
+        const cleanHtml = prepareHtmlForIframe(contentHtml);
+        htmlContent += `
+          <div class="content-section animate-item">
+            <div class="section-header">
+              <span class="material-icons section-icon">code</span>
+              <h2>Content Preview</h2>
+            </div>
+            <div class="html-render-container">
+              ${cleanHtml}
+            </div>
           </div>
-        </div>
-      `;
+        `;
+      }
     } else {
       htmlContent += `
-        <div class="content-section">
-          <h2>Content</h2>
+        <div class="content-section animate-item">
+          <div class="section-header">
+            <span class="material-icons section-icon">code</span>
+            <h2>Content</h2>
+          </div>
           <div class="html-placeholder">
+            <span class="material-icons placeholder-icon">description</span>
             <p>No HTML content available for this scrape.</p>
-            <p style="margin-top: 8px; font-size: 12px; color: #9aa0a6;">The website may have blocked scraping or returned only metadata.</p>
+            <p class="placeholder-subtitle">The website may have blocked scraping or returned only metadata.</p>
           </div>
         </div>
       `;
@@ -435,43 +677,43 @@ function renderData(data: any) {
 
     app.innerHTML = htmlContent;
 
-    // Set iframe content after DOM is ready (to avoid escaping issues)
-    if (html) {
-      const iframe = document.getElementById('html-preview-iframe') as HTMLIFrameElement;
-      if (iframe) {
-        const preparedHtml = prepareHtmlForIframe(html);
-        
-        // Use srcdoc directly without escaping - this is safe because we're setting it programmatically
-        iframe.srcdoc = preparedHtml;
-        
-        // Adjust iframe scaling after load
-        iframe.onload = function() {
-          try {
-            const iframeDoc = iframe.contentDocument || (iframe.contentWindow as any)?.document;
-            const iframeBody = iframeDoc?.body;
-            
-            if (iframeBody) {
-              // Ensure body has proper styling
-              iframeBody.style.margin = '0';
-              iframeBody.style.padding = '8px';
-              iframeBody.style.overflowX = 'auto';
-            }
-          } catch (e) {
-            // Cross-origin restrictions may prevent access
-            console.log('Cannot access iframe content (cross-origin):', e);
-          }
-          
-          // Notify size change after iframe loads
-          setTimeout(() => {
-            notifySizeChanged();
-          }, 100);
-        };
+    // Animate elements on load (only in main document, not iframe)
+    const isAnimeAvailable = typeof window !== 'undefined' && 
+                            typeof (window as any).anime !== 'undefined' &&
+                            window.self === window.top; // Not in iframe
+    
+    if (isAnimeAvailable) {
+      try {
+        (window as any).anime({
+          targets: '.animate-item',
+          opacity: [0, 1],
+          translateY: [20, 0],
+          delay: (window as any).anime.stagger(100),
+          duration: 600,
+          easing: 'easeOutQuad'
+        });
+      } catch (e) {
+        // Fallback: use CSS animations if anime fails
+        console.warn('Anime.js animation failed, using CSS fallback:', e);
+        document.querySelectorAll('.animate-item').forEach((el, index) => {
+          (el as HTMLElement).style.opacity = '1';
+          (el as HTMLElement).style.transform = 'translateY(0)';
+        });
       }
+    } else {
+      // Fallback: show elements immediately without animation
+      document.querySelectorAll('.animate-item').forEach((el) => {
+        (el as HTMLElement).style.opacity = '1';
+        (el as HTMLElement).style.transform = 'translateY(0)';
+      });
     }
 
+    // No iframe needed - content is rendered directly
+
   } catch (error: any) {
-    console.error('Render error:', error);
-    showError(`Error rendering data: ${error.message}`);
+    console.error('[Firecrawl] Render error:', error);
+    console.error('[Firecrawl] Error stack:', error.stack);
+    showError(`Error rendering data: ${error.message || 'Unknown error'}`);
     // Notify size even on error
     setTimeout(() => {
       notifySizeChanged();
@@ -492,21 +734,35 @@ function renderData(data: any) {
 window.addEventListener('message', function(event: MessageEvent) {
   const msg = event.data;
   
+  console.log('[Firecrawl] Received message event:', event);
+  console.log('[Firecrawl] Message data:', msg);
+  
+  // Handle direct data (not wrapped in JSON-RPC)
+  if (msg && typeof msg === 'object' && (msg.success || msg.data || msg.metadata)) {
+    console.log('[Firecrawl] Detected direct data format, rendering directly');
+    renderData(msg);
+    return;
+  }
+  
   if (!msg || msg.jsonrpc !== '2.0') {
+    console.log('[Firecrawl] Message is not JSON-RPC format, skipping');
     return;
   }
   
   if (msg.id !== undefined && !msg.method) {
+    console.log('[Firecrawl] Message has ID but no method, skipping');
     return;
   }
   
   switch (msg.method) {
     case 'ui/notifications/tool-result':
-      const data = msg.params?.structuredContent || msg.params;
-      if (data !== undefined) {
+      const data = msg.params?.structuredContent || msg.params || msg;
+      console.log('[Firecrawl] Received tool-result message:', msg);
+      console.log('[Firecrawl] Extracted data:', data);
+      if (data !== undefined && data !== null) {
         renderData(data);
       } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
+        console.warn('[Firecrawl] ui/notifications/tool-result received but no data found:', msg);
         showEmpty('No data received');
       }
       break;
@@ -533,12 +789,17 @@ window.addEventListener('message', function(event: MessageEvent) {
       
     default:
       // Unknown method - try to extract data as fallback
+      console.log('[Firecrawl] Unknown method:', msg.method, '- attempting to extract data');
       if (msg.params) {
         const fallbackData = msg.params.structuredContent || msg.params;
         if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
+          console.warn('[Firecrawl] Unknown method:', msg.method, '- attempting to render data');
           renderData(fallbackData);
         }
+      } else if (msg.data || msg.success) {
+        // Try direct data access
+        console.log('[Firecrawl] Attempting direct data access');
+        renderData(msg);
       }
   }
 });

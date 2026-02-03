@@ -5,10 +5,21 @@
   <title>MCP App: Firecrawl Website Scrape</title>
   <link rel="stylesheet" href="src/global.css">
   <link rel="stylesheet" href="src/mcp-app.css">
-  <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <!-- Material Icons -->
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <!-- Fonts: Using system fonts with Inter as fallback (no external dependencies for CSP compliance) -->
+  <style>
+    @font-face {
+      font-family: 'Inter';
+      font-style: normal;
+      font-weight: 300 700;
+      font-display: swap;
+      src: local('Inter'), local('Inter-Regular');
+    }
+    /* Fallback to system fonts if Inter not available */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+    }
+  </style>
+  <!-- Icons are embedded as SVG - no external dependencies -->
 </head>
 <body>
   <div id="app">
@@ -30,8 +41,6 @@
     </div>
   </div>
 
-  <!-- Anime.js bundled -->
-  <script src="src/anime.min.js"></script>
   <script type="module" src="src/mcp-app.ts"></script>
 </body>
 </html>

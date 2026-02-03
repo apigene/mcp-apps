@@ -28,8 +28,21 @@
   -->
   <link rel="stylesheet" href="src/global.css">
   <link rel="stylesheet" href="src/mcp-app.css">
-  <!-- Add external dependencies here (e.g., Chart.js, D3.js, etc.) -->
-  <!-- Example: <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script> -->
+  <!-- 
+    CSP Configuration Note:
+    If this app uses external resources (fonts, images, scripts, APIs), you MUST configure
+    CSP metadata in your MCP server's resources/read handler. See CSP_GUIDE.md for details.
+    
+    External dependencies require CSP configuration:
+    - External fonts → add to resourceDomains
+    - External images → add to resourceDomains  
+    - External scripts/styles → add to resourceDomains
+    - API calls → add to connectDomains
+    - Iframes → add to frameDomains
+    
+    Example: <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    Requires: resourceDomains: ["https://cdn.jsdelivr.net"]
+  -->
 </head>
 <body>
   <div id="app">
