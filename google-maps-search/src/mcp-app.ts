@@ -165,7 +165,7 @@ function showEmpty(message: string = 'No data available.') {
  * 
  * Alternatively, move this to the backend and have the backend add photo URLs to responses.
  */
-const GOOGLE_MAPS_API_KEY = 'AIzaSyBQE9xY93Xg8TOckRTxcayvJ27zfDPjRfA';
+const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
 
 /**
  * Get photo URL from photo reference or use provided URL
