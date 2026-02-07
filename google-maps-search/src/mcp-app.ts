@@ -660,42 +660,60 @@ function sendRequest(method: string, params: any): Promise<any> {
 
 let sizeChangeTimeout: number | null = null;
 let resizeObserver: ResizeObserver | null = null;
+let lastReportedWidth: number = 0;
+let lastReportedHeight: number = 0;
 
 function notifySizeChanged() {
-  const app = document.getElementById('app');
-  if (!app) return;
-  
   // Debounce size notifications
   if (sizeChangeTimeout) {
     clearTimeout(sizeChangeTimeout);
   }
   
   sizeChangeTimeout = window.setTimeout(() => {
-    const rect = app.getBoundingClientRect();
-    const height = Math.ceil(rect.height);
-    const width = Math.ceil(rect.width);
+    // Use scrollWidth/scrollHeight to get content size, not layout size
+    // This prevents feedback loops when the iframe is resized
+    const width = document.body.scrollWidth || document.documentElement.scrollWidth;
+    const height = document.body.scrollHeight || document.documentElement.scrollHeight;
     
-    window.parent.postMessage({
-      jsonrpc: "2.0",
-      method: "ui/notifications/size-changed",
-      params: {
-        width: width,
-        height: height
-      }
-    }, '*');
+    // Only notify if size changed significantly (more than 1px difference)
+    // This prevents infinite feedback loops
+    const widthDiff = Math.abs(width - lastReportedWidth);
+    const heightDiff = Math.abs(height - lastReportedHeight);
+    
+    if (widthDiff > 1 || heightDiff > 1) {
+      lastReportedWidth = width;
+      lastReportedHeight = height;
+      
+      window.parent.postMessage({
+        jsonrpc: "2.0",
+        method: "ui/notifications/size-changed",
+        params: {
+          width: width,
+          height: height
+        }
+      }, '*');
+    }
   }, 100);
 }
 
-// Observe size changes
+// Observe size changes on document.body instead of app element
+// This prevents feedback loops when the iframe is resized
 if (typeof ResizeObserver !== 'undefined') {
   resizeObserver = new ResizeObserver(() => {
     notifySizeChanged();
   });
   
-  const app = document.getElementById('app');
-  if (app) {
-    resizeObserver.observe(app);
-  }
+  resizeObserver.observe(document.body);
+} else {
+  // Fallback for browsers without ResizeObserver
+  window.addEventListener('resize', notifySizeChanged);
+  const mutationObserver = new MutationObserver(notifySizeChanged);
+  mutationObserver.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['style', 'class']
+  });
 }
 
 /* ============================================
