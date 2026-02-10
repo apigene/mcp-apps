@@ -8,10 +8,36 @@ This repository contains multiple template implementations for different use cas
 
 ## Templates
 
-### Base Template
-The foundational template that includes all common MCP protocol handling, dark mode support, display modes, and utility functions. See [base-template/README.md](./base-template/README.md) for detailed documentation.
+### Base Templates
 
-### Available Templates
+We provide **two base templates** with different approaches:
+
+#### 1. base-template (Manual Protocol)
+
+Manual MCP protocol implementation - perfect for learning internals and maximum control.
+
+- ✅ No dependencies (self-contained)
+- ✅ Smaller bundle (~20KB)
+- ✅ Full protocol control
+- ⚠️ More code to maintain (~540 lines)
+- See [base-template/README.md](./base-template/README.md)
+
+#### 2. base-template-sdk (Official SDK)
+
+Uses official `@modelcontextprotocol/ext-apps` SDK - recommended for production.
+
+- ✅ Less boilerplate (~50 lines)
+- ✅ Full TypeScript types
+- ✅ Auto-updates with SDK
+- ✅ Built-in utilities
+- ⚠️ Larger bundle (~60-70KB)
+- See [base-template-sdk/README.md](./base-template-sdk/README.md)
+
+**Not sure which to use?** See [TEMPLATE_COMPARISON.md](./TEMPLATE_COMPARISON.md) for detailed comparison.
+
+**Recommendation:** Use **base-template-sdk** for new projects unless bundle size is critical.
+
+### Available Application Templates
 
 - **apollo-companies** - Template for displaying Apollo company data
 - **apollo-people** - Template for displaying Apollo people/contact data
@@ -24,24 +50,70 @@ The foundational template that includes all common MCP protocol handling, dark m
 
 ## Quick Start
 
-1. **Choose a template** that matches your use case, or start with `base-template`
-2. **Copy the template directory** to create your new app
-3. **Customize** the `renderData()` function in `src/mcp-app.ts`
-4. **Add your styles** in `src/mcp-app.css`
-5. **Test** your app with sample data
+### Using base-template-sdk (Recommended)
+
+```bash
+# 1. Copy template
+cp -r base-template-sdk my-app-mcp
+cd my-app-mcp
+
+# 2. Install dependencies
+npm install
+
+# 3. Customize (edit src/mcp-app.ts and mcp-app.html)
+
+# 4. Build
+npm run build
+
+# 5. Use dist/mcp-app.html in your MCP server
+```
+
+### Using base-template (Manual)
+
+```bash
+# 1. Copy template
+cp -r base-template my-app-mcp
+
+# 2. Customize (edit src/mcp-app.ts and mcp-app.html)
+
+# 3. Use mcp-app.html directly in your MCP server (or add your own build step)
+```
+
+**New to MCP Apps?** Start with `base-template-sdk` for the best experience!
 
 ## Structure
 
-Each template follows this structure:
+### base-template-sdk (with build)
 
 ```
 template-name/
-├── mcp-app.html          # Main HTML file
+├── package.json          # Dependencies and scripts
+├── vite.config.ts        # Build configuration
+├── tsconfig.json         # TypeScript config
+├── mcp-app.html          # Source HTML
 ├── src/
-│   ├── mcp-app.ts        # TypeScript logic
+│   ├── mcp-app.ts        # TypeScript logic (uses SDK)
 │   ├── mcp-app.css       # Template-specific styles
 │   └── global.css        # Common base styles
-└── README.md             # Template-specific documentation (optional)
+├── dist/
+│   └── mcp-app.html      # Bundled output (single file)
+└── README.md             # Documentation
+```
+
+### **MCP Protocol Handling** (JSON-RPC 2.0)
+
+- ✅ **Dark Mode Support** (automatic theme switching)
+- ✅ **Display Modes** (inline/fullscreen)
+- ✅ **Size Notifications** (automatic iframe sizing)
+- ✅ **Error Handling** (graceful error states)
+- ✅ **Data Utilities** (unwrapping, escaping, etc.)
+- ✅ **CSP Support** (Content Security Policy configuration)
+- ✅ **Type Safety** (TypeScript definitions - SDK templates only)
+- ✅ **Professional Styling** (loading states, animations, responsive) # TypeScript logic (manual protocol)
+  │ ├── mcp-app.css # Template-specific styles
+  │ └── global.css # Common base styles
+  └── README.md # Documentation
+
 ```
 
 ## Features
@@ -56,6 +128,18 @@ All templates include:
 - ✅ Data Utilities
 
 ## Development
+#### Using SDK Template (Recommended)
+
+1. Copy `base-template-sdk` to a new directory
+2. Run `npm install`
+3. Update `mcp-app.html` title and metadata
+4. Implement `renderData()` function in `src/mcp-app.ts`
+5. Add template-specific styles in `src/mcp-app.css`
+6. Build with `npm run build`
+7. Test with sample data
+
+#### Using Manual Template
+
 
 ### Creating a New Template
 
@@ -80,3 +164,4 @@ All templates include:
 ## Contributing
 
 [Add contribution guidelines here]
+```
