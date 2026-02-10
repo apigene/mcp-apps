@@ -22,18 +22,18 @@ export interface FakeStoreResponse {
 
 export function parseProductData(data: any): Product {
   console.log("Parsing product data:", data);
-  
+
   // Check if this is an error response
   if (data.error) {
     throw new Error(`Server error: ${data.error.message || data.error}`);
   }
   if (data.isError) {
-    throw new Error(`Error: ${data.content?.[0]?.text || 'Unknown error'}`);
+    throw new Error(`Error: ${data.content?.[0]?.text || "Unknown error"}`);
   }
 
   // Extract product from the response structure
   let product: Product;
-  
+
   if (data.actions_result && data.actions_result.length > 0) {
     // FakeStore API response structure
     product = data.actions_result[0].response_content;
@@ -42,7 +42,9 @@ export function parseProductData(data: any): Product {
     product = data;
   } else {
     console.error("Invalid data structure received:", data);
-    throw new Error("Invalid data structure - expected FakeStore API product data");
+    throw new Error(
+      "Invalid data structure - expected FakeStore API product data",
+    );
   }
 
   // Validate required fields
@@ -68,10 +70,10 @@ export function generateStarRating(rate: number): string {
   const fullStars = Math.floor(rate);
   const hasHalfStar = rate % 1 >= 0.5;
   const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
-  
+
   let stars = "⭐".repeat(fullStars);
   if (hasHalfStar) stars += "✨";
   stars += "☆".repeat(emptyStars);
-  
+
   return stars;
 }

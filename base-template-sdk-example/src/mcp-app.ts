@@ -237,7 +237,7 @@ function renderData(data: any) {
   } catch (error: any) {
     console.error("Render error:", error);
     console.error("Received data:", data);
-    
+
     // Show more detailed error message
     let errorMsg = error.message || "Unknown error";
     if (errorMsg.includes("403") || errorMsg.includes("Forbidden")) {
@@ -245,7 +245,7 @@ function renderData(data: any) {
     } else if (errorMsg.includes("401") || errorMsg.includes("Unauthorized")) {
       errorMsg = "401 Unauthorized - Authentication required";
     }
-    
+
     showError(`Error rendering data: ${errorMsg}`);
   }
 }
