@@ -121,6 +121,25 @@ function iconRefresh(): string {
   </svg>`;
 }
 
+function iconSendToLLM(): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m22 2-7 20-4-9-9-4Z"></path>
+    <path d="M22 2 11 13"></path>
+  </svg>`;
+}
+
+function iconChevronDown(): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m6 9 6 6 6-6"></path>
+  </svg>`;
+}
+
+function iconChevronUp(): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m18 15-6-6-6 6"></path>
+  </svg>`;
+}
+
 /* ============================================
    COMMON UTILITY FUNCTIONS
    ============================================ */
@@ -295,6 +314,16 @@ let filters = {
   levelname: ''
 };
 
+/** Selected log IDs for "Send to LLM" (stable id: log.id or fallback index in list) */
+let selectedLogIds = new Set<string>();
+
+/** Whether the filters section is expanded (collapsible) */
+let filtersExpanded = true;
+
+function getLogId(log: any, index: number): string {
+  return log?.id != null ? String(log.id) : `idx-${index}`;
+}
+
 /**
  * Format timestamp - returns both relative and absolute
  */
@@ -361,54 +390,47 @@ function getLogLevelClass(status: string | null | undefined, levelname: string |
   return 'level-info';
 }
 
+/** Remove IPv4 and IPv6 addresses from text (for list display) */
+function stripIpFromMessage(text: string): string {
+  if (typeof text !== 'string') return text;
+  return text
+    .replace(/\b(?:\d{1,3}\.){3}\d{1,3}\b/g, '') // IPv4
+    .replace(/\b(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}\b/g, '') // IPv6 full
+    .replace(/\b(?:[0-9a-fA-F]{1,4}:){1,7}:\b/g, '') // IPv6 partial
+    .replace(/\b::(?:[0-9a-fA-F]{1,4}:){0,6}[0-9a-fA-F]{1,4}\b/g, '') // IPv6 with ::
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /**
- * Render log card
+ * Render log card (compact: time, message; metadata in detail view)
  */
 function renderLogCard(log: any, index: number): string {
   const attrs = log.attributes || {};
   const nestedAttrs = attrs.attributes || {};
-  const service = attrs.service || nestedAttrs.service || 'Unknown';
-  const host = attrs.host || nestedAttrs.host || 'Unknown';
-  const message = attrs.message || 'No message';
+  const rawMessage = attrs.message || 'No message';
+  const message = stripIpFromMessage(rawMessage) || rawMessage;
   const status = attrs.status || 'info';
   const levelname = nestedAttrs.levelname || '';
   const timestamp = attrs.timestamp || '';
-  const tags = attrs.tags || [];
-  
-  const statusClass = getStatusBadgeClass(status, levelname);
   const levelClass = getLogLevelClass(status, levelname);
-  const displayStatus = levelname || status || 'info';
+  const logId = getLogId(log, index);
+  const isSelected = selectedLogIds.has(logId);
+  const logIdAttr = escapeHtml(logId).replace(/"/g, '&quot;');
   const timeFormatted = timestamp ? formatTimestamp(timestamp) : null;
 
   return `
-    <div class="log-card ${levelClass}" onclick="showLogDetail(${index})">
+    <div class="log-card log-card-compact ${levelClass}" onclick="showLogDetail(${index})">
+      <div class="log-card-select" onclick="event.stopPropagation()">
+        <input type="checkbox" class="log-select-checkbox" data-log-id="${logIdAttr}" ${isSelected ? 'checked' : ''}
+          aria-label="Select log for LLM"
+          onchange="toggleLogSelection(this)">
+      </div>
       <div class="log-level-indicator ${levelClass}"></div>
       <div class="log-card-content">
-        <div class="log-header">
-          <div class="log-meta">
-            <span class="status-badge ${statusClass}">${escapeHtml(displayStatus.toUpperCase())}</span>
-          <span class="log-service">
-            <span class="icon-inline">${iconPackage()}</span>
-            ${escapeHtml(service)}
-          </span>
-          <span class="log-host">
-            <span class="icon-inline">${iconServer()}</span>
-            ${escapeHtml(host)}
-          </span>
-          </div>
-          ${timeFormatted ? `
-            <div class="log-timestamp-wrapper">
-              <span class="log-timestamp-relative">${escapeHtml(timeFormatted.relative)}</span>
-              <span class="log-timestamp-absolute">${escapeHtml(timeFormatted.absolute)}</span>
-            </div>
-          ` : ''}
-        </div>
         <div class="log-message">${escapeHtml(message)}</div>
-        ${tags.length > 0 ? `
-          <div class="log-tags">
-            ${tags.slice(0, 5).map((tag: any) => `<span class="log-tag">${escapeHtml(String(tag))}</span>`).join('')}
-            ${tags.length > 5 ? `<span class="log-tag">+${tags.length - 5} more</span>` : ''}
-          </div>
+        ${timeFormatted ? `
+        <div class="log-card-time" title="${escapeHtml(timeFormatted.absolute)}">${escapeHtml(timeFormatted.relative)}</div>
         ` : ''}
       </div>
       <div class="log-card-actions" onclick="event.stopPropagation()">
@@ -581,6 +603,9 @@ function filterLogs() {
   const statusFilter = (filters.status || '').toLowerCase();
   const levelnameFilter = (filters.levelname || '').toLowerCase();
 
+  // Clear selection when filters change so indices don't refer to different logs
+  selectedLogIds.clear();
+
   filteredLogs = allLogs.filter(log => {
     const attrs = log.attributes || {};
     const nestedAttrs = attrs.attributes || {};
@@ -652,6 +677,8 @@ function renderLogsList() {
   if (countEl) {
     countEl.textContent = String(filteredLogs.length);
   }
+
+  updateSendToLLMButton();
 
   // Notify host of size change
   setTimeout(() => {
@@ -748,11 +775,130 @@ function showCopyNotification(message: string) {
 }
 
 /**
+ * Toggle log selection for Send to LLM
+ */
+(window as any).toggleLogSelection = function(checkboxEl: HTMLInputElement) {
+  const logId = checkboxEl?.getAttribute?.('data-log-id');
+  if (logId == null) return;
+  if (checkboxEl.checked) {
+    selectedLogIds.add(logId);
+  } else {
+    selectedLogIds.delete(logId);
+  }
+  updateSendToLLMButton();
+};
+
+/**
+ * Update Send to LLM button state (enabled/disabled and count)
+ */
+function updateSendToLLMButton() {
+  const btn = document.getElementById('send-to-llm-btn');
+  const countEl = document.getElementById('send-to-llm-count');
+  const n = selectedLogIds.size;
+  if (btn) {
+    (btn as HTMLButtonElement).disabled = n === 0;
+    btn.setAttribute('aria-label', n === 0 ? 'Select logs to send to LLM' : `Send ${n} selected log(s) to LLM`);
+  }
+  if (countEl) {
+    countEl.textContent = String(n);
+    countEl.style.display = n === 0 ? 'none' : 'inline';
+  }
+}
+
+const SEND_TO_LLM_PREAMBLE = 'please explain to me the following log and detect issue and provide recommendation:';
+
+/**
+ * Format a single log for the LLM message
+ */
+function formatLogForLLM(log: any): string {
+  const attrs = log.attributes || {};
+  const nestedAttrs = attrs.attributes || {};
+  const service = attrs.service || nestedAttrs.service || 'Unknown';
+  const host = attrs.host || nestedAttrs.host || 'Unknown';
+  const message = attrs.message || 'No message';
+  const status = attrs.status || 'info';
+  const levelname = nestedAttrs.levelname || '';
+  const timestamp = attrs.timestamp || '';
+  const tags = attrs.tags || [];
+  const timeStr = timestamp ? formatTimestamp(timestamp).absolute : '';
+  const lines = [
+    `[${levelname || status}] ${timeStr}`,
+    `Service: ${service} | Host: ${host}`,
+    message,
+  ];
+  if (tags.length > 0) {
+    lines.push(`Tags: ${tags.join(', ')}`);
+  }
+  return lines.join('\n');
+}
+
+/**
+ * Send selected logs to the host chat (LLM) via ui/message
+ */
+(window as any).sendToLLM = function() {
+  const selected = filteredLogs.filter((log, index) => selectedLogIds.has(getLogId(log, index)));
+  if (selected.length === 0) {
+    showCopyNotification('No logs selected');
+    return;
+  }
+  const formatted = selected.map((log) => formatLogForLLM(log)).join('\n\n---\n\n');
+  const text = `${SEND_TO_LLM_PREAMBLE}\n\n${formatted}`;
+
+  const btn = document.getElementById('send-to-llm-btn');
+  if (btn) {
+    (btn as HTMLButtonElement).disabled = true;
+    btn.classList.add('send-loading');
+  }
+  sendRequest('ui/message', {
+    role: 'user',
+    content: [{ type: 'text', text }],
+  })
+    .then((result: any) => {
+      if (result?.isError) {
+        showCopyNotification('Host could not add message to chat.');
+        return;
+      }
+      selectedLogIds.clear();
+      renderLogsList();
+      updateSendToLLMButton();
+      showCopyNotification('Sent to LLM for investigation');
+    })
+    .catch((err: Error) => {
+      console.error('Send to LLM failed:', err);
+      showCopyNotification('Failed to send. Check console.');
+    })
+    .finally(() => {
+      if (btn) {
+        (btn as HTMLButtonElement).disabled = selectedLogIds.size === 0;
+        btn.classList.remove('send-loading');
+      }
+    });
+};
+
+/**
  * Update filter
  */
 (window as any).updateFilter = function(field: string, value: string) {
   filters[field as keyof typeof filters] = value;
   filterLogs();
+};
+
+/**
+ * Toggle filters section expand/collapse
+ */
+(window as any).toggleFilters = function() {
+  filtersExpanded = !filtersExpanded;
+  const section = document.querySelector('.filters-section');
+  const chevronEl = document.getElementById('filters-chevron');
+  if (section) {
+    section.classList.toggle('collapsed', !filtersExpanded);
+    section.setAttribute('aria-expanded', String(filtersExpanded));
+  }
+  if (chevronEl) {
+    chevronEl.innerHTML = filtersExpanded ? iconChevronUp() : iconChevronDown();
+    chevronEl.setAttribute('aria-label', filtersExpanded ? 'Collapse filters' : 'Expand filters');
+  }
+  notifySizeChanged();
 };
 
 /** Parameters for run_action_ui server tool (refresh logs from last 5 minutes) */
@@ -865,7 +1011,8 @@ function renderData(data: any) {
     const levelnames = extractUniqueValues(logs, 'levelname');
 
     let htmlContent = `
-      <div class="container">
+      <div class="container container-with-scroll">
+        <div class="sticky-top">
         <div class="header header-sticky">
           <div class="header-brand">
             <span class="datadog-logo icon-inline">${iconDatadogSmall()}</span>
@@ -876,10 +1023,23 @@ function renderData(data: any) {
           </div>
         </div>
 
-        <div class="filters-section">
-          <div class="filters-header">
+        <div class="search-container">
+          <span class="search-icon icon-inline">${iconSearch()}</span>
+          <input 
+            type="text" 
+            class="search-input" 
+            id="search-input"
+            placeholder="Search logs by message or tags..."
+            oninput="updateFilter('search', this.value)"
+          >
+        </div>
+
+        <div class="filters-section ${filtersExpanded ? '' : 'collapsed'}" aria-expanded="${filtersExpanded}">
+          <button type="button" class="filters-header filters-toggle" onclick="toggleFilters()" aria-expanded="${filtersExpanded}" aria-controls="filters-body" id="filters-toggle-btn">
             <div class="filters-title">Filters</div>
-          </div>
+            <span class="filters-chevron icon-inline" id="filters-chevron" aria-label="${filtersExpanded ? 'Collapse filters' : 'Expand filters'}">${filtersExpanded ? iconChevronUp() : iconChevronDown()}</span>
+          </button>
+          <div class="filters-body" id="filters-body">
           <div class="filters-grid">
             <div class="filter-group">
               <label class="filter-label">Service</label>
@@ -910,27 +1070,29 @@ function renderData(data: any) {
               </select>
             </div>
           </div>
-        </div>
-
-        <div class="search-container">
-          <span class="search-icon icon-inline">${iconSearch()}</span>
-          <input 
-            type="text" 
-            class="search-input" 
-            id="search-input"
-            placeholder="Search logs by message or tags..."
-            oninput="updateFilter('search', this.value)"
-          >
+          </div>
         </div>
 
         <div class="results-header">
           <div class="results-count">
             Showing <span id="results-count">${filteredLogs.length}</span> of ${logs.length} logs
           </div>
+          <div class="results-actions">
+            <button type="button" class="send-to-llm-btn" id="send-to-llm-btn" onclick="sendToLLM()"
+              disabled title="Select logs with the checkboxes, then click to send to LLM for investigation"
+              aria-label="Send selected logs to LLM">
+              <span class="icon-inline">${iconSendToLLM()}</span>
+              <span>Send to LLM</span>
+              <span class="send-to-llm-count" id="send-to-llm-count" style="display: none;">0</span>
+            </button>
+          </div>
+        </div>
         </div>
 
+        <div class="logs-list-wrapper">
         <div class="logs-list" id="logs-list">
           ${logs.map((log, index) => renderLogCard(log, index)).join('')}
+        </div>
         </div>
       </div>
     `;
@@ -945,6 +1107,8 @@ function renderData(data: any) {
       notifySizeChanged();
     }, 50);
   }
+
+  updateSendToLLMButton();
   
   // Notify host of size change after rendering completes
   // Use setTimeout to ensure DOM is fully updated
