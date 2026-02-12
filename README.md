@@ -50,6 +50,17 @@ Uses official `@modelcontextprotocol/ext-apps` SDK - recommended for production.
 
 ## Quick Start
 
+### Template Lab (Root Preview App)
+
+Use the root-level preview tool to inspect built templates in one place:
+
+```bash
+cd tools/template-lab
+npm run dev
+```
+
+Then open `http://localhost:4311`.
+
 ### Using base-template-sdk (Recommended)
 
 ```bash

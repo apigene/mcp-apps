@@ -36,8 +36,8 @@ import "./mcp-app.css";
    TEMPLATE-SPECIFIC: Update these values for your app
    ============================================ */
 
-const APP_NAME = "[Your App Name]"; // TODO: Replace with your app name
-const APP_VERSION = "1.0.0"; // TODO: Replace with your app version
+const APP_NAME = "XYZ Users";
+const APP_VERSION = "1.0.0";
 
 /* ============================================
    EXTERNAL DEPENDENCIES
@@ -132,22 +132,34 @@ function showEmpty(message: string = "No data available.") {
   }
 }
 
-/* ============================================
-   TEMPLATE-SPECIFIC FUNCTIONS
-   ============================================
-   
-   Add your template-specific utility functions here.
-   Examples:
-   - Data normalization functions
-   - Formatting functions (dates, numbers, etc.)
-   - Data transformation functions
-   - Chart rendering functions (if using Chart.js)
-   ============================================ */
+type User = {
+  id: number;
+  name: string;
+  username: string;
+  email: string;
+  address?: {
+    street?: string;
+    city?: string;
+    zipcode?: string;
+  };
+  isActive?: boolean;
+};
 
-// TODO: Add your template-specific utility functions here
-// Example:
-// function formatDate(date: string): string { ... }
-// function normalizeData(data: any): any { ... }
+function normalizeUsers(data: any): User[] {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.rows)) return data.rows;
+  if (Array.isArray(data?.users)) return data.users;
+  if (Array.isArray(data?.items)) return data.items;
+  return [];
+}
+
+function addressText(user: User): string {
+  if (!user.address) return "-";
+  const parts = [user.address.street, user.address.city, user.address.zipcode]
+    .filter(Boolean)
+    .map((value) => escapeHtml(value));
+  return parts.length ? parts.join(", ") : "-";
+}
 
 /* ============================================
    TEMPLATE-SPECIFIC RENDER FUNCTION
@@ -173,28 +185,55 @@ function renderData(data: any) {
   }
 
   try {
-    // Unwrap nested data structures
     const unwrapped = unwrapData(data);
+    const users = normalizeUsers(unwrapped);
 
-    // TODO: Implement your rendering logic here
-    // This is a basic example that just shows the JSON data
+    if (!users.length) {
+      showEmpty("No users found in response.");
+      return;
+    }
+
     app.innerHTML = `
       <div class="container">
-        <p class="mcp-app-badge">Called from MCP App</p>
-        <h1>Data Received</h1>
-        <pre>${escapeHtml(JSON.stringify(unwrapped, null, 2))}</pre>
+        <h1>Users</h1>
+        <div class="table-wrap">
+          <table class="users-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Address</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${users
+                .map(
+                  (user) => `
+                    <tr>
+                      <td>${escapeHtml(user.id)}</td>
+                      <td>${escapeHtml(user.name)}</td>
+                      <td>${escapeHtml(user.username)}</td>
+                      <td><a href="mailto:${escapeHtml(user.email)}">${escapeHtml(user.email)}</a></td>
+                      <td>${addressText(user)}</td>
+                      <td>
+                        <span class="status ${user.isActive ? "active" : "inactive"}">
+                          ${user.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </td>
+                    </tr>
+                  `,
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </div>
       </div>
     `;
 
-    // Log data structure to console for debugging
-    console.log("Data received:", {
-      original: data,
-      unwrapped: unwrapped,
-      type: Array.isArray(unwrapped) ? "array" : typeof unwrapped,
-      keys: Array.isArray(unwrapped)
-        ? unwrapped.length + " items"
-        : Object.keys(unwrapped || {}).join(", "),
-    });
+    console.log("Users rendered:", users.length);
   } catch (error: any) {
     console.error("Render error:", error);
     showError(`Error rendering data: ${error.message}`);

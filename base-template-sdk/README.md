@@ -1,63 +1,61 @@
-# Base Template (SDK Version) for MCP Apps
+# base-template-sdk
 
-This is a base template for creating MCP (Model Context Protocol) apps using the **official `@modelcontextprotocol/ext-apps` SDK**. It includes all common infrastructure needed for MCP apps, with Vite bundling to create a single-file HTML output.
+Minimal skeleton for building MCP Apps with `@modelcontextprotocol/ext-apps` in **proxy-compatible mode**.
+
+This template is the canonical source for cloning new app templates in this repository.
+It is intentionally clean:
+- no `app.connect()`
+- no mock host/dev preview logic
+- no app-specific parsing/helpers
+
+If you need local mock preview, use `tools/template-lab`.
+
+## What This Template Includes
+
+- Manual `postMessage` handling for MCP proxy notifications:
+  - `ui/notifications/tool-result`
+  - `ui/notifications/host-context-changed`
+  - `ui/notifications/tool-cancelled`
+  - `ui/resource-teardown` (with required JSON-RPC response)
+- SDK utilities only:
+  - `applyDocumentTheme`
+  - `applyHostFonts`
+  - `applyHostStyleVariables`
+  - `setupSizeChangedNotifications`
+- Minimal starter render (`renderData`) and shared safety helpers (`escapeHtml`, `showError`, `showEmpty`, `unwrapData`)
+- Single-file output via Vite + `vite-plugin-singlefile`
 
 ## Quick Start
 
-### 1. **Copy and Setup**
-
 ```bash
-# Copy the template directory
-cp -r base-template-sdk my-app-mcp
+# 1) Copy template (exclude build artifacts)
+rsync -av \
+  --exclude='node_modules' \
+  --exclude='dist' \
+  --exclude='.DS_Store' \
+  base-template-sdk/ my-app-mcp/
+
+# 2) Install deps
 cd my-app-mcp
-
-# Install dependencies
 npm install
+
+# 3) Customize
+# - mcp-app.html (title)
+# - src/mcp-app.ts (APP_NAME, APP_VERSION, renderData)
+# - src/mcp-app.css (your styles)
+
+# 4) Build
+npm run build
 ```
 
-### 2. **Configure App Metadata**
+Output: `dist/mcp-app.html`
 
-Edit `src/mcp-app.ts` and update:
-
-```typescript
-const APP_NAME = "My App Name"; // Your app name
-const APP_VERSION = "1.0.0"; // Your app version
-```
-
-### 3. **Update HTML Title**
-
-Edit `mcp-app.html`:
-
-```html
-<title>MCP App: My App Name</title>
-```
-
-### 4. **Implement Rendering Logic**
-
-Edit `src/mcp-app.ts` and implement the `renderData()` function:
-
-```typescript
-function renderData(data: any) {
-  const app = document.getElementById("app");
-  if (!app) return;
-
-  // Your rendering logic here
-  app.innerHTML = `<div class="container">...</div>`;
-}
-```
-
-### 5. **Add Custom Styles**
-
-Edit `src/mcp-app.css` and add your template-specific styles.
-
-### 6. **Build**
+## Scripts
 
 ```bash
-# One-time build
-npm run build
-
-# Watch mode (rebuilds on changes)
-npm run dev
+npm run build    # production single-file build
+npm run dev      # watch build (rebuilds dist on change)
+npm run preview  # preview built dist
 ```
 
 ### 7. **Test with the built-in MCP server (optional)**
@@ -83,9 +81,27 @@ The server registers one tool, **`show_demo`**, that returns sample data to the 
 
 ### 8. **Use in your own MCP Server**
 
-The bundled file is at `dist/mcp-app.html`. Use it in your MCP server:
+```text
+base-template-sdk/
+├── src/
+│   ├── mcp-app.ts
+│   ├── mcp-app.css
+│   └── global.css
+├── mcp-app.html
+├── package.json
+├── tsconfig.json
+├── vite.config.ts
+├── CSP_GUIDE.md
+├── COPY-TEMPLATE.md
+├── AGENTS.md
+└── README.md
+```
 
-```typescript
+## MCP Server Integration
+
+Use `dist/mcp-app.html` as your UI resource payload:
+
+```ts
 import fs from "node:fs/promises";
 import {
   registerAppResource,

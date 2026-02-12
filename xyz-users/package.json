@@ -1,7 +1,7 @@
 {
-  "name": "fakestore-product-mcp",
+  "name": "xyz-users-mcp",
   "version": "1.0.0",
-  "description": "FakeStore Product Display - MCP App using official SDK",
+  "description": "XYZ users table MCP app template",
   "type": "module",
   "private": true,
   "scripts": {

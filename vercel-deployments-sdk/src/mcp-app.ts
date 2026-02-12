@@ -268,12 +268,6 @@ window.addEventListener("message", (event: MessageEvent) => {
     return;
   }
 
-  if (msg.structuredContent || msg.data || msg.deployments) {
-    console.info("Received data from preview tool:", msg);
-    const data = msg.structuredContent || msg.data || msg;
-    renderData(data);
-    return;
-  }
 });
 
 /* ============================================

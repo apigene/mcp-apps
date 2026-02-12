@@ -1,0 +1,23 @@
+{
+  "actions_result": [
+    {
+      "status_code": 200,
+      "response_content": {
+        "title": "Template Lab mock payload",
+        "summary": "Default structuredContent for local preview.",
+        "items": [
+          {
+            "id": "item-1",
+            "name": "Alpha",
+            "value": 42
+          },
+          {
+            "id": "item-2",
+            "name": "Beta",
+            "value": 73
+          }
+        ]
+      }
+    }
+  ]
+}

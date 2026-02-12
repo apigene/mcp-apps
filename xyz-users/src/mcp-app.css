@@ -1,0 +1,115 @@
+/* XYZ users table styles */
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 12px;
+}
+
+.container h1 {
+  margin: 0 0 14px;
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.table-wrap {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow-x: auto;
+  background: #ffffff;
+}
+
+body.dark .table-wrap {
+  border-color: #2f3744;
+  background: #131925;
+}
+
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.users-table th,
+.users-table td {
+  padding: 11px 12px;
+  text-align: left;
+  border-bottom: 1px solid #edf2f7;
+  vertical-align: top;
+}
+
+body.dark .users-table th,
+body.dark .users-table td {
+  border-bottom-color: #2a3240;
+}
+
+.users-table th {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  background: #f8fafc;
+}
+
+body.dark .users-table th {
+  color: #a0aec0;
+  background: #1a2332;
+}
+
+.users-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.users-table a {
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.users-table a:hover {
+  text-decoration: underline;
+}
+
+body.dark .users-table a {
+  color: #8ab4f8;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.status.active {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.status.inactive {
+  color: #991b1b;
+  background: #fee2e2;
+}
+
+body.dark .status.active {
+  color: #86efac;
+  background: #163623;
+}
+
+body.dark .status.inactive {
+  color: #fca5a5;
+  background: #3f1d1d;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 8px;
+  }
+
+  .users-table th,
+  .users-table td {
+    padding: 10px;
+    font-size: 0.86rem;
+  }
+}

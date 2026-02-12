@@ -4,12 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
-    <title>FakeStore Product Display</title>
+    <title>MCP App: XYZ Users</title>
     <!--
-    Base Template (SDK Version) for MCP Apps
+    Base Template (SDK Utilities Version) for MCP Apps
     
     This template uses the official @modelcontextprotocol/ext-apps SDK
-    with Vite bundling to create a single-file HTML bundle.
+    for utilities only (theme helpers, auto-resize) and manual
+    message handling for proxy compatibility.
     
     To use:
     1. Copy this entire directory (base-template-sdk)
@@ -24,15 +25,13 @@
     
     Build Process:
     - npm run build → Creates single-file dist/mcp-app.html
-    - npm run dev → Watches for changes and rebuilds automatically
-    
-    The SDK handles:
-    - MCP protocol communication
-    - JSON-RPC 2.0 message handling
-    - Host context changes (theme, display mode)
-    - Size change notifications
-    - Tool result receiving
-    - Type safety with TypeScript
+    - npm run dev → Watches and rebuilds dist bundle
+
+    Notes:
+    - No app.connect() in template source
+    - Proxy/host forwards JSON-RPC notifications via postMessage
+    - SDK utilities are used for theme/fonts/style variables and auto-resize
+    - Type safety via TypeScript
     
     See README.md for detailed guidelines.
   -->
