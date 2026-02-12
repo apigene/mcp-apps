@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>MCP App: Fake Store SDK</title>
+    <!--
+    Base Template (SDK Utilities Version) for MCP Apps
+    
+    This template uses the official @modelcontextprotocol/ext-apps SDK
+    for utilities only (theme helpers, auto-resize) and manual
+    message handling for proxy compatibility.
+    
+    To use:
+    1. Copy this entire directory (base-template-sdk)
+    2. Rename the directory to your app name (e.g., "my-app-mcp")
+    3. Run: npm install
+    4. Update the title tag above
+    5. Update APP_NAME and APP_VERSION in src/mcp-app.ts
+    6. Add template-specific styles in src/mcp-app.css
+    7. Implement your renderData() function in src/mcp-app.ts
+    8. Run: npm run build
+    9. Use the bundled dist/mcp-app.html in your MCP server
+    
+    Build Process:
+    - npm run build → Creates single-file dist/mcp-app.html
+    - npm run dev → Watches and rebuilds dist bundle
+
+    Notes:
+    - No app.connect() in template source
+    - Proxy/host forwards JSON-RPC notifications via postMessage
+    - SDK utilities are used for theme/fonts/style variables and auto-resize
+    - Type safety via TypeScript
+    
+    See README.md for detailed guidelines.
+  -->
+    <!-- 
+    CSP Configuration Note:
+    If this app uses external resources (fonts, images, scripts, APIs), you MUST configure
+    CSP metadata in your MCP server's resources/read handler. See CSP_GUIDE.md for details.
+    
+    External dependencies require CSP configuration:
+    - External fonts → add to resourceDomains
+    - External images → add to resourceDomains  
+    - External scripts/styles → add to resourceDomains
+    - API calls → add to connectDomains
+    - Iframes → add to frameDomains
+    
+    Example: For Chart.js from CDN, add to resourceDomains: ["https://cdn.jsdelivr.net"]
+    
+    Note: With Vite bundling, most dependencies are inlined, reducing CSP requirements!
+  --></head>
+  <body>
+    <div id="app">
+      <div class="loading">
+        <div class="loading-content">
+          <div class="spinner-container">
+            <div class="spinner"></div>
+            <div class="spinner-ring"></div>
+          </div>
+          <div class="loading-text">
+            <p class="loading-message">Loading data</p>
+            <div class="loading-dots">
+              <span class="dot"></span>
+              <span class="dot"></span>
+              <span class="dot"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/mcp-app.ts"></script>
+  </body>
+</html>

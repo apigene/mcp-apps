@@ -61,6 +61,18 @@ npm run dev
 
 Then open `http://localhost:4311`.
 
+### Template MCP Server (Root Integration Server)
+
+Run a local MCP server for full host integration testing (Claude/MCPJam):
+
+```bash
+cd tools/template-mcp-server
+npm install
+npm run server:http
+```
+
+Endpoint: `http://127.0.0.1:3001/mcp`
+
 ### Using base-template-sdk (Recommended)
 
 ```bash

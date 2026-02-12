@@ -1,7 +1,7 @@
 {
-  "name": "mcp-app-base-template-sdk",
+  "name": "fake-store-sdk",
   "version": "1.0.0",
-  "description": "Base template for MCP Apps using the official SDK with Vite bundling",
+  "description": "Fake Store MCP app template (minimal neutral UI)",
   "type": "module",
   "private": true,
   "scripts": {

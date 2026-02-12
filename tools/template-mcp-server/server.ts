@@ -1,0 +1,261 @@
+import {
+  registerAppResource,
+  registerAppTool,
+  RESOURCE_MIME_TYPE,
+} from "@modelcontextprotocol/ext-apps/server";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import fs from "node:fs/promises";
+import {
+  existsSync,
+  readdirSync,
+  readFileSync,
+} from "node:fs";
+import path from "node:path";
+import { z } from "zod";
+
+const REPO_ROOT = path.resolve(import.meta.dirname, "../..");
+const DEFAULT_MOCK_PATH = path.join(
+  REPO_ROOT,
+  "tools",
+  "template-lab",
+  "mock-data",
+  "default.json",
+);
+
+type TemplateInfo = {
+  name: string;
+  toolName: string;
+  resourceUri: string;
+  hasBuiltHtml: boolean;
+};
+
+function normalizeTemplateName(input: string): string {
+  return input.trim().toLowerCase().replace(/\s+/g, "-");
+}
+
+function parseTemplateName(args: Record<string, unknown> | undefined): string {
+  const template = typeof args?.template === "string" ? args.template : "";
+  if (template.trim()) return normalizeTemplateName(template);
+
+  const request = typeof args?.request === "string" ? args.request : "";
+  const match = request.match(/show\s+demo\s+for\s+(.+)/i);
+  if (match?.[1]) return normalizeTemplateName(match[1]);
+
+  return "";
+}
+
+function toToolName(templateName: string): string {
+  return `show_demo_${templateName.replace(/[^a-z0-9_\-]/gi, "_")}`;
+}
+
+function listTemplates(): TemplateInfo[] {
+  const entries = readdirSync(REPO_ROOT, { withFileTypes: true });
+  const templates: TemplateInfo[] = [];
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    if (entry.name.startsWith(".")) continue;
+    if (entry.name === "tools") continue;
+
+    const sourceHtml = path.join(REPO_ROOT, entry.name, "mcp-app.html");
+    if (!existsSync(sourceHtml)) continue;
+
+    const hasBuiltHtml = existsSync(path.join(REPO_ROOT, entry.name, "dist", "mcp-app.html"));
+
+    templates.push({
+      name: entry.name,
+      toolName: toToolName(entry.name),
+      resourceUri: `ui://template-demo/${entry.name}/mcp-app.html`,
+      hasBuiltHtml,
+    });
+  }
+
+  templates.sort((a, b) => a.name.localeCompare(b.name));
+  return templates;
+}
+
+async function readMockPayload(templateName: string): Promise<unknown> {
+  const templateResponse = path.join(REPO_ROOT, templateName, "response.json");
+  const content = await fs
+    .readFile(templateResponse, "utf8")
+    .catch(async () => fs.readFile(DEFAULT_MOCK_PATH, "utf8"));
+  return JSON.parse(content);
+}
+
+function toStructuredContent(payload: unknown): Record<string, unknown> {
+  if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+    return payload as Record<string, unknown>;
+  }
+  if (Array.isArray(payload)) {
+    return { rows: payload };
+  }
+  return { value: payload ?? null };
+}
+
+function readTemplateHtmlSync(templateName: string): string {
+  const htmlPath = path.join(REPO_ROOT, templateName, "dist", "mcp-app.html");
+  return readFileSync(htmlPath, "utf8");
+}
+
+export function createServer(): McpServer {
+  const server = new McpServer({
+    name: "Template Demo MCP Server",
+    version: "0.2.0",
+  });
+
+  const templates = listTemplates();
+
+  // Lookup/not-found helper tool (no UI binding).
+  registerAppTool(
+    server,
+    "show_demo_for",
+    {
+      title: "Show Demo For Template",
+      description:
+        "Find a template demo tool by name. Pass template or request like 'show demo for xyz-users'.",
+      inputSchema: {
+        request: z
+          .string()
+          .optional()
+          .describe("Natural-language request like: show demo for xyz-users"),
+        template: z
+          .string()
+          .optional()
+          .describe("Template folder name, e.g. xyz-users"),
+      },
+      _meta: {},
+    },
+    async (args) => {
+      const templateName = parseTemplateName(args as Record<string, unknown> | undefined);
+      const availableTemplates = templates.map((t) => t.name);
+
+      if (!templateName) {
+        return {
+          content: [
+            {
+              type: "text",
+              text:
+                "Template name is missing. Use: 'show demo for <template>' or pass template argument.",
+            },
+          ],
+          structuredContent: {
+            ok: false,
+            reason: "missing_template_name",
+            availableTemplates,
+          },
+        };
+      }
+
+      const found = templates.find((t) => t.name === templateName);
+      if (!found) {
+        return {
+          content: [{ type: "text", text: `Template not found: ${templateName}` }],
+          structuredContent: {
+            ok: false,
+            reason: "template_not_found",
+            template: templateName,
+            availableTemplates,
+          },
+        };
+      }
+
+      if (!found.hasBuiltHtml) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Template '${templateName}' is not built yet. Run npm run build inside ${templateName}.`,
+            },
+          ],
+          structuredContent: {
+            ok: false,
+            reason: "template_not_built",
+            template: templateName,
+            tool: found.toolName,
+          },
+        };
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Use tool '${found.toolName}' to open demo for ${templateName}.`,
+          },
+        ],
+        structuredContent: {
+          ok: true,
+          template: templateName,
+          tool: found.toolName,
+        },
+      };
+    },
+  );
+
+  // One UI resource + one UI tool per template (prevents stale previous template view).
+  for (const template of templates) {
+    registerAppResource(
+      server,
+      `Template Demo UI: ${template.name}`,
+      template.resourceUri,
+      { mimeType: RESOURCE_MIME_TYPE },
+      async () => {
+        const html = template.hasBuiltHtml
+          ? readTemplateHtmlSync(template.name)
+          : `<!doctype html><html><body style="font-family:sans-serif;padding:16px;"><h3>Template not built</h3><p>Run <code>npm run build</code> in <code>${template.name}</code>.</p></body></html>`;
+
+        return {
+          contents: [
+            {
+              uri: template.resourceUri,
+              mimeType: RESOURCE_MIME_TYPE,
+              text: html,
+            },
+          ],
+        };
+      },
+    );
+
+    registerAppTool(
+      server,
+      template.toolName,
+      {
+        title: `Show Demo: ${template.name}`,
+        description: `Open MCP app demo for template '${template.name}'.`,
+        inputSchema: {
+          _: z.string().optional().describe("Optional placeholder; tool needs no arguments."),
+        },
+        _meta: {
+          ui: { resourceUri: template.resourceUri },
+        },
+      },
+      async () => {
+        if (!template.hasBuiltHtml) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `Template '${template.name}' is not built yet. Run npm run build inside ${template.name}.`,
+              },
+            ],
+            structuredContent: {
+              ok: false,
+              reason: "template_not_built",
+              template: template.name,
+            },
+          };
+        }
+
+        const payload = await readMockPayload(template.name);
+        const structuredContent = toStructuredContent(payload);
+
+        return {
+          content: [{ type: "text", text: `Opening demo for ${template.name}` }],
+          structuredContent,
+        };
+      },
+    );
+  }
+
+  return server;
+}
