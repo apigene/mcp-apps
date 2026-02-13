@@ -1,20 +1,41 @@
 /* ============================================
-   BASE TEMPLATE FOR MCP APPS
+   DATADOG LIST LOGS MCP APP (SDK VERSION)
    ============================================
-   
-   This file contains all common logic shared across MCP apps.
-   Customize the sections marked with "TEMPLATE-SPECIFIC" below.
-   
-   Common Features:
-   - MCP Protocol message handling (JSON-RPC 2.0)
-   - Dark mode support
-   - Display mode handling (inline/fullscreen)
-   - Size change notifications
-   - Data extraction utilities
-   - Error handling
-   
+
+   This file uses the official @modelcontextprotocol/ext-apps SDK
+   for utilities only (theme helpers, types, auto-resize).
+
+   Benefits of this approach:
+   - SDK utilities for theme, fonts, and styling
+   - Full TypeScript type safety
+   - Manual message handling for proxy compatibility
+   - Works with run-action.html proxy layer
+   - No SDK connection conflicts with proxy initialization
+
    See README.md for customization guidelines.
    ============================================ */
+
+/* ============================================
+   SDK IMPORTS
+   ============================================ */
+
+import {
+  App,
+  applyDocumentTheme,
+  applyHostFonts,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
+
+// Import styles (will be bundled by Vite)
+import "./global.css";
+import "./mcp-app.css";
+
+/* ============================================
+   APP CONFIGURATION
+   ============================================ */
+
+const APP_NAME = "Datadog List Logs";
+const APP_VERSION = "1.0.0";
 
 /* ============================================
    INLINE ICON FUNCTIONS (Embedded to avoid CSP)
@@ -24,34 +45,6 @@ function iconSearch(): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="11" cy="11" r="8"></circle>
     <path d="m21 21-4.35-4.35"></path>
-  </svg>`;
-}
-
-function iconPackage(): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-    <line x1="12" y1="22.08" x2="12" y2="12"></line>
-  </svg>`;
-}
-
-function iconServer(): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="2" y="3" width="20" height="4" rx="1"></rect>
-    <rect x="2" y="7" width="20" height="4" rx="1"></rect>
-    <rect x="2" y="11" width="20" height="4" rx="1"></rect>
-    <rect x="2" y="15" width="20" height="4" rx="1"></rect>
-    <line x1="6" y1="5" x2="6.01" y2="5"></line>
-    <line x1="6" y1="9" x2="6.01" y2="9"></line>
-    <line x1="6" y1="13" x2="6.01" y2="13"></line>
-    <line x1="6" y1="17" x2="6.01" y2="17"></line>
-  </svg>`;
-}
-
-function iconClock(): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="10"></circle>
-    <polyline points="12 6 12 12 16 14"></polyline>
   </svg>`;
 }
 
@@ -92,15 +85,6 @@ function iconSearchLarge(): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="11" cy="11" r="8"></circle>
     <path d="m21 21-4.35-4.35"></path>
-  </svg>`;
-}
-
-function iconDatadog(): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="24" viewBox="0 0 120 24" fill="currentColor">
-    <path d="M12.5 2.5c-5.5 0-10 4.5-10 10s4.5 10 10 10 10-4.5 10-10-4.5-10-10-10zm0 18c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8z"/>
-    <path d="M12.5 6.5c-3.3 0-6 2.7-6 6s2.7 6 6 6 6-2.7 6-6-2.7-6-6-6zm0 10c-2.2 0-4-1.8-4-4s1.8-4 4-4 4 1.8 4 4-1.8 4-4 4z"/>
-    <path d="M12.5 9.5c-1.7 0-3 1.3-3 3s1.3 3 3 3 3-1.3 3-3-1.3-3-3-3zm0 4c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1z"/>
-    <text x="30" y="16" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="currentColor">Datadog</text>
   </svg>`;
 }
 
@@ -145,41 +129,27 @@ function iconChevronUp(): string {
    ============================================ */
 
 /**
- * Extract data from MCP protocol messages
- * Handles standard JSON-RPC 2.0 format from run-action.html
- */
-function extractData(msg: any) {
-  if (msg?.params?.structuredContent !== undefined) {
-    return msg.params.structuredContent;
-  }
-  if (msg?.params !== undefined) {
-    return msg.params;
-  }
-  return msg;
-}
-
-/**
  * Unwrap nested API response structures
  * Handles various wrapper formats from different MCP clients
  * Special handling for Datadog log structures
  */
 function unwrapData(data: any): any {
   if (!data) return null;
-  
+
   // If data is a string, try to parse it as JSON
   if (typeof data === 'string') {
     try {
       data = JSON.parse(data);
-    } catch (e) {
-      console.warn('Failed to parse string data as JSON:', e);
+    } catch {
+      console.warn('Failed to parse string data as JSON');
       return null;
     }
   }
-  
+
   // Handle nested content structure
   if (data.content && Array.isArray(data.content) && data.content.length > 0) {
     const contentItem = data.content[0];
-    
+
     if (typeof contentItem?.text === 'string') {
       try {
         const parsedText = JSON.parse(contentItem.text);
@@ -187,86 +157,65 @@ function unwrapData(data: any): any {
           return parsedText.body;
         }
         return parsedText;
-      } catch (e) {
+      } catch {
         // Not JSON, continue
       }
     }
-    
+
     if (contentItem?.text?.body?.data) {
       return contentItem.text.body;
     }
   }
-  
+
   // Handle body.data structure directly
   if (data.body?.data) {
     return data.body;
   }
-  
+
   // Handle structuredContent.body.data
   if (data.structuredContent?.body?.data) {
     return data.structuredContent.body;
   }
-  
+
   // If data itself has data array, return it
   if (data.data && Array.isArray(data.data)) {
     return data;
   }
-  
-  // Standard table format { columns: [], rows: [] }
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
-    return data;
-  }
-  
-  // Format 2: Nested in message.template_data (3rd party MCP clients)
+
+  // Nested in message wrappers (3rd-party MCP clients)
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
-  // Format 3: Nested in message.response_content (3rd party MCP clients)
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
-  // Format 4: Common nested patterns
+
+  // Common nested payloads
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
-  // Format 5: Direct rows array
-  if (Array.isArray(data.rows)) {
+
+  // Standard table format { columns: [], rows: [] }
+  if (data.columns || Array.isArray(data.rows)) {
     return data;
   }
-  
-  // Format 6: If data itself is an array
+
+  // If data itself is an array
   if (Array.isArray(data)) {
     return { rows: data };
   }
-  
-  return data;
-}
 
-/**
- * Initialize dark mode based on system preference
- */
-function initializeDarkMode() {
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.body.classList.add('dark');
-  }
-  
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e: MediaQueryListEvent) => {
-    document.body.classList.toggle('dark', e.matches);
-  });
+  return data;
 }
 
 /**
  * Escape HTML to prevent XSS attacks
  */
 function escapeHtml(str: any): string {
-  if (typeof str !== "string") return str;
+  if (typeof str !== "string") return String(str);
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
@@ -276,20 +225,19 @@ function escapeHtml(str: any): string {
  * Show error message in the app
  */
 function showError(message: string) {
-  const app = document.getElementById('app');
-  if (app) {
-    app.innerHTML = `<div class="error">${escapeHtml(message)}</div>`;
+  const appEl = document.getElementById('app');
+  if (appEl) {
+    appEl.innerHTML = `<div class="error">${escapeHtml(message)}</div>`;
   }
 }
 
 /**
  * Show empty state message
- * Override the default message by passing a custom message
  */
 function showEmpty(message: string = 'No data available.') {
-  const app = document.getElementById('app');
-  if (app) {
-    app.innerHTML = `
+  const appEl = document.getElementById('app');
+  if (appEl) {
+    appEl.innerHTML = `
       <div class="empty-state">
         <span class="empty-state-icon icon-inline">${iconInbox()}</span>
         <h3 class="empty-state-title">No logs found</h3>
@@ -337,7 +285,7 @@ function formatTimestamp(timestamp: string | number | null | undefined): { relat
     const diffMin = Math.floor(diffSec / 60);
     const diffHour = Math.floor(diffMin / 60);
     const diffDay = Math.floor(diffHour / 24);
-    
+
     let relative = '';
     if (diffSec < 60) {
       relative = `${diffSec}s ago`;
@@ -350,7 +298,7 @@ function formatTimestamp(timestamp: string | number | null | undefined): { relat
     } else {
       relative = date.toLocaleDateString();
     }
-    
+
     const absolute = date.toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -359,9 +307,9 @@ function formatTimestamp(timestamp: string | number | null | undefined): { relat
       second: '2-digit',
       hour12: false
     });
-    
+
     return { relative, absolute };
-  } catch (e) {
+  } catch {
     return { relative: 'Unknown', absolute: String(timestamp) };
   }
 }
@@ -459,7 +407,7 @@ function renderLogDetail(log: any): string {
   const timestamp = attrs.timestamp || '';
   const tags = attrs.tags || [];
   const asctime = nestedAttrs.asctime || '';
-  
+
   const statusClass = getStatusBadgeClass(status, levelname);
 
   let detailHtml = `
@@ -557,7 +505,7 @@ function renderLogDetail(log: any): string {
       additionalAttrs[key] = nestedAttrs[key];
     }
   });
-  
+
   if (Object.keys(additionalAttrs).length > 0) {
     detailHtml += `
       <div class="detail-section">
@@ -585,7 +533,7 @@ function extractUniqueValues(logs: any[], field: string): string[] {
   logs.forEach(log => {
     const attrs = log.attributes || {};
     const nestedAttrs = attrs.attributes || {};
-    let value = attrs[field] || nestedAttrs[field];
+    const value = attrs[field] || nestedAttrs[field];
     if (value) {
       values.add(String(value));
     }
@@ -609,7 +557,7 @@ function filterLogs() {
   filteredLogs = allLogs.filter(log => {
     const attrs = log.attributes || {};
     const nestedAttrs = attrs.attributes || {};
-    
+
     const service = String(attrs.service || nestedAttrs.service || '').toLowerCase();
     const host = String(attrs.host || nestedAttrs.host || '').toLowerCase();
     const message = String(attrs.message || '').toLowerCase();
@@ -617,27 +565,18 @@ function filterLogs() {
     const levelname = String(nestedAttrs.levelname || '').toLowerCase();
     const tags = (attrs.tags || []).map((t: any) => String(t).toLowerCase()).join(' ');
 
-    // Search filter
     if (searchTerm && !message.includes(searchTerm) && !tags.includes(searchTerm)) {
       return false;
     }
-
-    // Service filter
     if (serviceFilter && !service.includes(serviceFilter)) {
       return false;
     }
-
-    // Host filter
     if (hostFilter && !host.includes(hostFilter)) {
       return false;
     }
-
-    // Status filter
     if (statusFilter && !status.includes(statusFilter)) {
       return false;
     }
-
-    // Levelname filter
     if (levelnameFilter && !levelname.includes(levelnameFilter)) {
       return false;
     }
@@ -652,9 +591,9 @@ function filterLogs() {
  * Render logs list
  */
 function renderLogsList() {
-  const app = document.getElementById('app');
-  const container = app?.querySelector('.container');
-  
+  const appEl = document.getElementById('app');
+  const container = appEl?.querySelector('.container');
+
   if (!container) return;
 
   const logsHtml = filteredLogs.length > 0
@@ -679,11 +618,6 @@ function renderLogsList() {
   }
 
   updateSendToLLMButton();
-
-  // Notify host of size change
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 50);
 }
 
 /**
@@ -695,14 +629,14 @@ function renderLogsList() {
 
   const detailView = document.getElementById('detail-view');
   const detailContent = document.getElementById('detail-content');
-  
+
   if (detailContent) {
     detailContent.innerHTML = renderLogDetail(log);
   }
   if (detailView) {
     detailView.classList.add('active');
   }
-  
+
   document.body.style.overflow = 'hidden';
 };
 
@@ -723,11 +657,10 @@ function renderLogsList() {
 (window as any).copyLogMessage = function(index: number) {
   const log = filteredLogs[index];
   if (!log) return;
-  
+
   const attrs = log.attributes || {};
-  const nestedAttrs = attrs.attributes || {};
   const message = attrs.message || 'No message';
-  
+
   navigator.clipboard.writeText(message).then(() => {
     showCopyNotification('Message copied to clipboard');
   }).catch(err => {
@@ -741,7 +674,7 @@ function renderLogsList() {
 (window as any).copyLogJson = function(index: number) {
   const log = filteredLogs[index];
   if (!log) return;
-  
+
   const jsonStr = JSON.stringify(log, null, 2);
   navigator.clipboard.writeText(jsonStr).then(() => {
     showCopyNotification('Log JSON copied to clipboard');
@@ -761,14 +694,14 @@ function showCopyNotification(message: string) {
     notification.className = 'copy-notification';
     document.body.appendChild(notification);
   }
-  
+
   notification.innerHTML = `
     <span class="icon-inline">${iconCheck()}</span>
     <span>${escapeHtml(message)}</span>
   `;
-  
+
   notification.classList.add('show');
-  
+
   setTimeout(() => {
     notification.classList.remove('show');
   }, 2000);
@@ -836,7 +769,7 @@ function formatLogForLLM(log: any): string {
  * Send selected logs to the host chat (LLM) via ui/message
  */
 (window as any).sendToLLM = function() {
-  const selected = filteredLogs.filter((log, index) => selectedLogIds.has(getLogId(log, index)));
+  const selected = filteredLogs.filter((_log, index) => selectedLogIds.has(getLogId(_log, index)));
   if (selected.length === 0) {
     showCopyNotification('No logs selected');
     return;
@@ -898,7 +831,6 @@ function formatLogForLLM(log: any): string {
     chevronEl.innerHTML = filtersExpanded ? iconChevronUp() : iconChevronDown();
     chevronEl.setAttribute('aria-label', filtersExpanded ? 'Collapse filters' : 'Expand filters');
   }
-  notifySizeChanged();
 };
 
 /** Parameters for run_action_ui server tool (refresh logs from last 5 minutes) */
@@ -924,7 +856,6 @@ function dataFromToolResult(result: any): any {
 
 /**
  * Call server tool run_action_ui to refresh logs (last 5 minutes).
- * Uses MCP tools/call request; re-renders from the response result (host may not send a separate tool-result notification).
  */
 (window as any).refreshLogs = function() {
   const btn = document.getElementById('refresh-logs-btn');
@@ -946,7 +877,6 @@ function dataFromToolResult(result: any): any {
       if (data !== undefined) {
         renderData(data);
       }
-      // If host also sends ui/notifications/tool-result, renderData will run again (idempotent).
     })
     .catch(err => {
       console.error('Refresh logs failed:', err);
@@ -965,15 +895,15 @@ function dataFromToolResult(result: any): any {
  * Main render function
  */
 function renderData(data: any) {
-  const app = document.getElementById('app');
-  
-  if (!app) {
+  const appEl = document.getElementById('app');
+
+  if (!appEl) {
     console.error('App element not found!');
     return;
   }
-  
-  app.innerHTML = '';
-  
+
+  appEl.innerHTML = '';
+
   if (!data) {
     showEmpty('No data received');
     return;
@@ -982,10 +912,10 @@ function renderData(data: any) {
   try {
     // Unwrap nested data structures
     const unwrapped = unwrapData(data);
-    
+
     // Extract logs from the structure
     let logs: any[] = [];
-    
+
     if (unwrapped?.data && Array.isArray(unwrapped.data)) {
       logs = unwrapped.data;
     } else if (Array.isArray(unwrapped)) {
@@ -1010,7 +940,7 @@ function renderData(data: any) {
     const statuses = extractUniqueValues(logs, 'status');
     const levelnames = extractUniqueValues(logs, 'levelname');
 
-    let htmlContent = `
+    const htmlContent = `
       <div class="container container-with-scroll">
         <div class="sticky-top">
         <div class="header header-sticky">
@@ -1025,9 +955,9 @@ function renderData(data: any) {
 
         <div class="search-container">
           <span class="search-icon icon-inline">${iconSearch()}</span>
-          <input 
-            type="text" 
-            class="search-input" 
+          <input
+            type="text"
+            class="search-input"
             id="search-input"
             placeholder="Search logs by message or tags..."
             oninput="updateFilter('search', this.value)"
@@ -1097,98 +1027,173 @@ function renderData(data: any) {
       </div>
     `;
 
-    app.innerHTML = htmlContent;
+    appEl.innerHTML = htmlContent;
 
   } catch (error: any) {
     console.error('Render error:', error);
     showError(`Error rendering data: ${error.message}`);
-    // Notify size even on error
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
   }
 
   updateSendToLLMButton();
-  
-  // Notify host of size change after rendering completes
-  // Use setTimeout to ensure DOM is fully updated
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 50);
+
+  // Log data structure to console for debugging
+  console.log("Data rendered:", {
+    original: data,
+    logCount: allLogs.length,
+  });
 }
 
 /* ============================================
-   MESSAGE HANDLER (Standardized MCP Protocol)
+   MCP COMMUNICATION
    ============================================ */
 
-window.addEventListener('message', function(event: MessageEvent) {
+let requestIdCounter = 1;
+function sendRequest(method: string, params: any): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const id = requestIdCounter++;
+    window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, '*');
+
+    const listener = (event: MessageEvent) => {
+      if (event.data?.id === id) {
+        window.removeEventListener('message', listener);
+        if (event.data?.result) {
+          resolve(event.data.result);
+        } else if (event.data?.error) {
+          reject(new Error(event.data.error.message || 'Unknown error'));
+        }
+      }
+    };
+    window.addEventListener('message', listener);
+
+    // Timeout after 5 seconds
+    setTimeout(() => {
+      window.removeEventListener('message', listener);
+      reject(new Error('Request timeout'));
+    }, 5000);
+  });
+}
+
+/* ============================================
+   SDK UTILITIES ONLY (NO CONNECTION)
+   ============================================
+
+   We use the SDK only for utilities (theme helpers, types).
+   Message handling is done manually to work with the proxy.
+   ============================================ */
+
+// Create app instance
+const app = new App({
+  name: APP_NAME,
+  version: APP_VERSION,
+});
+
+/* ============================================
+   DIRECT MESSAGE HANDLING
+   ============================================
+
+   Handle messages manually to work with the proxy layer.
+   The proxy already handles ui/initialize, so we listen for notifications.
+   ============================================ */
+
+window.addEventListener("message", (event: MessageEvent) => {
   const msg = event.data;
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    return;
-  }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
-  }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      let data = msg.params?.structuredContent || msg.params;
-      
+
+  if (!msg) return;
+
+  // Handle JSON-RPC 2.0 protocol messages
+  if (msg.jsonrpc === "2.0") {
+    // Handle tool result notifications
+    if (msg.method === "ui/notifications/tool-result" && msg.params) {
+      console.info("Received tool result from proxy");
+      let data = msg.params.structuredContent || msg.params;
+
       if (typeof data === 'string') {
         try {
           data = JSON.parse(data);
-        } catch (e) {
-          console.warn('Failed to parse data as JSON:', e);
+        } catch {
+          console.warn('Failed to parse data as JSON');
         }
       }
-      
+
       if (data !== undefined) {
         renderData(data);
       } else {
         console.warn('ui/notifications/tool-result received but no data found:', msg);
         showEmpty('No data received');
       }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      if (msg.params?.theme === 'dark') {
-        document.body.classList.add('dark');
-      } else if (msg.params?.theme === 'light') {
-        document.body.classList.remove('dark');
+      return;
+    }
+
+    // Handle host context changes
+    if (msg.method === "ui/notifications/host-context-changed" && msg.params) {
+      console.info("Host context changed:", msg.params);
+
+      if (msg.params.theme) {
+        applyDocumentTheme(msg.params.theme);
       }
-      // Handle display mode changes
-      if (msg.params?.displayMode) {
-        handleDisplayModeChange(msg.params.displayMode);
+
+      if (msg.params.styles?.css?.fonts) {
+        applyHostFonts(msg.params.styles.css.fonts);
       }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      // Tool input notification (optional - handle if needed)
-      break;
-      
-    case 'ui/notifications/initialized':
-      // Initialization notification (optional - handle if needed)
-      break;
-      
-    default:
-      if (msg.params) {
-        let fallbackData = msg.params.structuredContent || msg.params;
-        
-        if (typeof fallbackData === 'string') {
-          try {
-            fallbackData = JSON.parse(fallbackData);
-          } catch (e) {
-            console.warn('Failed to parse fallback data as JSON:', e);
-          }
+
+      if (msg.params.styles?.variables) {
+        applyHostStyleVariables(msg.params.styles.variables);
+      }
+
+      if (msg.params.displayMode === "fullscreen") {
+        document.body.classList.add("fullscreen-mode");
+      } else if (msg.params.displayMode) {
+        document.body.classList.remove("fullscreen-mode");
+      }
+
+      return;
+    }
+
+    // Handle tool cancellation
+    if (msg.method === "ui/notifications/tool-cancelled") {
+      const reason = msg.params?.reason || "Unknown reason";
+      console.info("Tool cancelled:", reason);
+      showError(`Operation cancelled: ${reason}`);
+      return;
+    }
+
+    // Handle resource teardown
+    if (msg.id !== undefined && msg.method === "ui/resource-teardown") {
+      console.info("Resource teardown requested");
+
+      // Clean up resources
+      cleanupResize();
+
+      window.parent.postMessage(
+        {
+          jsonrpc: "2.0",
+          id: msg.id,
+          result: {},
+        },
+        "*",
+      );
+      return;
+    }
+
+    // Fallback: try to render unknown methods that have data
+    if (msg.method && msg.params) {
+      let fallbackData = msg.params.structuredContent || msg.params;
+
+      if (typeof fallbackData === 'string') {
+        try {
+          fallbackData = JSON.parse(fallbackData);
+        } catch {
+          console.warn('Failed to parse fallback data as JSON');
         }
-        
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
       }
+
+      if (fallbackData && fallbackData !== msg) {
+        console.warn('Unknown method:', msg.method, '- attempting to render data');
+        renderData(fallbackData);
+      }
+    }
+
+    return;
   }
 });
 
@@ -1202,7 +1207,7 @@ document.addEventListener('keydown', function(e) {
 // Close detail view on backdrop click
 const detailViewEl = document.getElementById('detail-view');
 if (detailViewEl) {
-  detailViewEl.addEventListener('click', function(e) {
+  detailViewEl.addEventListener('click', function(this: HTMLElement, e) {
     if (e.target === this) {
       (window as any).closeDetailView();
     }
@@ -1210,181 +1215,20 @@ if (detailViewEl) {
 }
 
 /* ============================================
-   MCP COMMUNICATION
+   APP INITIALIZATION
+   ============================================
+
+   No SDK connection needed - the proxy handles ui/initialize.
+   We only set up auto-resize and lifecycle cleanup.
    ============================================ */
 
-let requestIdCounter = 1;
-function sendRequest(method: string, params: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const id = requestIdCounter++;
-    window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, '*');
-    
-    const listener = (event: MessageEvent) => {
-      if (event.data?.id === id) {
-        window.removeEventListener('message', listener);
-        if (event.data?.result) {
-          resolve(event.data.result);
-        } else if (event.data?.error) {
-          reject(new Error(event.data.error.message || 'Unknown error'));
-        }
-      }
-    };
-    window.addEventListener('message', listener);
-    
-    // Timeout after 5 seconds
-    setTimeout(() => {
-      window.removeEventListener('message', listener);
-      reject(new Error('Request timeout'));
-    }, 5000);
-  });
-}
+// Setup automatic size change notifications
+// The SDK will monitor DOM changes and notify the host automatically
+const cleanupResize = app.setupSizeChangedNotifications();
 
-function sendNotification(method: string, params: any) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, '*');
-}
-
-/* ============================================
-   DISPLAY MODE HANDLING
-   ============================================ */
-
-let currentDisplayMode = 'inline';
-
-function handleDisplayModeChange(mode: string) {
-  currentDisplayMode = mode;
-  if (mode === 'fullscreen') {
-    document.body.classList.add('fullscreen-mode');
-    // Adjust layout for fullscreen if needed
-    const container = document.querySelector('.container');
-    if (container) {
-      (container as HTMLElement).style.maxWidth = '100%';
-      (container as HTMLElement).style.padding = '20px';
-    }
-  } else {
-    document.body.classList.remove('fullscreen-mode');
-    // Restore normal layout
-    const container = document.querySelector('.container');
-    if (container) {
-      (container as HTMLElement).style.maxWidth = '';
-      (container as HTMLElement).style.padding = '';
-    }
-  }
-  // Notify host of size change after mode change
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
-
-function requestDisplayMode(mode: string): Promise<any> {
-  return sendRequest('ui/request-display-mode', { mode: mode })
-    .then(result => {
-      if (result?.mode) {
-        handleDisplayModeChange(result.mode);
-      }
-      return result;
-    })
-    .catch(err => {
-      console.warn('Failed to request display mode:', err);
-      throw err;
-    });
-}
-
-// Make function globally accessible for testing/debugging
-(window as any).requestDisplayMode = requestDisplayMode;
-
-/* ============================================
-   SIZE CHANGE NOTIFICATIONS
-   ============================================ */
-
-function notifySizeChanged() {
-  const width = document.body.scrollWidth || document.documentElement.scrollWidth;
-  const height = document.body.scrollHeight || document.documentElement.scrollHeight;
-  
-  sendNotification('ui/notifications/size-changed', {
-    width: width,
-    height: height
-  });
-}
-
-// Debounce function to avoid too many notifications
-let sizeChangeTimeout: NodeJS.Timeout | null = null;
-function debouncedNotifySizeChanged() {
-  if (sizeChangeTimeout) {
-    clearTimeout(sizeChangeTimeout);
-  }
-  sizeChangeTimeout = setTimeout(() => {
-    notifySizeChanged();
-  }, 100); // Wait 100ms after last change
-}
-
-// Use ResizeObserver to detect size changes
-let resizeObserver: ResizeObserver | null = null;
-function setupSizeObserver() {
-  if (typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => {
-      debouncedNotifySizeChanged();
-    });
-    resizeObserver.observe(document.body);
-  } else {
-    // Fallback: use window resize and mutation observer
-    window.addEventListener('resize', debouncedNotifySizeChanged);
-    const mutationObserver = new MutationObserver(debouncedNotifySizeChanged);
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['style', 'class']
-    });
-  }
-  
-  // Send initial size after a short delay to ensure content is rendered
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
-
-/* ============================================
-   INITIALIZATION
-   ============================================ */
-
-// Initialize MCP App - REQUIRED for MCP Apps protocol
-sendRequest('ui/initialize', {
-  appCapabilities: {
-    availableDisplayModes: ["inline", "fullscreen"]
-  }
-}).then((ctx: any) => {
-  // Apply theme from host context
-  if (ctx?.theme === 'dark') {
-    document.body.classList.add('dark');
-  } else if (ctx?.theme === 'light') {
-    document.body.classList.remove('dark');
-  }
-  // Handle display mode from host context
-  if (ctx?.displayMode) {
-    handleDisplayModeChange(ctx.displayMode);
-  }
-  // Handle container dimensions if provided
-  if (ctx?.containerDimensions) {
-    const dims = ctx.containerDimensions;
-    if (dims.width) {
-      document.body.style.width = dims.width + 'px';
-    }
-    if (dims.height) {
-      document.body.style.height = dims.height + 'px';
-    }
-    if (dims.maxWidth) {
-      document.body.style.maxWidth = dims.maxWidth + 'px';
-    }
-    if (dims.maxHeight) {
-      document.body.style.maxHeight = dims.maxHeight + 'px';
-    }
-  }
-}).catch(err => {
-  console.warn('Failed to initialize MCP App:', err);
-  // Fallback to system preference if initialization fails
+// Clean up on page unload
+window.addEventListener("beforeunload", () => {
+  cleanupResize();
 });
 
-initializeDarkMode();
-
-// Setup size observer to notify host of content size changes
-// This is critical for the host to properly size the iframe
-setupSizeObserver();
+console.info("MCP App initialized (SDK utilities mode)");
