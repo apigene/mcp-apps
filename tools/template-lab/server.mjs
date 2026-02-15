@@ -227,11 +227,20 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (pathname.startsWith("/template/")) {
-      const rel = pathname.replace(/^\/template\//, "");
-      const filePath = safeJoin(repoRoot, rel);
+      let rel = pathname.replace(/^\/template\//, "").replace(/^templates\//, "");
+      let filePath = safeJoin(repoRoot, path.join("templates", rel));
       if (!filePath) {
         sendText(res, 400, "Invalid path", "text/plain");
         return;
+      }
+
+      if (rel.endsWith("dist/mcp-app.html")) {
+        const exists = await fs.access(filePath).then(() => true).catch(() => false);
+        if (!exists) {
+          const fallback = path.join(path.dirname(path.dirname(filePath)), "mcp-app.html");
+          const fallbackExists = await fs.access(fallback).then(() => true).catch(() => false);
+          if (fallbackExists) filePath = fallback;
+        }
       }
 
       const content = await fs.readFile(filePath);

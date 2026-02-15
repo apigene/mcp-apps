@@ -63,10 +63,13 @@ npx mcp-app-playground mcp stdio
 ```bash
 npx mcp-app-playground start
 npx mcp-app-playground list
+npx mcp-app-playground build    # build all templates that have a build script
 npx mcp-app-playground lab
 npx mcp-app-playground mcp http
 npx mcp-app-playground mcp stdio
 ```
+
+From the repo root you can also run `npm run build:templates` to build all templates.
 
 ## Template Contract (Recommended)
 

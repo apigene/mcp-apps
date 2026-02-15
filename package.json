@@ -40,11 +40,13 @@
     "README.md"
   ],
   "scripts": {
+    "build": "echo 'No build step — templates run as ES modules'",
     "start": "node bin/mcp-app-playground.mjs start",
     "lab": "node tools/template-lab/server.mjs",
     "list": "node bin/mcp-app-playground.mjs list",
     "mcp:http": "node --import tsx tools/template-mcp-server/main.ts",
-    "mcp:stdio": "node --import tsx tools/template-mcp-server/main.ts --stdio"
+    "mcp:stdio": "node --import tsx tools/template-mcp-server/main.ts --stdio",
+    "build:templates": "node bin/mcp-app-playground.mjs build"
   },
   "engines": {
     "node": ">=18"

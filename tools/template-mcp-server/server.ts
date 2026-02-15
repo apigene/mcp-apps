@@ -91,17 +91,32 @@ function toStructuredContent(payload: unknown): Record<string, unknown> {
   return { value: payload ?? null };
 }
 
-function readTemplateHtmlSync(templateName: string): string {
-  const htmlPath = path.join(TEMPLATES_ROOT, templateName, "dist", "mcp-app.html");
-  return readFileSync(htmlPath, "utf8");
-}
+const distPath = (name: string) =>
+  path.join(TEMPLATES_ROOT, name, "dist", "mcp-app.html");
+const sourcePath = (name: string) =>
+  path.join(TEMPLATES_ROOT, name, "mcp-app.html");
 
-function templateDistPath(templateName: string): string {
-  return path.join(TEMPLATES_ROOT, templateName, "dist", "mcp-app.html");
+function readTemplateHtmlSync(templateName: string): string {
+  const dist = distPath(templateName);
+  const src = sourcePath(templateName);
+  if (existsSync(dist)) return readFileSync(dist, "utf8");
+  if (existsSync(src)) return readFileSync(src, "utf8");
+  throw new Error(`No mcp-app.html found for template: ${templateName}`);
 }
 
 function isTemplateBuilt(templateName: string): boolean {
-  return existsSync(templateDistPath(templateName));
+  return existsSync(distPath(templateName));
+}
+
+function templateHasBuildScript(templateName: string): boolean {
+  const pkgPath = path.join(TEMPLATES_ROOT, templateName, "package.json");
+  if (!existsSync(pkgPath)) return false;
+  try {
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+    return typeof pkg?.scripts?.build === "string";
+  } catch {
+    return false;
+  }
 }
 
 function runCommand(command: string, args: string[], cwd: string): Promise<void> {
