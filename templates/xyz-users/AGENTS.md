@@ -38,7 +38,7 @@ Required updates for a new template:
 
 Optional:
 - add `src/mcp-app-impl.ts` for complex parsing/formatting
-- add `response.json` in the template root for Template Lab preview payload
+- add `response.json` in the template root for MCP Apps Playground preview payload
 
 ## What Agents Should Not Modify (by default)
 
@@ -67,4 +67,4 @@ Before finishing:
 - tool result path renders expected UI
 - teardown response for `ui/resource-teardown` still present
 - user content is escaped (`escapeHtml`) where needed
-- template has `response.json` (recommended for Template Lab; not required for runtime)
+- template has `response.json` (recommended for MCP Apps Playground; not required for runtime)

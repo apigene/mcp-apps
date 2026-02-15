@@ -61,7 +61,7 @@ npm run preview  # preview built dist
 
 `response.json` is optional for runtime usage in real MCP hosts.
 
-It is recommended for local preview workflows (Template Lab and demo servers):
+It is recommended for local preview workflows (MCP Apps Playground and demo servers):
 - if `<template>/response.json` exists, preview tools use it
 - otherwise they fall back to a default mock payload
 

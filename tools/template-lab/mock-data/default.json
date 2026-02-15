@@ -3,7 +3,7 @@
     {
       "status_code": 200,
       "response_content": {
-        "title": "Template Lab mock payload",
+        "title": "MCP Apps Playground mock payload",
         "summary": "Default structuredContent for local preview.",
         "items": [
           {

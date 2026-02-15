@@ -277,5 +277,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(port, host, () => {
-  console.log(`Template Lab running at http://${host}:${port}`);
+  console.log(`MCP Apps Playground running at http://${host}:${port}`);
 });

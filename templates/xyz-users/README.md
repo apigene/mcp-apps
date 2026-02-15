@@ -123,7 +123,7 @@ Keep as-is unless you know why:
 ## Notes
 
 - This base template intentionally has no fallback demo timeout.
-- `response.json` is optional for MCP runtime, but recommended for local preview in Template Lab.
-- Template Lab mock payload resolution:
+- `response.json` is optional for MCP runtime, but recommended for local preview in MCP Apps Playground.
+- MCP Apps Playground mock payload resolution:
   - `<template>/response.json` if present
   - fallback to `tools/template-lab/mock-data/default.json`

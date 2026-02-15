@@ -41,7 +41,7 @@ function parseTemplateName(args: Record<string, unknown> | undefined): string {
   if (template.trim()) return normalizeTemplateName(template);
 
   const request = typeof args?.request === "string" ? args.request : "";
-  const match = request.match(/show\s+demo\s+for\s+(.+)/i);
+  const match = request.match(/show\s+demo\s+app\s+(.+)/i) ?? request.match(/show\s+demo\s+for\s+(.+)/i);
   if (match?.[1]) return normalizeTemplateName(match[1]);
 
   return "";
@@ -194,19 +194,52 @@ export function createServer(): McpServer {
 
   const templates = listTemplates();
 
-  // Lookup/not-found helper tool (no UI binding).
+  // List all apps available to demo (no UI binding).
   registerAppTool(
     server,
-    "show_demo_for",
+    "list_demo_apps",
     {
-      title: "Show Demo For Template",
+      title: "List Demo Apps",
       description:
-        "Find a template demo tool by name. Pass template or request like 'show demo for xyz-users'.",
+        "List all MCP app templates available to demo. Returns template names and the tool to open each one.",
+      inputSchema: {},
+      _meta: {},
+    },
+    async () => {
+      const currentTemplates = listTemplates();
+      const apps = currentTemplates.map((t) => ({
+        name: t.name,
+        tool: t.toolName,
+      }));
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Available demo apps (${apps.length}): ${apps.map((a) => a.name).join(", ")}. Use show_demo_app with template name, or call the specific tool (e.g. ${apps[0]?.tool ?? "show_demo_<name>"}) to open one.`,
+          },
+        ],
+        structuredContent: {
+          ok: true,
+          count: apps.length,
+          apps,
+        },
+      };
+    },
+  );
+
+  // Lookup/helper tool: show_demo_app (no UI binding).
+  registerAppTool(
+    server,
+    "show_demo_app",
+    {
+      title: "Show Demo App",
+      description:
+        "Open an MCP app demo by template name. Pass template or request like 'show demo app xyz-users'. Use list_demo_apps to see all available apps.",
       inputSchema: {
         request: z
           .string()
           .optional()
-          .describe("Natural-language request like: show demo for xyz-users"),
+          .describe("Natural-language request like: show demo app xyz-users"),
         template: z
           .string()
           .optional()
@@ -225,7 +258,7 @@ export function createServer(): McpServer {
             {
               type: "text",
               text:
-                "Template name is missing. Use: 'show demo for <template>' or pass template argument.",
+                "Template name is missing. Use show_demo_app with template argument, or say 'show demo app <name>'. Use list_demo_apps to see all available apps.",
             },
           ],
           structuredContent: {

@@ -2,7 +2,28 @@ const selectEl = document.getElementById("template-select");
 const statusEl = document.getElementById("status");
 const frameEl = document.getElementById("preview-frame");
 
+const MCP_SERVER_URL = "http://127.0.0.1:3001/mcp";
+
 let templates = [];
+
+function initMcpCopy() {
+  const urlEl = document.getElementById("mcp-server-url");
+  const btn = document.getElementById("mcp-server-copy");
+  if (!urlEl || !btn) return;
+  btn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(MCP_SERVER_URL);
+      btn.textContent = "Copied!";
+      btn.classList.add("copied");
+      setTimeout(() => {
+        btn.textContent = "Copy";
+        btn.classList.remove("copied");
+      }, 2000);
+    } catch (err) {
+      console.error("Copy failed:", err);
+    }
+  });
+}
 
 function setStatus(text) {
   statusEl.textContent = text;
@@ -58,12 +79,14 @@ async function sendInitialEvents(templateName) {
     method: "ui/notifications/tool-result",
     params: {
       structuredContent: payload,
-      content: [{ type: "text", text: "Template Lab mock event" }],
+      content: [{ type: "text", text: "MCP Apps Playground mock event" }],
     },
   });
 
   return source;
 }
+
+const REPO_TEMPLATES = "https://github.com/apigene/mcp-apps/tree/main/templates";
 
 function renderOptions() {
   selectEl.innerHTML = "";
@@ -81,6 +104,15 @@ function renderOptions() {
   } else if (templates[0]) {
     selectEl.value = templates[0].name;
   }
+  updateSourceLink();
+}
+
+function updateSourceLink() {
+  const link = document.getElementById("source-link");
+  if (!link) return;
+  const selected = templates.find((t) => t.name === selectEl.value);
+  link.href = selected ? `${REPO_TEMPLATES}/${encodeURIComponent(selected.name)}` : REPO_TEMPLATES;
+  link.textContent = selected ? `Open source: templates/${selected.name}/ →` : "View all templates on GitHub →";
 }
 
 async function loadSelectedTemplate() {
@@ -117,11 +149,14 @@ frameEl.addEventListener("load", async () => {
 });
 
 selectEl.addEventListener("change", () => {
+  updateSourceLink();
   loadSelectedTemplate().catch((error) => {
     console.error(error);
     setStatus(`Error: ${error.message}`);
   });
 });
+
+initMcpCopy();
 
 async function init() {
   try {

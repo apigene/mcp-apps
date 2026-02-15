@@ -17,15 +17,21 @@ Open-source repository of MCP App templates and local tooling.
 
 ## Quick Start
 
-### 1) Run Lab + MCP HTTP together
+### 1) Run Lab + MCP HTTP (default)
+
+```bash
+npx mcp-app-playground
+```
+
+With no arguments, starts the MCP Apps Playground and MCP server and opens the lab in your browser. You can also run:
 
 ```bash
 npx mcp-app-playground start
 ```
 
-Starts:
-- Template Lab: `http://localhost:4311`
-- MCP HTTP endpoint: `http://127.0.0.1:3001/mcp`
+Both start:
+- **MCP Apps Playground:** `http://localhost:4311` — preview any template with mock tool results; includes docs on connecting to MCP and customizing mock data
+- **MCP HTTP endpoint:** `http://127.0.0.1:3001/mcp`
 
 ### 2) Create a new template
 
@@ -36,7 +42,7 @@ npm install
 npm run build
 ```
 
-### 3) Preview in Template Lab only
+### 3) Preview in MCP Apps Playground only
 
 ```bash
 npx mcp-app-playground lab

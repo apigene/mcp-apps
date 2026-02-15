@@ -42,7 +42,7 @@ In `src/mcp-app.css` and `mcp-app.html`:
 Optional:
 
 - Add helpers (e.g. formatDate, normalizeData) in `src/mcp-app.ts` or `src/mcp-app-impl.ts`.
-- Add `response.json` in the template root for Template Lab / preview tooling.
+- Add `response.json` in the template root for MCP Apps Playground / preview tooling.
 
 ## SDK Utilities (What This Template Uses)
 
@@ -142,7 +142,7 @@ Output: `dist/mcp-app.html` (single-file bundle via Vite + `vite-plugin-singlefi
 - Tool result path drives `renderData()` and expected UI.
 - `ui/resource-teardown` receives a JSON-RPC `result: {}` response.
 - User/content is escaped with `escapeHtml` where needed.
-- Optional: `response.json` for Template Lab preview.
+- Optional: `response.json` for MCP Apps Playground preview.
 
 ## Optional: Streaming and Fullscreen
 

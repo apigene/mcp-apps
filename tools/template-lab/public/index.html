@@ -3,26 +3,104 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Template Lab</title>
+    <title>MCP Apps Playground</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <header class="topbar">
-      <h1>Template Lab</h1>
-      <p>Preview any built MCP template (`dist/mcp-app.html`) with mock events.</p>
+    <header class="header">
+      <div class="header-inner">
+        <h1 class="logo">MCP Apps Playground</h1>
+        <p class="tagline">Preview and develop MCP App templates with mock tool results. Each template is a UI that runs inside MCP hosts (e.g. Claude, Cursor).</p>
+      </div>
     </header>
 
-    <main class="layout">
-      <section class="controls">
-        <label for="template-select">Template</label>
-        <select id="template-select"></select>
-        <p id="status" class="status"></p>
-      </section>
+    <div class="app">
+      <aside class="sidebar">
+        <section class="panel control-panel">
+          <h2 class="panel-title">Preview</h2>
+          <label for="template-select" class="label">Template</label>
+          <select id="template-select" class="select" aria-label="Choose template"></select>
+          <p id="status" class="status" aria-live="polite"></p>
+        </section>
 
-      <section class="preview">
-        <iframe id="preview-frame" title="Template preview"></iframe>
-      </section>
-    </main>
+        <section class="panel card">
+          <details class="collapsible" id="what-is-this">
+            <summary class="panel-title collapsible-summary">What is this?</summary>
+            <div class="collapsible-body">
+              <p class="prose">MCP Apps Playground loads a built MCP App (<code>dist/mcp-app.html</code> or source <code>mcp-app.html</code>) and sends it a mock <strong>tool-result</strong> event so you can see how the UI renders without connecting to a real MCP server.</p>
+
+              <h3 class="panel-subtitle">App source code</h3>
+              <p class="prose">Each template lives in the repo under <code>templates/&lt;name&gt;/</code>. Source files: <code>mcp-app.html</code>, <code>src/mcp-app.ts</code>, <code>src/mcp-app.css</code>.</p>
+              <p class="prose">
+                <a id="source-link" href="https://github.com/apigene/mcp-apps/tree/main/templates" target="_blank" rel="noopener noreferrer" class="link">View all templates on GitHub →</a>
+              </p>
+
+              <h3 class="panel-subtitle">Docs</h3>
+              <p class="prose">
+                <a href="https://github.com/apigene/mcp-apps#readme" target="_blank" rel="noopener noreferrer" class="link">README — quick start, CLI, template contract</a>
+              </p>
+
+              <h3 class="panel-subtitle">How to connect to MCP</h3>
+              <ul class="list">
+                <li>Run <code>npx mcp-app-playground start</code> to start this lab and the demo MCP server.</li>
+                <li>In your own MCP server: register tools with a <code>ui</code> (or similar) metadata pointing to your app’s HTML resource; the host will load the app and send tool arguments when the user invokes the tool.</li>
+              </ul>
+
+              <h3 class="panel-subtitle">How to change the mock response</h3>
+              <ul class="list">
+                <li><strong>Per template:</strong> add <code>response.json</code> in the template folder (<code>templates/&lt;name&gt;/response.json</code>). The lab uses this as the <code>structuredContent</code> payload for that template.</li>
+                <li><strong>Default for all:</strong> edit <code>tools/template-lab/mock-data/default.json</code> in the repo. Used when a template has no <code>response.json</code>.</li>
+              </ul>
+            </div>
+          </details>
+        </section>
+
+        <section class="panel card">
+          <details class="collapsible" id="add-mcp-server">
+            <summary class="panel-title collapsible-summary">Add MCP server to your client</summary>
+            <div class="collapsible-body">
+              <p class="prose">To use the demo templates in Claude, Cursor, or another MCP client, add this local MCP server (HTTP):</p>
+              <div class="mcp-server-row">
+                <code class="mcp-server-url" id="mcp-server-url">http://127.0.0.1:3001/mcp</code>
+                <button type="button" class="mcp-server-copy" id="mcp-server-copy" aria-label="Copy MCP server URL">Copy</button>
+              </div>
+              <p class="mcp-server-hint">Paste this URL in your client’s MCP server configuration (e.g. Cursor Settings → MCP, or Claude Desktop config).</p>
+            </div>
+          </details>
+        </section>
+
+        <section class="panel card">
+          <details class="collapsible" id="create-new-template">
+            <summary class="panel-title collapsible-summary">How to create a new template</summary>
+            <div class="collapsible-body">
+              <p class="prose">Copy the recommended base template, install dependencies, and build:</p>
+              <ol class="list list-ordered">
+                <li>From the repo root, copy the base template and rename it:
+                  <pre class="code-block">cp -r templates/base-template-sdk templates/my-app
+cd templates/my-app</pre>
+                </li>
+                <li>Install dependencies and build:
+                  <pre class="code-block">npm install
+npm run build</pre>
+                </li>
+                <li>Customize <code>src/mcp-app.ts</code> (e.g. <code>APP_NAME</code>, <code>renderData()</code>), <code>src/mcp-app.css</code>, and <code>mcp-app.html</code> as needed.</li>
+                <li>Add <code>response.json</code> in the template folder for mock data in the lab (optional).</li>
+                <li>Your built app is at <code>dist/mcp-app.html</code>. Use it in your MCP server as the UI resource for a tool.</li>
+              </ol>
+              <p class="prose">
+                <a href="https://github.com/apigene/mcp-apps#readme" target="_blank" rel="noopener noreferrer" class="link">Full docs in README →</a>
+              </p>
+            </div>
+          </details>
+        </section>
+      </aside>
+
+      <main class="main">
+        <div class="preview-wrap">
+          <iframe id="preview-frame" class="preview-frame" title="Template preview"></iframe>
+        </div>
+      </main>
+    </div>
 
     <script type="module" src="/app.js"></script>
   </body>

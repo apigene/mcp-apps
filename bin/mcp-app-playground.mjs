@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { spawn, spawnSync } from "node:child_process";
+import { exec, spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,13 +38,14 @@ function help() {
  ${title}  ${dim("Local tooling for MCP App templates")}
 
  ${style(c.bold, "Usage")}
-   npx mcp-app-playground ${cmd("<command>")} ${opt("[options]")}
+   npx mcp-app-playground ${opt("[command]")}
+   ${dim("No command → starts Lab + MCP server and opens the lab in your browser.")}
 
  ${style(c.bold, "Commands")}
-   ${cmd("start")}        Start Template Lab + MCP server (HTTP). Open the lab in your browser.
+   ${cmd("start")}        Start MCP Apps Playground + MCP server (HTTP). Optionally opens the lab in your browser.
    ${cmd("list")}        List all available templates in templates/
    ${cmd("build")}       Install deps and build every template that has a build script
-   ${cmd("lab")}         Run only the Template Lab (web preview server)
+   ${cmd("lab")}         Run only the MCP Apps Playground (web preview server)
    ${cmd("mcp")} ${opt("http")}   Run only the MCP demo server over HTTP
    ${cmd("mcp")} ${opt("stdio")}  Run only the MCP demo server over stdio (for CLI hosts)
    ${cmd("help")}        Show this help
@@ -75,7 +76,7 @@ function run(command, args, cwd) {
   });
 }
 
-function runDev() {
+function runDev(shouldOpenBrowser = false) {
   const procs = [];
 
   function spawnNamed(name, command, args, cwd) {
@@ -111,13 +112,17 @@ function runDev() {
     process.exit(0);
   });
 
-  console.log(style(c.bold, "\n MCP App Playground\n"));
-  console.log(style(c.dim, " Starting Template Lab and MCP HTTP server...\n"));
-  console.log("  " + style(c.cyan, "Template Lab") + "  " + style(c.blue, "http://localhost:4311") + style(c.dim, "  (preview templates in the browser)"));
+  console.log(style(c.bold, "\n MCP Apps Playground\n"));
+  console.log(style(c.dim, " Starting MCP Apps Playground and MCP HTTP server...\n"));
+  console.log("  " + style(c.cyan, "MCP Apps Playground") + "  " + style(c.blue, "http://localhost:4311") + style(c.dim, "  (preview templates in the browser)"));
   console.log("  " + style(c.cyan, "MCP server") + "   " + style(c.blue, "http://127.0.0.1:3001/mcp") + style(c.dim, "  (HTTP transport for MCP clients)\n"));
+  if (shouldOpenBrowser) {
+    console.log(style(c.dim, " Opening MCP Apps Playground in your browser in a moment.\n"));
+    setTimeout(() => openBrowser("http://127.0.0.1:4311"), 1800);
+  }
   console.log(style(c.dim, " Press Ctrl+C to stop both servers.\n"));
 
-  spawnNamed("Template Lab", "node", ["server.mjs"], labDir);
+  spawnNamed("MCP Apps Playground", "node", ["server.mjs"], labDir);
   spawnNamed("MCP HTTP Server", "node", ["--import", "tsx", mcpMain], repoRoot);
 }
 
@@ -209,9 +214,22 @@ function buildAllTemplates() {
 
 const [, , cmd, sub] = process.argv;
 
-if (!cmd || cmd === "help" || cmd === "--help" || cmd === "-h") {
+if (cmd === "help" || cmd === "--help" || cmd === "-h") {
   help();
   process.exit(0);
+}
+
+function openBrowser(url) {
+  const platform = process.platform;
+  const command =
+    platform === "darwin"
+      ? `open "${url}"`
+      : platform === "win32"
+        ? `start "" "${url}"`
+        : `xdg-open "${url}"`;
+  exec(command, (err) => {
+    if (err) console.error("Could not open browser:", err.message);
+  });
 }
 
 if (cmd === "list") {
@@ -220,10 +238,10 @@ if (cmd === "list") {
 } else if (cmd === "build") {
   buildAllTemplates();
   process.exit(0);
-} else if (cmd === "start" || cmd === "dev") {
-  runDev();
+} else if (cmd === "start" || cmd === "dev" || !cmd) {
+  runDev(!cmd);
 } else if (cmd === "lab") {
-  console.log(style(c.bold, "\n Template Lab") + style(c.dim, " (preview only)\n"));
+  console.log(style(c.bold, "\n MCP Apps Playground") + style(c.dim, " (preview only)\n"));
   console.log("  " + style(c.blue, "http://localhost:4311") + style(c.dim, "  — open in your browser to preview templates\n"));
   console.log(style(c.dim, " Press Ctrl+C to stop.\n"));
   run("node", ["server.mjs"], labDir);

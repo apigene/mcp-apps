@@ -1,4 +1,4 @@
-# Template Lab
+# MCP Apps Playground
 
 Small root-level dev app for previewing MCP templates in this repository.
 
@@ -25,6 +25,6 @@ Open: `http://localhost:4311`
 
 ## Important
 
-- On template selection, Lab auto-builds when `dist/mcp-app.html` is missing.
-- If build fails, Lab will try `npm install` once and then rebuild.
+- On template selection, the playground auto-builds when `dist/mcp-app.html` is missing.
+- If build fails, the playground will try `npm install` once and then rebuild.
 - Put a `response.json` in `templates/<template>/` to control preview payload.

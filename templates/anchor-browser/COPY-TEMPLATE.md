@@ -41,7 +41,7 @@ rm -rf node_modules dist .DS_Store
 npm install
 npm run build
 
-# Optional but recommended for local preview in Template Lab
+# Optional but recommended for local preview in MCP Apps Playground
 cp /path/to/sample/response.json ./response.json
 ```
 

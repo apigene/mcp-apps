@@ -40,7 +40,7 @@ async function startHttp(createMcpServer: () => McpServer): Promise<void> {
       process.exit(1);
     }
     console.log(`MCP server: http://127.0.0.1:${port}/mcp`);
-    console.log("Tool: show_demo_for");
+    console.log("Tools: show_demo_app, list_demo_apps");
   });
 
   const shutdown = () => {
