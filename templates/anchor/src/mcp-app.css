@@ -1,0 +1,58 @@
+/* Anchor template: single screenshot from body.media_type + body.data */
+
+.container.anchor-screenshot {
+  max-width: 100%;
+  padding: 16px;
+}
+
+.anchor-screenshot .mcp-app-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #5f6368;
+  background: #e8eaed;
+  padding: 4px 10px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  letter-spacing: 0.02em;
+}
+
+body.dark .anchor-screenshot .mcp-app-badge {
+  color: #9aa0a6;
+  background: #3c4043;
+}
+
+.anchor-screenshot-wrap {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e0e0e0;
+  background: #f8f9fa;
+}
+
+body.dark .anchor-screenshot-wrap {
+  border-color: #3c4043;
+  background: #1a1a1a;
+}
+
+.anchor-screenshot-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  vertical-align: top;
+}
+
+.anchor-screenshot-caption {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 0.8125rem;
+  color: #5f6368;
+}
+
+body.dark .anchor-screenshot-caption {
+  color: #9aa0a6;
+}
+
+body.fullscreen-mode .anchor-screenshot-image {
+  max-height: min(70vh, 900px);
+  object-fit: contain;
+}
