@@ -34,13 +34,19 @@ async function startHttp(createMcpServer: () => McpServer): Promise<void> {
     }
   });
 
+  const tty = process.stdout?.isTTY;
+  const dim = (s: string) => (tty ? `\x1b[2m${s}\x1b[0m` : s);
+  const cyan = (s: string) => (tty ? `\x1b[36m${s}\x1b[0m` : s);
+
   const httpServer = app.listen(port, (err?: Error) => {
     if (err) {
       console.error("Failed to start server:", err);
       process.exit(1);
     }
-    console.log(`MCP server: http://127.0.0.1:${port}/mcp`);
-    console.log("Tools: show_demo_app, list_demo_apps");
+    console.log(cyan(`MCP server: http://127.0.0.1:${port}/mcp`));
+    console.log(dim("Tools:"));
+    console.log(dim(`  • list_demo_apps — list all demo apps (no args)`));
+    console.log(dim(`  • show_demo_app  — open a demo (args: template name or request like "show demo app xyz-users")`));
   });
 
   const shutdown = () => {

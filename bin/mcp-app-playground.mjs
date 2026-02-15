@@ -113,14 +113,17 @@ function runDev(shouldOpenBrowser = false) {
   });
 
   console.log(style(c.bold, "\n MCP Apps Playground\n"));
-  console.log(style(c.dim, " Starting MCP Apps Playground and MCP HTTP server...\n"));
-  console.log("  " + style(c.cyan, "MCP Apps Playground") + "  " + style(c.blue, "http://localhost:4311") + style(c.dim, "  (preview templates in the browser)"));
-  console.log("  " + style(c.cyan, "MCP server") + "   " + style(c.blue, "http://127.0.0.1:3001/mcp") + style(c.dim, "  (HTTP transport for MCP clients)\n"));
+  console.log(style(c.dim, " Starting servers...\n"));
+  console.log("  " + style(c.cyan, "Playground") + "  " + style(c.blue, "http://localhost:4311") + style(c.dim, "  — preview templates in the browser"));
+  console.log("  " + style(c.cyan, "MCP server") + "  " + style(c.blue, "http://127.0.0.1:3001/mcp") + style(c.dim, "  — add this URL in Cursor / Claude / your MCP client\n"));
+  console.log(style(c.bold, " MCP tools (use after adding the server URL above):\n"));
+  console.log("  " + style(c.green, "list_demo_apps") + style(c.dim, "  — list all app templates you can demo; call this first to see available apps"));
+  console.log("  " + style(c.green, "show_demo_app") + style(c.dim, "  — open a demo by name, e.g. show_demo_app with template: \"xyz-users\" or say \"show demo app xyz-users\"\n"));
   if (shouldOpenBrowser) {
-    console.log(style(c.dim, " Opening MCP Apps Playground in your browser in a moment.\n"));
+    console.log(style(c.dim, " Opening playground in your browser in a moment.\n"));
     setTimeout(() => openBrowser("http://127.0.0.1:4311"), 1800);
   }
-  console.log(style(c.dim, " Press Ctrl+C to stop both servers.\n"));
+  console.log(style(c.dim, " Press Ctrl+C to stop.\n"));
 
   spawnNamed("MCP Apps Playground", "node", ["server.mjs"], labDir);
   spawnNamed("MCP HTTP Server", "node", ["--import", "tsx", mcpMain], repoRoot);

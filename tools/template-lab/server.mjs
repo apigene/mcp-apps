@@ -276,6 +276,10 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+const tty = process.stdout?.isTTY;
+const dim = (s) => (tty ? `\x1b[2m${s}\x1b[0m` : s);
+const cyan = (s) => (tty ? `\x1b[36m${s}\x1b[0m` : s);
+
 server.listen(port, host, () => {
-  console.log(`MCP Apps Playground running at http://${host}:${port}`);
+  console.log(cyan(`Playground: http://${host}:${port}`));
 });
