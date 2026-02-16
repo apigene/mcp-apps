@@ -1,0 +1,269 @@
+{
+  "offers": [
+    {
+      "id": "gid://shopify/p/4cMS0b7P1EGFVx9NcgfChv",
+      "title": "THE ROGER Advantage",
+      "description": "Classic tennis-inspired sneakers with cushioned comfort and breathable mesh for all-day wear.",
+      "uniqueSellingPoint": "Combines tennis-inspired design with cushioned comfort and breathable mesh for versatile everyday use.",
+      "topFeatures": [
+        "Cushioned insole provides lasting comfort during extended wear",
+        "Breathable mesh upper keeps feet cool and dry",
+        "Lace-up closure ensures a secure, adjustable fit"
+      ],
+      "techSpecs": [
+        "Closure Type: Lace-up",
+        "Upper Material: Mesh, Synthetic",
+        "Heel Height Type: Flat",
+        "Color: White"
+      ],
+      "attributes": [
+        { "name": "Closure type", "values": ["Lace-up"] },
+        { "name": "Color", "values": ["White"] },
+        { "name": "Activity", "values": ["Tennis"] }
+      ],
+      "media": [
+        { "url": "https://cdn.shopify.com/s/files/1/0755/4383/9020/files/gujiyafzzp2rmlyqx0tu.png?v=1758181810", "altText": "front" }
+      ],
+      "priceRange": {
+        "min": { "amount": 8400, "currency": "USD" },
+        "max": { "amount": 9600, "currency": "USD" }
+      },
+      "lookupUrl": "https://discover.shopifyapps.com/global/v2/p/4cMS0b7P1EGFVx9NcgfChv",
+      "options": [
+        { "name": "Color", "values": [{ "value": "White | White" }, { "value": "White | Midnight" }] },
+        { "name": "Size", "values": [{ "value": "8" }, { "value": "9" }, { "value": "10" }] }
+      ],
+      "variants": [
+        {
+          "id": "gid://shopify/ProductVariant/52491319279916?shop=75543839020",
+          "productId": "gid://shopify/Product/10090876404012",
+          "displayName": "THE ROGER Advantage",
+          "availableForSale": true,
+          "price": { "amount": 9600, "currency": "USD" },
+          "media": [{ "url": "https://cdn.shopify.com/s/files/1/0755/4383/9020/files/gujiyafzzp2rmlyqx0tu.png?v=1758181810", "altText": "front" }],
+          "options": [{ "name": "Condition", "value": "Great" }, { "name": "Size", "value": "14" }],
+          "shop": { "id": "gid://shopify/Shop/75543839020", "name": "On, Inc", "onlineStoreUrl": "https://onward.on.com" },
+          "variantUrl": "https://onward.on.com/products/the-roger-advantage?variant=52491319279916",
+          "checkoutUrl": "https://onward.on.com/cart/52491319279916:1",
+          "secondhand": false
+        },
+        {
+          "id": "gid://shopify/ProductVariant/52041365782828?shop=75543839020",
+          "productId": "gid://shopify/Product/10090876404012",
+          "displayName": "THE ROGER Advantage",
+          "availableForSale": true,
+          "price": { "amount": 8400, "currency": "USD" },
+          "media": [{ "url": "https://cdn.shopify.com/s/files/1/0755/4383/9020/files/gujiyafzzp2rmlyqx0tu.png?v=1758181810", "altText": "front" }],
+          "options": [{ "name": "Condition", "value": "Great" }, { "name": "Size", "value": "7.5" }],
+          "shop": { "id": "gid://shopify/Shop/75543839020", "name": "On, Inc", "onlineStoreUrl": "https://onward.on.com" },
+          "variantUrl": "https://onward.on.com/products/the-roger-advantage?variant=52041365782828",
+          "checkoutUrl": "https://onward.on.com/cart/52041365782828:1",
+          "secondhand": false
+        },
+        {
+          "id": "gid://shopify/ProductVariant/51955917750572?shop=75543839020",
+          "productId": "gid://shopify/Product/10090866377004",
+          "displayName": "THE ROGER Advantage",
+          "availableForSale": true,
+          "price": { "amount": 9600, "currency": "USD" },
+          "media": [{ "url": "https://cdn.shopify.com/s/files/1/0755/4383/9020/files/qp8ogqwo8aqa9ndnryjq.png?v=1758181550", "altText": "front" }],
+          "options": [{ "name": "Condition", "value": "Basically Perfect" }, { "name": "Size", "value": "8.5" }],
+          "shop": { "id": "gid://shopify/Shop/75543839020", "name": "On, Inc", "onlineStoreUrl": "https://onward.on.com" },
+          "variantUrl": "https://onward.on.com/products/the-roger-advantage?variant=51955917750572",
+          "checkoutUrl": "https://onward.on.com/cart/51955917750572:1",
+          "secondhand": false
+        }
+      ]
+    },
+    {
+      "id": "gid://shopify/p/5QZyLj8EtSHsQmZPyVF3CK",
+      "title": "On Men's Cloud 6 Black Black",
+      "description": "The On Cloud 6 Black offers all-day comfort, support, and cushioning for active lifestyles with a modern, stylish design.",
+      "uniqueSellingPoint": "Combines CloudTec lightweight cushioning with Speedboard construction for superior comfort and support.",
+      "topFeatures": [
+        "CloudTec lightweight cushioning provides lasting comfort",
+        "Speedboard construction delivers dynamic movement and stability",
+        "Wider opening and updated sockliner ensure easy step-in"
+      ],
+      "techSpecs": [
+        "Weight: 7.6 oz",
+        "Closure Type: Lace-up",
+        "Material: Synthetic, Mesh, Rubber"
+      ],
+      "attributes": [
+        { "name": "Closure type", "values": ["Lace-up"] },
+        { "name": "Color", "values": ["Black"] },
+        { "name": "Target gender", "values": ["Male"] }
+      ],
+      "media": [
+        { "url": "https://cdn.shopify.com/s/files/1/1563/9833/files/o1_f10aadf0-8692-4b5c-9f23-5faa0357e99f.png?v=1745919323", "altText": "On Men's Cloud 6 Black Black" }
+      ],
+      "priceRange": {
+        "min": { "amount": 15995, "currency": "USD" },
+        "max": { "amount": 15995, "currency": "USD" }
+      },
+      "rating": { "rating": 5, "count": 3 },
+      "lookupUrl": "https://discover.shopifyapps.com/global/v2/p/5QZyLj8EtSHsQmZPyVF3CK",
+      "options": [
+        { "name": "Size", "values": [{ "value": "9" }, { "value": "10" }, { "value": "11" }] },
+        { "name": "Color", "values": [{ "value": "Black/Black" }] }
+      ],
+      "variants": [
+        {
+          "id": "gid://shopify/ProductVariant/46074005651684?shop=15639833",
+          "productId": "gid://shopify/Product/8595156664548",
+          "displayName": "On Men's Cloud 6 Black Black",
+          "availableForSale": true,
+          "price": { "amount": 15995, "currency": "USD" },
+          "media": [{ "url": "https://cdn.shopify.com/s/files/1/1563/9833/files/o1_f10aadf0-8692-4b5c-9f23-5faa0357e99f.png?v=1745919323", "altText": "On Men's Cloud 6 Black Black" }],
+          "options": [{ "name": "Size", "value": "11.5 M" }],
+          "shop": { "id": "gid://shopify/Shop/15639833", "name": "Orleans Shoe Co.", "onlineStoreUrl": "https://orleansshoes.com" },
+          "variantUrl": "https://orleansshoes.com/products/on-mens-cloud-6-black-black?variant=46074005651684",
+          "checkoutUrl": "https://orleansshoes.com/cart/46074005651684:1",
+          "rating": { "rating": 5, "count": 3 },
+          "secondhand": false
+        },
+        {
+          "id": "gid://shopify/ProductVariant/47475021676772?shop=15639833",
+          "productId": "gid://shopify/Product/8595156664548",
+          "displayName": "On Men's Cloud 6 Black Black",
+          "availableForSale": true,
+          "price": { "amount": 15995, "currency": "USD" },
+          "media": [{ "url": "https://cdn.shopify.com/s/files/1/1563/9833/files/o1_f10aadf0-8692-4b5c-9f23-5faa0357e99f.png?v=1745919323", "altText": "On Men's Cloud 6 Black Black" }],
+          "options": [{ "name": "Size", "value": "11.5 W" }],
+          "shop": { "id": "gid://shopify/Shop/15639833", "name": "Orleans Shoe Co.", "onlineStoreUrl": "https://orleansshoes.com" },
+          "variantUrl": "https://orleansshoes.com/products/on-mens-cloud-6-black-black?variant=47475021676772",
+          "checkoutUrl": "https://orleansshoes.com/cart/47475021676772:1",
+          "rating": { "rating": 5, "count": 3 },
+          "secondhand": false
+        }
+      ]
+    },
+    {
+      "id": "gid://shopify/p/5F6D10Hs3Hk9AogbAgam3X",
+      "title": "New Balance 530 in Raincloud with Shadow Grey and Silver Metallic",
+      "description": "Classic running shoes blending throwback style with modern comfort and impact cushioning.",
+      "uniqueSellingPoint": "Combines heritage-inspired design with advanced ABZORB midsole for superior cushioning and support.",
+      "topFeatures": [
+        "ABZORB midsole delivers advanced impact cushioning",
+        "Leather upper construction offers durability and a premium feel",
+        "Sleek shadow grey and silver metallic colorway"
+      ],
+      "techSpecs": [
+        "Upper Material: Leather",
+        "Midsole: ABZORB cushioning",
+        "Closure Type: Lace-up"
+      ],
+      "attributes": [
+        { "name": "Closure type", "values": ["Lace-up"] },
+        { "name": "Color", "values": ["Gray", "Silver"] },
+        { "name": "Target gender", "values": ["Unisex"] }
+      ],
+      "media": [
+        { "url": "https://cdn.shopify.com/s/files/1/0372/7592/6573/files/nb-mr530ck-1686-1.jpg?v=1725887990", "altText": "New Balance 530" }
+      ],
+      "priceRange": {
+        "min": { "amount": 7373, "currency": "USD" },
+        "max": { "amount": 9586, "currency": "USD" }
+      },
+      "lookupUrl": "https://discover.shopifyapps.com/global/v2/p/5F6D10Hs3Hk9AogbAgam3X",
+      "options": [
+        { "name": "Size", "values": [{ "value": "7.0 Men | 8.5 Women" }, { "value": "8.5 Men | 10.0 Women" }] }
+      ],
+      "variants": [
+        {
+          "id": "gid://shopify/ProductVariant/42094621622317?shop=37275926573",
+          "productId": "gid://shopify/Product/7718330171437",
+          "displayName": "New Balance 530 in Raincloud with Shadow Grey and Silver Metallic",
+          "availableForSale": true,
+          "price": { "amount": 7373, "currency": "USD" },
+          "media": [{ "url": "https://cdn.shopify.com/s/files/1/0372/7592/6573/files/nb-mr530ck-1686-1.jpg?v=1725887990", "altText": "New Balance 530" }],
+          "options": [{ "name": "Size", "value": "4.0 Men | 5.5 Women" }],
+          "shop": { "id": "gid://shopify/Shop/37275926573", "name": "Getoutside Shoes", "onlineStoreUrl": "https://www.getoutsideshoes.com" },
+          "variantUrl": "https://www.getoutsideshoes.com/products/new-balance-530?variant=42094621622317",
+          "checkoutUrl": "https://www.getoutsideshoes.com/cart/42094621622317:1",
+          "secondhand": false
+        },
+        {
+          "id": "gid://shopify/ProductVariant/42094622048301?shop=37275926573",
+          "productId": "gid://shopify/Product/7718330171437",
+          "displayName": "New Balance 530 in Raincloud with Shadow Grey and Silver Metallic",
+          "availableForSale": true,
+          "price": { "amount": 9586, "currency": "USD" },
+          "media": [{ "url": "https://cdn.shopify.com/s/files/1/0372/7592/6573/files/nb-mr530ck-1686-1.jpg?v=1725887990", "altText": "New Balance 530" }],
+          "options": [{ "name": "Size", "value": "8.5 Men | 10.0 Women" }],
+          "shop": { "id": "gid://shopify/Shop/37275926573", "name": "Getoutside Shoes", "onlineStoreUrl": "https://www.getoutsideshoes.com" },
+          "variantUrl": "https://www.getoutsideshoes.com/products/new-balance-530?variant=42094622048301",
+          "checkoutUrl": "https://www.getoutsideshoes.com/cart/42094622048301:1",
+          "secondhand": false
+        }
+      ]
+    },
+    {
+      "id": "gid://shopify/p/rrYZuPRwjgyxM37N3EWEf",
+      "title": "Lorax Signature - Healthy & Non-slip Barefoot Shoes [Limited Edition]",
+      "description": "Ultra-light, flexible shoes designed for natural movement and comfort, ideal for daily activities and barefoot-style footwear.",
+      "uniqueSellingPoint": "Zero drop, ultra-light sole and wide toe box promote natural foot alignment and unrestricted movement.",
+      "topFeatures": [
+        "Zero drop sole for natural foot alignment",
+        "Ultra-light, flexible 4mm thin sole",
+        "Wide toe box allows unrestricted toe movement",
+        "Slip-resistant outsole provides safety"
+      ],
+      "techSpecs": [
+        "Sole Thickness: 4 mm",
+        "Upper Material: Mesh and synthetic",
+        "Closure Type: Lace-up"
+      ],
+      "attributes": [
+        { "name": "Heel height type", "values": ["Flat"] },
+        { "name": "Activity", "values": ["Universal"] },
+        { "name": "Color", "values": ["Multicolor"] }
+      ],
+      "media": [
+        { "url": "https://cdn.shopify.com/s/files/1/0762/7286/1524/files/Lorax_America_-_Rainbow.webp?v=1769581557", "altText": "Lorax Signature - Rainbow" }
+      ],
+      "priceRange": {
+        "min": { "amount": 6995, "currency": "USD" },
+        "max": { "amount": 6995, "currency": "USD" }
+      },
+      "rating": { "rating": 5, "count": 2049 },
+      "lookupUrl": "https://discover.shopifyapps.com/global/v2/p/rrYZuPRwjgyxM37N3EWEf",
+      "options": [
+        { "name": "Color", "values": [{ "value": "Rainbow" }, { "value": "Lavender" }] },
+        { "name": "Size", "values": [{ "value": "US Women 7.5 - US Men 5.5" }, { "value": "US Women 10/10.5 - US Men 8/8.5" }] }
+      ],
+      "variants": [
+        {
+          "id": "gid://shopify/ProductVariant/51644279488852?shop=76272861524",
+          "productId": "gid://shopify/Product/11933106635092",
+          "displayName": "Lorax Signature - Healthy & Non-slip Barefoot Shoes [Limited Edition]",
+          "availableForSale": true,
+          "price": { "amount": 6995, "currency": "USD" },
+          "media": [{ "url": "https://cdn.shopify.com/s/files/1/0762/7286/1524/files/Lorax_America_-_Rainbow.webp?v=1769581557", "altText": "Lorax Signature - Rainbow" }],
+          "options": [{ "name": "Color", "value": "Rainbow" }, { "name": "Size", "value": "US Women 7.5 - US Men 5.5" }],
+          "shop": { "id": "gid://shopify/Shop/76272861524", "name": "Hike Footwear", "onlineStoreUrl": "https://customers.hike-footwear.com" },
+          "variantUrl": "https://customers.hike-footwear.com/products/lorax-signature?variant=51644279488852",
+          "checkoutUrl": "https://customers.hike-footwear.com/cart/51644279488852:1",
+          "rating": { "rating": 5, "count": 1025 },
+          "secondhand": false
+        },
+        {
+          "id": "gid://shopify/ProductVariant/51644279980372?shop=76272861524",
+          "productId": "gid://shopify/Product/11933106635092",
+          "displayName": "Lorax Signature - Healthy & Non-slip Barefoot Shoes [Limited Edition]",
+          "availableForSale": true,
+          "price": { "amount": 6995, "currency": "USD" },
+          "media": [{ "url": "https://cdn.shopify.com/s/files/1/0762/7286/1524/files/Lorax_America_-_Lavender.webp?v=1769581639", "altText": "Lorax Signature - Lavender" }],
+          "options": [{ "name": "Color", "value": "Lavender" }, { "name": "Size", "value": "US Women 10/10.5 - US Men 8/8.5" }],
+          "shop": { "id": "gid://shopify/Shop/76272861524", "name": "Hike Footwear", "onlineStoreUrl": "https://customers.hike-footwear.com" },
+          "variantUrl": "https://customers.hike-footwear.com/products/lorax-signature?variant=51644279980372",
+          "checkoutUrl": "https://customers.hike-footwear.com/cart/51644279980372:1",
+          "rating": { "rating": 5, "count": 1025 },
+          "secondhand": false
+        }
+      ]
+    }
+  ],
+  "instructions": "Use markdown to render product titles as links to their respective product pages using the URL property."
+}

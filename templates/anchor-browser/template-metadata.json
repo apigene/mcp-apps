@@ -1,0 +1,4 @@
+{
+  "uiElements": ["iframe", "list"],
+  "mcpFeatures": ["tool-result", "host-context"]
+}

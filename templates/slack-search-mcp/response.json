@@ -1,0 +1,466 @@
+{
+  "ok": true,
+  "query": "mcp",
+  "messages": {
+    "total": 42,
+    "pagination": {
+      "total_count": 42,
+      "page": 1,
+      "per_page": 20,
+      "page_count": 3,
+      "first": 1,
+      "last": 20
+    },
+    "paging": {
+      "count": 20,
+      "total": 42,
+      "page": 1,
+      "pages": 3
+    },
+    "matches": [
+      {
+        "iid": "a1b2c3d4-100a-4aba-ade5-19b1f45986fb",
+        "team": "T0DEMO0SUQ",
+        "score": 0,
+        "channel": {
+          "id": "C0DEMO0123",
+          "is_channel": true,
+          "is_group": false,
+          "is_im": false,
+          "is_mpim": false,
+          "is_shared": false,
+          "is_org_shared": false,
+          "is_ext_shared": false,
+          "is_private": false,
+          "name": "ci",
+          "pending_shared": [],
+          "is_pending_ext_shared": false
+        },
+        "type": "message",
+        "user": null,
+        "username": "ci bot",
+        "ts": "1770722942.853429",
+        "attachments": [
+          {
+            "id": 1,
+            "color": "2eb886",
+            "fallback": "• Commit: <https://github.com/demo-org/demo-repo/commit/a1b2c3d4|`a1b2c3d`> by Demo User\n• Message: chore: cleanup run_action loader",
+            "author_name": "demo-user",
+            "author_link": "https://github.com/demo-user",
+            "author_icon": "https://github.com/demo-user.png?size=32",
+            "footer": "Powered By GitHub Actions | Triggered on this workflow run",
+            "fields": [
+              {
+                "value": "• Commit: <https://github.com/demo-org/demo-repo/commit/a1b2c3d4|`a1b2c3d`> by Demo User\n• Message: chore: cleanup run_action loader",
+                "title": "✅ demo-gw new deployment #12 (v)",
+                "short": false
+              }
+            ]
+          }
+        ],
+        "text": "",
+        "permalink": "https://demo-workspace.slack.com/archives/C0DEMO0123/p1770722942853429",
+        "no_reactions": true
+      },
+      {
+        "iid": "b2c3d4e5-200b-4517-a56d-be8d854f8269",
+        "team": "T0DEMO0SUQ",
+        "score": 0,
+        "channel": {
+          "id": "C0DEMO0123",
+          "is_channel": true,
+          "is_group": false,
+          "is_im": false,
+          "is_mpim": false,
+          "is_shared": false,
+          "is_org_shared": false,
+          "is_ext_shared": false,
+          "is_private": false,
+          "name": "ci",
+          "pending_shared": [],
+          "is_pending_ext_shared": false
+        },
+        "type": "message",
+        "user": null,
+        "username": "ci bot",
+        "ts": "1770719491.319379",
+        "attachments": [
+          {
+            "id": 1,
+            "color": "2eb886",
+            "fallback": "• Commit: <https://github.com/demo-org/demo-repo/commit/b2c3d4e5|`b2c3d4e`> by Demo User\n• Message: Revert \"chore: cleanup run_action loader\"",
+            "author_name": "demo-user",
+            "author_link": "https://github.com/demo-user",
+            "author_icon": "https://github.com/demo-user.png?size=32",
+            "footer": "Powered By GitHub Actions | Triggered on this workflow run",
+            "fields": [
+              {
+                "value": "• Commit: <https://github.com/demo-org/demo-repo/commit/b2c3d4e5|`b2c3d4e`> by Demo User\n• Message: Revert \"chore: cleanup run_action loader\"",
+                "title": "✅ demo-gw new deployment #11 (v)",
+                "short": false
+              }
+            ]
+          }
+        ],
+        "text": "",
+        "permalink": "https://demo-workspace.slack.com/archives/C0DEMO0123/p1770719491319379",
+        "no_reactions": true
+      },
+      {
+        "iid": "c3d4e5f6-300c-4a20-99bd-5d516dd5f91a",
+        "team": "T0DEMO0SUQ",
+        "score": 0,
+        "channel": {
+          "id": "C0DEMO4567",
+          "is_channel": true,
+          "is_group": false,
+          "is_im": false,
+          "is_mpim": false,
+          "is_shared": false,
+          "is_org_shared": false,
+          "is_ext_shared": false,
+          "is_private": false,
+          "name": "alerts",
+          "pending_shared": [],
+          "is_pending_ext_shared": false
+        },
+        "type": "message",
+        "user": "U0DEMO001",
+        "username": "datadog",
+        "ts": "1770713451.271259",
+        "attachments": [
+          {
+            "id": 1,
+            "color": "a30200",
+            "fallback": "Triggered: High Log error rate demo-backend on @levelname:ERROR,host:demo-backend",
+            "text": "demo-backend : Authorization failed: App 'DemoApp' is not authorized for agent 'demo-agent'. More than 0 log events matched in the last 5m.\n\n@slack-alerts",
+            "title": "Triggered: High Log error rate demo-backend on @levelname:ERROR,host:demo-backend",
+            "title_link": "https://app.example-monitoring.com/monitors/10001",
+            "callback_id": "datadog-event-message",
+            "fields": [
+              { "value": "@levelname:ERROR, host:demo-backend", "title": "Tags", "short": true },
+              { "value": "@slack-alerts", "title": "Notified", "short": true }
+            ],
+            "mrkdwn_in": ["fields", "text"]
+          },
+          {
+            "id": 2,
+            "color": "a30200",
+            "fallback": "View in Log Explorer",
+            "text": "```Time | @Levelname | Host | Message\n08:49 UTC | ERROR | demo-backend | Authorization failed: App 'DemoApp' is not authorized.```",
+            "title": "View in Log Explorer",
+            "title_link": "https://app.example-monitoring.com/logs",
+            "mrkdwn_in": ["text"]
+          }
+        ],
+        "text": "",
+        "permalink": "https://demo-workspace.slack.com/archives/C0DEMO4567/p1770713451271259",
+        "no_reactions": true
+      },
+      {
+        "iid": "d4e5f678-400d-47bd-9b56-7f8983c3e370",
+        "team": "T0DEMO0SUQ",
+        "score": 0,
+        "channel": {
+          "id": "C0DEMO0123",
+          "is_channel": true,
+          "is_group": false,
+          "is_im": false,
+          "is_mpim": false,
+          "is_shared": false,
+          "is_org_shared": false,
+          "is_ext_shared": false,
+          "is_private": false,
+          "name": "ci",
+          "pending_shared": [],
+          "is_pending_ext_shared": false
+        },
+        "type": "message",
+        "user": null,
+        "username": "ci bot",
+        "ts": "1770709719.933449",
+        "attachments": [
+          {
+            "id": 1,
+            "color": "2eb886",
+            "fallback": "• Commit: <https://github.com/demo-org/demo-repo/commit/d4e5f678|`d4e5f67`> by Demo User\n• Message: feat: implement lazy CSP loading for UI resources",
+            "author_name": "demo-user",
+            "author_link": "https://github.com/demo-user",
+            "author_icon": "https://github.com/demo-user.png?size=32",
+            "footer": "Powered By GitHub Actions | Triggered on this workflow run",
+            "fields": [
+              {
+                "value": "• Commit: <https://github.com/demo-org/demo-repo/commit/d4e5f678|`d4e5f67`> by Demo User\n• Message: feat: implement lazy CSP loading for UI resources",
+                "title": "✅ demo-gw new deployment #10 (v)",
+                "short": false
+              }
+            ]
+          }
+        ],
+        "text": "",
+        "permalink": "https://demo-workspace.slack.com/archives/C0DEMO0123/p1770709719933449",
+        "no_reactions": true
+      },
+      {
+        "iid": "e5f67890-500e-48ec-9708-feb4287b7306",
+        "team": "T0DEMO0SUQ",
+        "score": 0,
+        "channel": {
+          "id": "D0DEMO001",
+          "is_channel": false,
+          "is_group": false,
+          "is_im": true,
+          "is_mpim": false,
+          "is_shared": false,
+          "is_org_shared": false,
+          "is_ext_shared": false,
+          "is_private": true,
+          "name": "U0DEMO002",
+          "user": "U0DEMO002"
+        },
+        "type": "im",
+        "user": "U0DEMO003",
+        "username": "demo-user",
+        "ts": "1770706834.180079",
+        "attachments": [
+          {
+            "id": 1,
+            "is_forwarded": true,
+            "color": "D0D0D0",
+            "from_url": "https://demo-workspace.slack.com/archives/C0DEMO0123/p1770706126031939",
+            "is_share": true,
+            "fallback": "• Commit: <https://github.com/demo-org/demo-repo/commit/e5f67890|`e5f6789`> by Demo User\n• Message: fix CSP configuration loading",
+            "author_name": "demo-user",
+            "author_link": "https://github.com/demo-user",
+            "author_icon": "https://github.com/demo-user.png?size=32",
+            "footer": "Powered By GitHub Actions | Triggered on this workflow run",
+            "fields": [
+              {
+                "value": "• Commit: <https://github.com/demo-org/demo-repo/commit/e5f67890|`e5f6789`> by Demo User\n• Message: fix CSP configuration loading",
+                "title": "✅ demo-gw new deployment #9 (v)",
+                "short": false
+              }
+            ]
+          }
+        ],
+        "text": "",
+        "permalink": "https://demo-workspace.slack.com/archives/D0DEMO001/p1770706834180079",
+        "no_reactions": true
+      },
+      {
+        "iid": "f6789012-600f-49ac-bd72-08085d782d81",
+        "team": "T0DEMO0SUQ",
+        "score": 0,
+        "channel": {
+          "id": "D0DEMO002",
+          "is_channel": false,
+          "is_group": false,
+          "is_im": true,
+          "is_mpim": false,
+          "is_shared": false,
+          "is_org_shared": false,
+          "is_ext_shared": false,
+          "is_private": true,
+          "name": "U0DEMO004",
+          "user": "U0DEMO004"
+        },
+        "type": "im",
+        "user": "U0DEMO003",
+        "username": "demo-user",
+        "ts": "1770681373.890859",
+        "blocks": [
+          {
+            "type": "rich_text",
+            "block_id": "Blk01",
+            "elements": [
+              {
+                "type": "rich_text_section",
+                "elements": [
+                  { "type": "text", "text": "I think the root cause might be that when using OAuth2 the config key is not set, so the aggregated CSP is empty and we fail. " },
+                  { "type": "text", "text": "I tried to simulate in the playground and in that case the CSP was not loaded.", "style": { "italic": true } },
+                  { "type": "text", "text": "\n\nWe could fix it by loading CSP when the token is present too, not only when the API key is set." }
+                ]
+              }
+            ]
+          }
+        ],
+        "text": "I think the root cause might be that when using OAuth2 the config key is not set, so the aggregated CSP is empty and we fail. I tried to simulate in the playground and in that case the CSP was not loaded. We could fix it by loading CSP when the token is present too, not only when the API key is set.",
+        "permalink": "https://demo-workspace.slack.com/archives/D0DEMO002/p1770681373890859",
+        "no_reactions": true
+      },
+      {
+        "iid": "78901234-700a-42b6-90c3-2d4feccd1011",
+        "team": "T0DEMO0SUQ",
+        "score": 0,
+        "channel": {
+          "id": "C0DEMO4567",
+          "is_channel": true,
+          "is_group": false,
+          "is_im": false,
+          "is_mpim": false,
+          "is_shared": false,
+          "is_org_shared": false,
+          "is_ext_shared": false,
+          "is_private": false,
+          "name": "alerts",
+          "pending_shared": [],
+          "is_pending_ext_shared": false
+        },
+        "type": "message",
+        "user": "U0DEMO001",
+        "username": "datadog",
+        "ts": "1770677332.176279",
+        "attachments": [
+          {
+            "id": 1,
+            "color": "a30200",
+            "fallback": "Triggered: High Log error rate demo-backend on @levelname:ERROR,host:demo-backend",
+            "text": "demo-backend : Traceback: AttributeError: 'str' object has no attribute 'get'. More than 0 log events matched in the last 5m.\n\n@slack-alerts",
+            "title": "Triggered: High Log error rate demo-backend on @levelname:ERROR,host:demo-backend",
+            "title_link": "https://app.example-monitoring.com/monitors/10001",
+            "callback_id": "datadog-event-message",
+            "fields": [
+              { "value": "@levelname:ERROR, host:demo-backend", "title": "Tags", "short": true },
+              { "value": "@slack-alerts", "title": "Notified", "short": true }
+            ],
+            "mrkdwn_in": ["fields", "text"]
+          },
+          {
+            "id": 2,
+            "color": "a30200",
+            "fallback": "View in Log Explorer",
+            "text": "```Time | @Levelname | Host | Message\n22:47 UTC | ERROR | demo-backend | AttributeError: 'str' object has no attribute 'get'```",
+            "title": "View in Log Explorer",
+            "title_link": "https://app.example-monitoring.com/logs",
+            "mrkdwn_in": ["text"]
+          }
+        ],
+        "text": "",
+        "permalink": "https://demo-workspace.slack.com/archives/C0DEMO4567/p1770677332176279",
+        "no_reactions": true
+      },
+      {
+        "iid": "89012345-800b-426d-ae22-fb547ec0056f",
+        "team": "T0DEMO0SUQ",
+        "score": 0,
+        "channel": {
+          "id": "D0DEMO003",
+          "is_channel": false,
+          "is_group": false,
+          "is_im": true,
+          "is_mpim": false,
+          "is_shared": false,
+          "is_org_shared": false,
+          "is_ext_shared": false,
+          "is_private": true,
+          "name": "U0DEMO004",
+          "user": "U0DEMO004"
+        },
+        "type": "im",
+        "user": "U0DEMO004",
+        "username": "alex",
+        "ts": "1770629883.526519",
+        "blocks": [
+          {
+            "type": "rich_text",
+            "block_id": "Blk02",
+            "elements": [
+              {
+                "type": "rich_text_section",
+                "elements": [
+                  { "type": "text", "text": "Hey! I'm trying to isolate an issue. I made the simplest MCP server with a single tool and an image to render, but the desktop client still doesn't work, even though the playground works fine." }
+                ]
+              }
+            ]
+          }
+        ],
+        "text": "Hey! I'm trying to isolate an issue. I made the simplest MCP server with a single tool and an image to render, but the desktop client still doesn't work, even though the playground works fine.",
+        "permalink": "https://demo-workspace.slack.com/archives/D0DEMO003/p1770629883526519",
+        "no_reactions": true
+      },
+      {
+        "iid": "90123456-900c-4270-42b6-90c3-2d4feccd1011",
+        "team": "T0DEMO0SUQ",
+        "score": 0,
+        "channel": {
+          "id": "D0DEMO004",
+          "is_channel": false,
+          "is_group": false,
+          "is_im": true,
+          "is_mpim": false,
+          "is_shared": false,
+          "is_org_shared": false,
+          "is_ext_shared": false,
+          "is_private": true,
+          "name": "U0DEMO003",
+          "user": "U0DEMO003"
+        },
+        "type": "im",
+        "user": "U0DEMO003",
+        "username": "demo-user",
+        "ts": "1770632800.881209",
+        "blocks": [
+          {
+            "type": "rich_text",
+            "block_id": "Blk03",
+            "elements": [
+              {
+                "type": "rich_text_section",
+                "elements": [
+                  { "type": "link", "url": "https://github.com/demo-org/demo-repo/blob/main/README.md" }
+                ]
+              }
+            ]
+          }
+        ],
+        "text": "https://github.com/demo-org/demo-repo/blob/main/README.md",
+        "permalink": "https://demo-workspace.slack.com/archives/D0DEMO004/p1770632800881209",
+        "no_reactions": true
+      },
+      {
+        "iid": "a0123456-a00d-4373-256579-2d4feccd1011",
+        "team": "T0DEMO0SUQ",
+        "score": 0,
+        "channel": {
+          "id": "C0DEMO0123",
+          "is_channel": true,
+          "is_group": false,
+          "is_im": false,
+          "is_mpim": false,
+          "is_shared": false,
+          "is_org_shared": false,
+          "is_ext_shared": false,
+          "is_private": false,
+          "name": "ci",
+          "pending_shared": [],
+          "is_pending_ext_shared": false
+        },
+        "type": "message",
+        "user": null,
+        "username": "ci bot",
+        "ts": "1770629273.256579",
+        "attachments": [
+          {
+            "id": 1,
+            "color": "2eb886",
+            "fallback": "• Commit: <https://github.com/demo-org/demo-repo/commit/a0123456|`a012345`> by Demo User\n• Message: feat: enhance session request logging",
+            "author_name": "demo-user",
+            "author_link": "https://github.com/demo-user",
+            "author_icon": "https://github.com/demo-user.png?size=32",
+            "footer": "Powered By GitHub Actions | Triggered on this workflow run",
+            "fields": [
+              {
+                "value": "• Commit: <https://github.com/demo-org/demo-repo/commit/a0123456|`a012345`> by Demo User\n• Message: feat: enhance session request logging",
+                "title": "✅ demo-gw new deployment #8 (v)",
+                "short": false
+              }
+            ]
+          }
+        ],
+        "text": "",
+        "permalink": "https://demo-workspace.slack.com/archives/C0DEMO0123/p1770629273256579",
+        "no_reactions": true
+      }
+    ]
+  }
+}

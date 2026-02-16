@@ -1,0 +1,92 @@
+{
+  "agents": [
+    {
+      "id": "bc-f80bf8e4-42eb-4946-9415-61b030183698",
+      "status": "FINISHED",
+      "source": {
+        "repository": "github.com/demo-org/demo-website",
+        "ref": "main",
+        "prUrl": "https://github.com/demo-org/demo-website/pull/5"
+      },
+      "target": {
+        "branchName": "cursor/general-bugs-3d29",
+        "url": "https://cursor.com/agents?id=bc-f80bf8e4-42eb-4946-9415-61b030183698",
+        "prUrl": "https://github.com/demo-org/demo-website/pull/5",
+        "openAsCursorGithubApp": false,
+        "skipReviewerRequest": false
+      },
+      "name": "General bugs",
+      "summary": "Several bugs were addressed:\n*   `hero-section.tsx`: Corrected `MediaPlaceholder` import path and changed to a named import.\n*   `mcp-content-generator.ts`: Added type assertion for `category` to resolve a type mismatch.\n*   `blog-post-content.tsx`: Updated `rehype-pretty-code` callback signatures (`onVisitHighlightedWord` to `onVisitHighlightedChars`, added `id` parameter).\n*   `next.config.mjs`: Removed deprecated `typescript.ignoreBuildErrors` and `swcMinify` options.\n*   Installed missing `shiki` dependency and configured ESLint via `.eslintrc.json`.\n*   Updated Next.js to `16.1.6` to fix high-severity vulnerabilities.",
+      "createdAt": "2026-02-05T17:04:30.132Z",
+      "linesAdded": 11317,
+      "linesRemoved": 12,
+      "filesChanged": 7
+    },
+    {
+      "id": "bc-a1b2c3d4-5678-90ab-cdef-111111111111",
+      "status": "FINISHED",
+      "source": {
+        "repository": "github.com/demo-org/api-service",
+        "ref": "develop",
+        "prUrl": "https://github.com/demo-org/api-service/pull/22"
+      },
+      "target": {
+        "branchName": "cursor/add-auth-middleware",
+        "url": "https://cursor.com/agents?id=bc-a1b2c3d4-5678-90ab-cdef-111111111111",
+        "prUrl": "https://github.com/demo-org/api-service/pull/22",
+        "openAsCursorGithubApp": false,
+        "skipReviewerRequest": false
+      },
+      "name": "Add auth middleware",
+      "summary": "Implemented JWT-based authentication middleware for the API.\n*   Added `auth-middleware.ts` with token validation and role extraction.\n*   Wired middleware into Express app for `/api/*` routes.\n*   Updated OpenAPI spec with security schemes and bearer auth.\n*   Added unit tests for middleware and refreshed integration tests.",
+      "createdAt": "2026-02-04T14:22:00.000Z",
+      "linesAdded": 342,
+      "linesRemoved": 18,
+      "filesChanged": 5
+    },
+    {
+      "id": "bc-e5f6a7b8-9c0d-4e1f-2a3b-4c5d6e7f8a9b",
+      "status": "FINISHED",
+      "source": {
+        "repository": "github.com/demo-org/mobile-app",
+        "ref": "main",
+        "prUrl": "https://github.com/demo-org/mobile-app/pull/8"
+      },
+      "target": {
+        "branchName": "cursor/fix-offline-sync",
+        "url": "https://cursor.com/agents?id=bc-e5f6a7b8-9c0d-4e1f-2a3b-4c5d6e7f8a9b",
+        "prUrl": "https://github.com/demo-org/mobile-app/pull/8",
+        "openAsCursorGithubApp": false,
+        "skipReviewerRequest": false
+      },
+      "name": "Fix offline sync",
+      "summary": "Resolved race conditions and data loss in offline-first sync.\n*   Fixed conflict resolution in `sync-engine.ts` when merging local and remote changes.\n*   Added retry with exponential backoff for failed sync requests.\n*   Improved handling of deleted records and tombstone cleanup.\n*   Updated sync status UI to show last successful sync time.",
+      "createdAt": "2026-02-03T09:15:45.000Z",
+      "linesAdded": 521,
+      "linesRemoved": 89,
+      "filesChanged": 6
+    },
+    {
+      "id": "bc-0b1c2d3e-4f5a-6b7c-8d9e-0f1a2b3c4d5e",
+      "status": "IN_PROGRESS",
+      "source": {
+        "repository": "github.com/demo-org/docs-site",
+        "ref": "main",
+        "prUrl": null
+      },
+      "target": {
+        "branchName": "cursor/update-api-docs",
+        "url": "https://cursor.com/agents?id=bc-0b1c2d3e-4f5a-6b7c-8d9e-0f1a2b3c4d5e",
+        "prUrl": null,
+        "openAsCursorGithubApp": false,
+        "skipReviewerRequest": false
+      },
+      "name": "Update API docs",
+      "summary": "Regenerating REST API documentation from OpenAPI spec and fixing broken examples.",
+      "createdAt": "2026-02-06T11:00:00.000Z",
+      "linesAdded": 0,
+      "linesRemoved": 0,
+      "filesChanged": 0
+    }
+  ]
+}

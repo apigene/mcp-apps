@@ -1,0 +1,104 @@
+{
+  "repositories": [
+    {
+      "owner": "demo-org",
+      "name": "demo-website",
+      "repository": "https://github.com/demo-org/demo-website"
+    },
+    {
+      "owner": "demo-org",
+      "name": "demo-backend",
+      "repository": "https://github.com/demo-org/demo-backend"
+    },
+    {
+      "owner": "demo-org",
+      "name": "demo-frontend",
+      "repository": "https://github.com/demo-org/demo-frontend"
+    },
+    {
+      "owner": "demo-org",
+      "name": "demo-api",
+      "repository": "https://github.com/demo-org/demo-api"
+    },
+    {
+      "owner": "demo-org",
+      "name": "demo-docs",
+      "repository": "https://github.com/demo-org/demo-docs"
+    },
+    {
+      "owner": "demo-org",
+      "name": "demo-mobile-app",
+      "repository": "https://github.com/demo-org/demo-mobile-app"
+    },
+    {
+      "owner": "demo-org",
+      "name": "demo-landing",
+      "repository": "https://github.com/demo-org/demo-landing"
+    },
+    {
+      "owner": "demo-org",
+      "name": "demo-cli",
+      "repository": "https://github.com/demo-org/demo-cli"
+    },
+    {
+      "owner": "demo-org",
+      "name": "demo-sdk",
+      "repository": "https://github.com/demo-org/demo-sdk"
+    },
+    {
+      "owner": "demo-org",
+      "name": "demo-openapi-spec",
+      "repository": "https://github.com/demo-org/demo-openapi-spec"
+    },
+    {
+      "owner": "demo-org",
+      "name": "auth-service",
+      "repository": "https://github.com/demo-org/auth-service"
+    },
+    {
+      "owner": "demo-org",
+      "name": "api-gateway",
+      "repository": "https://github.com/demo-org/api-gateway"
+    },
+    {
+      "owner": "demo-org",
+      "name": "shared-components",
+      "repository": "https://github.com/demo-org/shared-components"
+    },
+    {
+      "owner": "demo-org",
+      "name": "e2e-tests",
+      "repository": "https://github.com/demo-org/e2e-tests"
+    },
+    {
+      "owner": "demo-org",
+      "name": "infrastructure",
+      "repository": "https://github.com/demo-org/infrastructure"
+    },
+    {
+      "owner": "demo-org",
+      "name": "sample-app",
+      "repository": "https://github.com/demo-org/sample-app"
+    },
+    {
+      "owner": "demo-org",
+      "name": "template-repo",
+      "repository": "https://github.com/demo-org/template-repo"
+    },
+    {
+      "owner": "demo-org",
+      "name": "docs-site",
+      "repository": "https://github.com/demo-org/docs-site"
+    },
+    {
+      "owner": "demo-org",
+      "name": "internal-tools",
+      "repository": "https://github.com/demo-org/internal-tools"
+    },
+    {
+      "owner": "demo-org",
+      "name": "demo-scripts",
+      "repository": "https://github.com/demo-org/demo-scripts"
+    }
+  ]
+}

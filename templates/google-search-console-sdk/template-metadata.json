@@ -1,0 +1,4 @@
+{
+  "uiElements": ["chart", "table", "list"],
+  "mcpFeatures": ["tool-result", "host-context"]
+}

@@ -1,0 +1,300 @@
+{
+  "data": [
+    {
+      "id": "AwFha2V4YW1wbGVPbmVBYmNkZWYxMjM0NTY3ODkAAAAkZmU5YzYxYTktNmE3My00NWUyLTljZGQtM2M3YWJhOTQzMTQzAAAABQ",
+      "type": "log",
+      "attributes": {
+        "service": "demo-api",
+        "host": "demo-backend",
+        "attributes": {
+          "service": "demo-api",
+          "host": "demo-backend",
+          "id": "39498299787449155413884664627563677684245117951152750625",
+          "aws": {
+            "awslogs": {
+              "owner": "111122223333",
+              "logGroup": "demo-backend",
+              "logStream": "demo-backend/api/a1b2c3d4e5f67890"
+            },
+            "invoked_function_arn": "arn:aws:lambda:us-east-1:111122223333:function:demo-log-forwarder"
+          },
+          "timestamp": 1739721600000
+        },
+        "message": "Request completed successfully. method=GET path=/api/health status=200 duration_ms=12",
+        "status": "info",
+        "timestamp": "2025-02-16T10:00:00.000Z",
+        "tags": [
+          "aws_account:111122223333",
+          "aws_account_alias:demo-org",
+          "region:us-east-1",
+          "source:cloudwatch",
+          "sourcecategory:aws",
+          "env:demo"
+        ]
+      }
+    },
+    {
+      "id": "AwFha2V4YW1wbGVUd29YZmdoaWprbG1ub3BxAAAAkZmU5YzYxYTktNmE3My00NWUyLTljZGQtM2M3YWJhOTQzMTQzAAAABA",
+      "type": "log",
+      "attributes": {
+        "service": "demo-api",
+        "host": "demo-backend",
+        "attributes": {
+          "service": "demo-api",
+          "host": "demo-backend",
+          "name": "app.api.request",
+          "id": "39498299784193246614899193648899462816438457171279609887",
+          "aws": {
+            "awslogs": {
+              "owner": "111122223333",
+              "logGroup": "demo-backend",
+              "logStream": "demo-backend/api/a1b2c3d4e5f67890"
+            },
+            "invoked_function_arn": "arn:aws:lambda:us-east-1:111122223333:function:demo-log-forwarder"
+          },
+          "levelname": "INFO",
+          "asctime": "2025-02-16 10:00:01,100",
+          "timestamp": 1739721601100
+        },
+        "message": "Cache MISS for key:demo:cache:spec:paths:/api/v1/users (2.1ms)",
+        "status": "info",
+        "timestamp": "2025-02-16T10:00:01.100Z",
+        "tags": [
+          "aws_account:111122223333",
+          "aws_account_alias:demo-org",
+          "region:us-east-1",
+          "source:cloudwatch",
+          "sourcecategory:aws",
+          "env:demo"
+        ]
+      }
+    },
+    {
+      "id": "AwFha2V4YW1wbGVUaHJlZVN0cnV2d3h5ejEyMzQ1AAAAkZmU5YzYxYTktNmE3My00NWUyLTljZGQtM2M3YWJhOTQzMTQzAAAAvQ",
+      "type": "log",
+      "attributes": {
+        "service": "demo-api",
+        "host": "demo-backend",
+        "attributes": {
+          "service": "demo-api",
+          "host": "demo-backend",
+          "name": "app.api.request",
+          "id": "39498299784193246614899193648899462816438457171279609886",
+          "aws": {
+            "awslogs": {
+              "owner": "111122223333",
+              "logGroup": "demo-backend",
+              "logStream": "demo-backend/api/a1b2c3d4e5f67890"
+            },
+            "invoked_function_arn": "arn:aws:lambda:us-east-1:111122223333:function:demo-log-forwarder"
+          },
+          "levelname": "WARNING",
+          "asctime": "2025-02-16 10:00:02,200",
+          "timestamp": 1739721602200
+        },
+        "message": "DeprecationWarning: RefResolver is deprecated. Use the referencing library instead. See docs for migration.",
+        "status": "warn",
+        "timestamp": "2025-02-16T10:00:02.200Z",
+        "tags": [
+          "aws_account:111122223333",
+          "aws_account_alias:demo-org",
+          "region:us-east-1",
+          "source:cloudwatch",
+          "sourcecategory:aws",
+          "env:demo"
+        ]
+      }
+    },
+    {
+      "id": "AwFha2V4YW1wbGVGb3VyUVdFUlRZMTIzNDU2Nzg5AAAAkZmU5YzYxYTktNmE3My00NWUyLTljZGQtM2M3YWJhOTQzMTQzAAAADg",
+      "type": "log",
+      "attributes": {
+        "service": "demo-worker",
+        "host": "demo-backend",
+        "attributes": {
+          "service": "demo-worker",
+          "host": "demo-backend",
+          "name": "worker.job.process",
+          "id": "39498299784193246614899193648899462816438457171279609885",
+          "aws": {
+            "awslogs": {
+              "owner": "111122223333",
+              "logGroup": "demo-backend",
+              "logStream": "demo-backend/worker/abc123def456"
+            },
+            "invoked_function_arn": "arn:aws:lambda:us-east-1:111122223333:function:demo-worker"
+          },
+          "levelname": "INFO",
+          "asctime": "2025-02-16 10:00:03,050",
+          "timestamp": 1739721603050
+        },
+        "message": "Job completed. job_id=job_abc123 type=export duration_sec=4 result=success",
+        "status": "info",
+        "timestamp": "2025-02-16T10:00:03.050Z",
+        "tags": [
+          "aws_account:111122223333",
+          "aws_account_alias:demo-org",
+          "region:us-east-1",
+          "source:cloudwatch",
+          "sourcecategory:aws",
+          "env:demo"
+        ]
+      }
+    },
+    {
+      "id": "AwFha2V4YW1wbGVGaXZlUlRZVUlPOTg3NjU0MzIxAAAAkZmU5YzYxYTktNmE3My00NWUyLTljZGQtM2M3YWJhOTQzMTQzAAAADQ",
+      "type": "log",
+      "attributes": {
+        "service": "demo-api",
+        "host": "demo-backend",
+        "attributes": {
+          "service": "demo-api",
+          "host": "demo-backend",
+          "name": "app.db.query",
+          "id": "39498299770166077885023431692873496022942637784017928211",
+          "aws": {
+            "awslogs": {
+              "owner": "111122223333",
+              "logGroup": "demo-backend",
+              "logStream": "demo-backend/api/a1b2c3d4e5f67890"
+            },
+            "invoked_function_arn": "arn:aws:lambda:us-east-1:111122223333:function:demo-log-forwarder"
+          },
+          "levelname": "INFO",
+          "asctime": "2025-02-16 10:00:04,100",
+          "timestamp": 1739721604100
+        },
+        "message": "spec_read_data() cache MISS for key:demo:spec:paths:/api/v1/items",
+        "status": "info",
+        "timestamp": "2025-02-16T10:00:04.100Z",
+        "tags": [
+          "aws_account:111122223333",
+          "aws_account_alias:demo-org",
+          "region:us-east-1",
+          "source:cloudwatch",
+          "sourcecategory:aws",
+          "env:demo"
+        ]
+      }
+    },
+    {
+      "id": "AwFha2V4YW1wbGVTaXhBU0RGR0hKS0xaWkMxMjM0AAAAkZmU5YzYxYTktNmE3My00NWUyLTljZGQtM2M3YWJhOTQzMTQzAAAADA",
+      "type": "log",
+      "attributes": {
+        "service": "demo-api",
+        "host": "demo-backend",
+        "attributes": {
+          "service": "demo-api",
+          "host": "demo-backend",
+          "name": "app.api.request",
+          "id": "39498299770166077885023431692873496022942637784017928210",
+          "aws": {
+            "awslogs": {
+              "owner": "111122223333",
+              "logGroup": "demo-backend",
+              "logStream": "demo-backend/api/a1b2c3d4e5f67890"
+            },
+            "invoked_function_arn": "arn:aws:lambda:us-east-1:111122223333:function:demo-log-forwarder"
+          },
+          "levelname": "INFO",
+          "asctime": "2025-02-16 10:00:05,000",
+          "timestamp": 1739721605000
+        },
+        "message": "NEW REQUEST: User=user@example.com Operation=ListItems Context={ limit: 25, offset: 0 }",
+        "status": "info",
+        "timestamp": "2025-02-16T10:00:05.000Z",
+        "tags": [
+          "aws_account:111122223333",
+          "aws_account_alias:demo-org",
+          "region:us-east-1",
+          "source:cloudwatch",
+          "sourcecategory:aws",
+          "env:demo"
+        ]
+      }
+    },
+    {
+      "id": "AwFha2V4YW1wbGVTZXZlblFXRVJUWVVJTzEyMzQ1Njc4AAAAkZmU5YzYxYTktNmE3My00NWUyLTljZGQtM2M3YWJhOTQzMTQzAAAACw",
+      "type": "log",
+      "attributes": {
+        "service": "demo-api",
+        "host": "demo-backend",
+        "attributes": {
+          "service": "demo-api",
+          "host": "demo-backend",
+          "name": "app.auth.middleware",
+          "id": "39498299770143777139824901069731960304669989422511947786",
+          "aws": {
+            "awslogs": {
+              "owner": "111122223333",
+              "logGroup": "demo-backend",
+              "logStream": "demo-backend/api/a1b2c3d4e5f67890"
+            },
+            "invoked_function_arn": "arn:aws:lambda:us-east-1:111122223333:function:demo-log-forwarder"
+          },
+          "levelname": "INFO",
+          "asctime": "2025-02-16 10:00:06,200",
+          "timestamp": 1739721606200
+        },
+        "message": "execute_action called: app=demo-api operation=ListItems template_type=default",
+        "status": "info",
+        "timestamp": "2025-02-16T10:00:06.200Z",
+        "tags": [
+          "aws_account:111122223333",
+          "aws_account_alias:demo-org",
+          "region:us-east-1",
+          "source:cloudwatch",
+          "sourcecategory:aws",
+          "env:demo"
+        ]
+      }
+    },
+    {
+      "id": "AwFha2V4YW1wbGVFaWdodEZXRVJUWVVJTzk4NzY1NDMyAAAAkZmU5YzYxYTktNmE3My00NWUyLTljZGQtM2M3YWJhOTQzMTQzAAAACg",
+      "type": "log",
+      "attributes": {
+        "service": "demo-api",
+        "host": "demo-backend",
+        "attributes": {
+          "service": "demo-api",
+          "host": "demo-backend",
+          "name": "app.api.handler",
+          "id": "39498299768828033173111594304381352926583736093659103241",
+          "aws": {
+            "awslogs": {
+              "owner": "111122223333",
+              "logGroup": "demo-backend",
+              "logStream": "demo-backend/api/a1b2c3d4e5f67890"
+            },
+            "invoked_function_arn": "arn:aws:lambda:us-east-1:111122223333:function:demo-log-forwarder"
+          },
+          "levelname": "INFO",
+          "asctime": "2025-02-16 10:00:07,100",
+          "timestamp": 1739721607100
+        },
+        "message": "handle_request() app_name=demo-api user_input=List items from last hour context={ limit: 25 }",
+        "status": "info",
+        "timestamp": "2025-02-16T10:00:07.100Z",
+        "tags": [
+          "aws_account:111122223333",
+          "aws_account_alias:demo-org",
+          "region:us-east-1",
+          "source:cloudwatch",
+          "sourcecategory:aws",
+          "env:demo"
+        ]
+      }
+    }
+  ],
+  "meta": {
+    "page": {
+      "after": "eyJhZnRlciI6IkF3RmhhMmtWNFlhMUJjVlZEdGlsVzBBQUFCSm9CbGRuaG9jVmhKZVVGQlF6WnJURWRHTWtGeFNpMVJRVW9BQUFBa1pqRTVZell4WVRrdE5tRTNNeTAwTldVeUxUbGpaR1F0TTJNM1lXSmhPVFF6TVRRekFBQUFHdyIsInZhbHVlcyI6WyIyMDI1LTAyLTE2VDEwOjAwOjA3LjEwMFoiLDEyMjg0NDkxMDJdfQ"
+    },
+    "elapsed": 72,
+    "request_id": "demo_req_abc123xyz789fake",
+    "status": "done"
+  },
+  "links": {
+    "next": "https://app.datadoghq.com/api/v2/logs/events?filter%5Bfrom%5D=now-1h&filter%5Bto%5D=now&page%5Bcursor%5D=eyJmYWtlIjoidCJ9&page%5Blimit%5D=25"
+  }
+}

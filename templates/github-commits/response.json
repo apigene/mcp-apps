@@ -1,0 +1,154 @@
+[
+  {
+    "sha": "a1b2c3d4e5f6789012345678abcdef0123456789",
+    "node_id": "C_kwDOFha2ZQAAAAaMQjMmMzRkNWY2Nzg5MDEyMzQ1Njc4YWJjZGVmMDEyMzQ1Njc4OQ",
+    "commit": {
+      "author": { "name": "demo-user", "email": "dev@example.com", "date": "2025-02-16T10:00:00Z" },
+      "committer": { "name": "demo-user", "email": "dev@example.com", "date": "2025-02-16T10:00:00Z" },
+      "message": "feat: add create_skill endpoint\n\n- New POST endpoint for skill creation.\n- Validation for content and metadata.\n- Error handling for failure scenarios.",
+      "tree": { "sha": "47846633b2e2e3d3cc0762be6161134f644194b5", "url": "https://api.github.com/repos/demo-org/demo-backend/git/trees/47846633b2e2e3d3cc0762be6161134f644194b5" },
+      "url": "https://api.github.com/repos/demo-org/demo-backend/git/commits/a1b2c3d4e5f6789012345678abcdef0123456789",
+      "comment_count": 0,
+      "verification": { "verified": false, "reason": "unsigned", "signature": null, "payload": null, "verified_at": null }
+    },
+    "url": "https://api.github.com/repos/demo-org/demo-backend/commits/a1b2c3d4e5f6789012345678abcdef0123456789",
+    "html_url": "https://github.com/demo-org/demo-backend/commit/a1b2c3d4e5f6789012345678abcdef0123456789",
+    "comments_url": "https://api.github.com/repos/demo-org/demo-backend/commits/a1b2c3d4e5f6789012345678abcdef0123456789/comments",
+    "author": { "login": "demo-user", "id": 100001, "node_id": "U_kgDOAbCdEf", "avatar_url": "https://avatars.githubusercontent.com/u/100001?v=4", "url": "https://api.github.com/users/demo-user", "html_url": "https://github.com/demo-user", "type": "User", "site_admin": false },
+    "committer": { "login": "demo-user", "id": 100001, "node_id": "U_kgDOAbCdEf", "avatar_url": "https://avatars.githubusercontent.com/u/100001?v=4", "url": "https://api.github.com/users/demo-user", "html_url": "https://github.com/demo-user", "type": "User", "site_admin": false },
+    "parents": [{ "sha": "b2c3d4e5f6789012345678abcdef01234567890ab", "url": "https://api.github.com/repos/demo-org/demo-backend/commits/b2c3d4e5f6789012345678abcdef01234567890ab", "html_url": "https://github.com/demo-org/demo-backend/commit/b2c3d4e5f6789012345678abcdef01234567890ab" }]
+  },
+  {
+    "sha": "b2c3d4e5f6789012345678abcdef01234567890ab",
+    "node_id": "C_kwDOFha2ZQAAAAbMmMzZDRlNWY2Nzg5MDEyMzQ1Njc4YWJjZGVmMDEyMzQ1Njc4OWFi",
+    "commit": {
+      "author": { "name": "demo-user", "email": "dev@example.com", "date": "2025-02-16T09:30:00Z" },
+      "committer": { "name": "demo-user", "email": "dev@example.com", "date": "2025-02-16T09:30:00Z" },
+      "message": "fix: support binary responses and add media type to body\n\n- Store image/video/audio as base64.\n- Wrap binary body with media_type and format indicator.",
+      "tree": { "sha": "9d2809ef4885d94096c78a0be718c8908cd48493", "url": "https://api.github.com/repos/demo-org/demo-backend/git/trees/9d2809ef4885d94096c78a0be718c8908cd48493" },
+      "url": "https://api.github.com/repos/demo-org/demo-backend/git/commits/b2c3d4e5f6789012345678abcdef01234567890ab",
+      "comment_count": 0,
+      "verification": { "verified": false, "reason": "unsigned", "signature": null, "payload": null, "verified_at": null }
+    },
+    "url": "https://api.github.com/repos/demo-org/demo-backend/commits/b2c3d4e5f6789012345678abcdef01234567890ab",
+    "html_url": "https://github.com/demo-org/demo-backend/commit/b2c3d4e5f6789012345678abcdef01234567890ab",
+    "comments_url": "https://api.github.com/repos/demo-org/demo-backend/commits/b2c3d4e5f6789012345678abcdef01234567890ab/comments",
+    "author": { "login": "demo-user", "id": 100001, "node_id": "U_kgDOAbCdEf", "avatar_url": "https://avatars.githubusercontent.com/u/100001?v=4", "url": "https://api.github.com/users/demo-user", "html_url": "https://github.com/demo-user", "type": "User", "site_admin": false },
+    "committer": { "login": "demo-user", "id": 100001, "node_id": "U_kgDOAbCdEf", "avatar_url": "https://avatars.githubusercontent.com/u/100001?v=4", "url": "https://api.github.com/users/demo-user", "html_url": "https://github.com/demo-user", "type": "User", "site_admin": false },
+    "parents": [{ "sha": "c3d4e5f6789012345678abcdef01234567890abcd", "url": "https://api.github.com/repos/demo-org/demo-backend/commits/c3d4e5f6789012345678abcdef01234567890abcd", "html_url": "https://github.com/demo-org/demo-backend/commit/c3d4e5f6789012345678abcdef01234567890abcd" }]
+  },
+  {
+    "sha": "c3d4e5f6789012345678abcdef01234567890abcd",
+    "node_id": "C_kwDOFha2ZQAAAAYzZDRlNWY2Nzg5MDEyMzQ1Njc4YWJjZGVmMDEyMzQ1Njc4OWFiY2Q",
+    "commit": {
+      "author": { "name": "jane-dev", "email": "jane@example.com", "date": "2025-02-15T14:10:00Z" },
+      "committer": { "name": "GitHub", "email": "noreply@github.com", "date": "2025-02-15T14:10:00Z" },
+      "message": "fix: parse config value (#42)\n\n* fix: parse config value\n* support comma-separated values",
+      "tree": { "sha": "e3da95636e05e16bd25fca58f98356eb1b82f9be", "url": "https://api.github.com/repos/demo-org/demo-backend/git/trees/e3da95636e05e16bd25fca58f98356eb1b82f9be" },
+      "url": "https://api.github.com/repos/demo-org/demo-backend/git/commits/c3d4e5f6789012345678abcdef01234567890abcd",
+      "comment_count": 0,
+      "verification": { "verified": false, "reason": "unsigned", "signature": null, "payload": null, "verified_at": null }
+    },
+    "url": "https://api.github.com/repos/demo-org/demo-backend/commits/c3d4e5f6789012345678abcdef01234567890abcd",
+    "html_url": "https://github.com/demo-org/demo-backend/commit/c3d4e5f6789012345678abcdef01234567890abcd",
+    "comments_url": "https://api.github.com/repos/demo-org/demo-backend/commits/c3d4e5f6789012345678abcdef01234567890abcd/comments",
+    "author": { "login": "jane-dev", "id": 100002, "node_id": "U_kgDOGhIjKl", "avatar_url": "https://avatars.githubusercontent.com/u/100002?v=4", "url": "https://api.github.com/users/jane-dev", "html_url": "https://github.com/jane-dev", "type": "User", "site_admin": false },
+    "committer": { "login": "web-flow", "id": 19864447, "node_id": "MDQ6VXNlcjE5ODY0NDQ3", "avatar_url": "https://avatars.githubusercontent.com/u/19864447?v=4", "url": "https://api.github.com/users/web-flow", "html_url": "https://github.com/web-flow", "type": "User", "site_admin": false },
+    "parents": [{ "sha": "d4e5f6789012345678abcdef01234567890abcdef", "url": "https://api.github.com/repos/demo-org/demo-backend/commits/d4e5f6789012345678abcdef01234567890abcdef", "html_url": "https://github.com/demo-org/demo-backend/commit/d4e5f6789012345678abcdef01234567890abcdef" }]
+  },
+  {
+    "sha": "d4e5f6789012345678abcdef01234567890abcdef",
+    "node_id": "C_kwDOFha2ZQAAAAZkNGU1ZjY3ODkwMTIzNDU2NzhhYmNkZWYwMTIzNDU2Nzg5MGFiY2RlZg",
+    "commit": {
+      "author": { "name": "demo-user", "email": "dev@example.com", "date": "2025-02-15T11:00:00Z" },
+      "committer": { "name": "demo-user", "email": "dev@example.com", "date": "2025-02-15T11:00:00Z" },
+      "message": "feat: add sync router to API v1 configuration\n\n- Include the sync_router in the API v1 router setup.\n- Ensure the new router is included before the templates router.",
+      "tree": { "sha": "0b4992538e4a7345f8df73c2a85d25f68684e529", "url": "https://api.github.com/repos/demo-org/demo-backend/git/trees/0b4992538e4a7345f8df73c2a85d25f68684e529" },
+      "url": "https://api.github.com/repos/demo-org/demo-backend/git/commits/d4e5f6789012345678abcdef01234567890abcdef",
+      "comment_count": 0,
+      "verification": { "verified": false, "reason": "unsigned", "signature": null, "payload": null, "verified_at": null }
+    },
+    "url": "https://api.github.com/repos/demo-org/demo-backend/commits/d4e5f6789012345678abcdef01234567890abcdef",
+    "html_url": "https://github.com/demo-org/demo-backend/commit/d4e5f6789012345678abcdef01234567890abcdef",
+    "comments_url": "https://api.github.com/repos/demo-org/demo-backend/commits/d4e5f6789012345678abcdef01234567890abcdef/comments",
+    "author": { "login": "demo-user", "id": 100001, "node_id": "U_kgDOAbCdEf", "avatar_url": "https://avatars.githubusercontent.com/u/100001?v=4", "url": "https://api.github.com/users/demo-user", "html_url": "https://github.com/demo-user", "type": "User", "site_admin": false },
+    "committer": { "login": "demo-user", "id": 100001, "node_id": "U_kgDOAbCdEf", "avatar_url": "https://avatars.githubusercontent.com/u/100001?v=4", "url": "https://api.github.com/users/demo-user", "html_url": "https://github.com/demo-user", "type": "User", "site_admin": false },
+    "parents": [{ "sha": "e5f6789012345678abcdef01234567890abcdef01", "url": "https://api.github.com/repos/demo-org/demo-backend/commits/e5f6789012345678abcdef01234567890abcdef01", "html_url": "https://github.com/demo-org/demo-backend/commit/e5f6789012345678abcdef01234567890abcdef01" }]
+  },
+  {
+    "sha": "e5f6789012345678abcdef01234567890abcdef01",
+    "node_id": "C_kwDOFha2ZQAAAAZVNWY2Nzg5MDEyMzQ1Njc4YWJjZGVmMDEyMzQ1Njc4OTBhYmNkZWYwMQ",
+    "commit": {
+      "author": { "name": "demo-user", "email": "dev@example.com", "date": "2025-02-14T14:33:00Z" },
+      "committer": { "name": "demo-user", "email": "dev@example.com", "date": "2025-02-14T14:33:00Z" },
+      "message": "add more logs for debugging",
+      "tree": { "sha": "34cdd39baaf0dc198cd07526b62bbe049f5dcfc0", "url": "https://api.github.com/repos/demo-org/demo-backend/git/trees/34cdd39baaf0dc198cd07526b62bbe049f5dcfc0" },
+      "url": "https://api.github.com/repos/demo-org/demo-backend/git/commits/e5f6789012345678abcdef01234567890abcdef01",
+      "comment_count": 0,
+      "verification": { "verified": false, "reason": "unsigned", "signature": null, "payload": null, "verified_at": null }
+    },
+    "url": "https://api.github.com/repos/demo-org/demo-backend/commits/e5f6789012345678abcdef01234567890abcdef01",
+    "html_url": "https://github.com/demo-org/demo-backend/commit/e5f6789012345678abcdef01234567890abcdef01",
+    "comments_url": "https://api.github.com/repos/demo-org/demo-backend/commits/e5f6789012345678abcdef01234567890abcdef01/comments",
+    "author": { "login": "demo-user", "id": 100001, "node_id": "U_kgDOAbCdEf", "avatar_url": "https://avatars.githubusercontent.com/u/100001?v=4", "url": "https://api.github.com/users/demo-user", "html_url": "https://github.com/demo-user", "type": "User", "site_admin": false },
+    "committer": { "login": "demo-user", "id": 100001, "node_id": "U_kgDOAbCdEf", "avatar_url": "https://avatars.githubusercontent.com/u/100001?v=4", "url": "https://api.github.com/users/demo-user", "html_url": "https://github.com/demo-user", "type": "User", "site_admin": false },
+    "parents": [{ "sha": "f6789012345678abcdef01234567890abcdef0123", "url": "https://api.github.com/repos/demo-org/demo-backend/commits/f6789012345678abcdef01234567890abcdef0123", "html_url": "https://github.com/demo-org/demo-backend/commit/f6789012345678abcdef01234567890abcdef0123" }]
+  },
+  {
+    "sha": "f6789012345678abcdef01234567890abcdef0123",
+    "node_id": "C_kwDOFha2ZQAAAAZmNjc4OTAxMjM0NTY3OGFiY2RlZjAxMjM0NTY3ODkwYWJjZGVmMDEyMw",
+    "commit": {
+      "author": { "name": "demo-user", "email": "dev@example.com", "date": "2025-02-14T14:15:00Z" },
+      "committer": { "name": "demo-user", "email": "dev@example.com", "date": "2025-02-14T14:15:00Z" },
+      "message": "update log message",
+      "tree": { "sha": "74a11643d338f8d6bfa0a730ad2b2975db2f25fc", "url": "https://api.github.com/repos/demo-org/demo-backend/git/trees/74a11643d338f8d6bfa0a730ad2b2975db2f25fc" },
+      "url": "https://api.github.com/repos/demo-org/demo-backend/git/commits/f6789012345678abcdef01234567890abcdef0123",
+      "comment_count": 0,
+      "verification": { "verified": false, "reason": "unsigned", "signature": null, "payload": null, "verified_at": null }
+    },
+    "url": "https://api.github.com/repos/demo-org/demo-backend/commits/f6789012345678abcdef01234567890abcdef0123",
+    "html_url": "https://github.com/demo-org/demo-backend/commit/f6789012345678abcdef01234567890abcdef0123",
+    "comments_url": "https://api.github.com/repos/demo-org/demo-backend/commits/f6789012345678abcdef01234567890abcdef0123/comments",
+    "author": { "login": "demo-user", "id": 100001, "node_id": "U_kgDOAbCdEf", "avatar_url": "https://avatars.githubusercontent.com/u/100001?v=4", "url": "https://api.github.com/users/demo-user", "html_url": "https://github.com/demo-user", "type": "User", "site_admin": false },
+    "committer": { "login": "demo-user", "id": 100001, "node_id": "U_kgDOAbCdEf", "avatar_url": "https://avatars.githubusercontent.com/u/100001?v=4", "url": "https://api.github.com/users/demo-user", "html_url": "https://github.com/demo-user", "type": "User", "site_admin": false },
+    "parents": [{ "sha": "789012345678abcdef01234567890abcdef012345", "url": "https://api.github.com/repos/demo-org/demo-backend/commits/789012345678abcdef01234567890abcdef012345", "html_url": "https://github.com/demo-org/demo-backend/commit/789012345678abcdef01234567890abcdef012345" }]
+  },
+  {
+    "sha": "789012345678abcdef01234567890abcdef012345",
+    "node_id": "C_kwDOFha2ZQAAAAY3ODkwMTIzNDU2NzhhYmNkZWYwMTIzNDU2Nzg5MGFiY2RlZjAxMjM0NQ",
+    "commit": {
+      "author": { "name": "demo-user", "email": "dev@example.com", "date": "2025-02-13T20:51:00Z" },
+      "committer": { "name": "demo-user", "email": "dev@example.com", "date": "2025-02-13T20:51:00Z" },
+      "message": "feat: extend support for optional resource files",
+      "tree": { "sha": "b4bad457b15734a3384da99e479720761150cc1e", "url": "https://api.github.com/repos/demo-org/demo-backend/git/trees/b4bad457b15734a3384da99e479720761150cc1e" },
+      "url": "https://api.github.com/repos/demo-org/demo-backend/git/commits/789012345678abcdef01234567890abcdef012345",
+      "comment_count": 0,
+      "verification": { "verified": false, "reason": "unsigned", "signature": null, "payload": null, "verified_at": null }
+    },
+    "url": "https://api.github.com/repos/demo-org/demo-backend/commits/789012345678abcdef01234567890abcdef012345",
+    "html_url": "https://github.com/demo-org/demo-backend/commit/789012345678abcdef01234567890abcdef012345",
+    "comments_url": "https://api.github.com/repos/demo-org/demo-backend/commits/789012345678abcdef01234567890abcdef012345/comments",
+    "author": { "login": "demo-user", "id": 100001, "node_id": "U_kgDOAbCdEf", "avatar_url": "https://avatars.githubusercontent.com/u/100001?v=4", "url": "https://api.github.com/users/demo-user", "html_url": "https://github.com/demo-user", "type": "User", "site_admin": false },
+    "committer": { "login": "demo-user", "id": 100001, "node_id": "U_kgDOAbCdEf", "avatar_url": "https://avatars.githubusercontent.com/u/100001?v=4", "url": "https://api.github.com/users/demo-user", "html_url": "https://github.com/demo-user", "type": "User", "site_admin": false },
+    "parents": [{ "sha": "89012345678abcdef01234567890abcdef01234567", "url": "https://api.github.com/repos/demo-org/demo-backend/commits/89012345678abcdef01234567890abcdef01234567", "html_url": "https://github.com/demo-org/demo-backend/commit/89012345678abcdef01234567890abcdef01234567" }]
+  },
+  {
+    "sha": "89012345678abcdef01234567890abcdef01234567",
+    "node_id": "C_kwDOFha2ZQAAAAY4OTAxMjM0NTY3OGFiY2RlZjAxMjM0NTY3ODkwYWJjZGVmMDEyMzQ1Njc",
+    "commit": {
+      "author": { "name": "demo-user", "email": "dev@example.com", "date": "2025-02-13T09:26:00Z" },
+      "committer": { "name": "demo-user", "email": "dev@example.com", "date": "2025-02-13T09:26:00Z" },
+      "message": "feat: support multi content type in response",
+      "tree": { "sha": "ff0031fbdf46da12ae8844ef32eaa46db5d2836c", "url": "https://api.github.com/repos/demo-org/demo-backend/git/trees/ff0031fbdf46da12ae8844ef32eaa46db5d2836c" },
+      "url": "https://api.github.com/repos/demo-org/demo-backend/git/commits/89012345678abcdef01234567890abcdef01234567",
+      "comment_count": 0,
+      "verification": { "verified": false, "reason": "unsigned", "signature": null, "payload": null, "verified_at": null }
+    },
+    "url": "https://api.github.com/repos/demo-org/demo-backend/commits/89012345678abcdef01234567890abcdef01234567",
+    "html_url": "https://github.com/demo-org/demo-backend/commit/89012345678abcdef01234567890abcdef01234567",
+    "comments_url": "https://api.github.com/repos/demo-org/demo-backend/commits/89012345678abcdef01234567890abcdef01234567/comments",
+    "author": { "login": "demo-user", "id": 100001, "node_id": "U_kgDOAbCdEf", "avatar_url": "https://avatars.githubusercontent.com/u/100001?v=4", "url": "https://api.github.com/users/demo-user", "html_url": "https://github.com/demo-user", "type": "User", "site_admin": false },
+    "committer": { "login": "demo-user", "id": 100001, "node_id": "U_kgDOAbCdEf", "avatar_url": "https://avatars.githubusercontent.com/u/100001?v=4", "url": "https://api.github.com/users/demo-user", "html_url": "https://github.com/demo-user", "type": "User", "site_admin": false },
+    "parents": [{ "sha": "9012345678abcdef01234567890abcdef0123456789", "url": "https://api.github.com/repos/demo-org/demo-backend/commits/9012345678abcdef01234567890abcdef0123456789", "html_url": "https://github.com/demo-org/demo-backend/commit/9012345678abcdef01234567890abcdef0123456789" }]
+  }
+]

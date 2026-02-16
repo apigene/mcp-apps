@@ -1,0 +1,4 @@
+{
+  "uiElements": ["chart", "table", "list", "pagination"],
+  "mcpFeatures": ["tool-result", "host-context"]
+}

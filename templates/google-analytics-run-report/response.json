@@ -1,0 +1,37 @@
+{
+  "rows": {
+    "columns": ["dimensionValues", "metricValues"],
+    "rows": [
+      [[{"value": "desktop"}, {"value": "Country A"}], [{"value": "390"}, {"value": "389"}, {"value": "0.99"}, {"value": "0.70"}]],
+      [[{"value": "desktop"}, {"value": "Country B"}], [{"value": "217"}, {"value": "212"}, {"value": "0.59"}, {"value": "36.79"}]],
+      [[{"value": "desktop"}, {"value": "Country C"}], [{"value": "132"}, {"value": "132"}, {"value": "0.79"}, {"value": "1.49"}]],
+      [[{"value": "desktop"}, {"value": "Country D"}], [{"value": "98"}, {"value": "45"}, {"value": "0.38"}, {"value": "246.41"}]],
+      [[{"value": "desktop"}, {"value": "Country E"}], [{"value": "91"}, {"value": "86"}, {"value": "0.68"}, {"value": "58.21"}]],
+      [[{"value": "desktop"}, {"value": "Country F"}], [{"value": "84"}, {"value": "82"}, {"value": "0.73"}, {"value": "8.04"}]],
+      [[{"value": "desktop"}, {"value": "Country G"}], [{"value": "60"}, {"value": "60"}, {"value": "0.77"}, {"value": "1.18"}]],
+      [[{"value": "desktop"}, {"value": "Country H"}], [{"value": "59"}, {"value": "59"}, {"value": "0.75"}, {"value": "2.90"}]],
+      [[{"value": "desktop"}, {"value": "Country I"}], [{"value": "50"}, {"value": "50"}, {"value": "0.94"}, {"value": "0.40"}]],
+      [[{"value": "desktop"}, {"value": "Country J"}], [{"value": "38"}, {"value": "38"}, {"value": "0.66"}, {"value": "2.07"}]],
+      [[{"value": "desktop"}, {"value": "Country K"}], [{"value": "36"}, {"value": "36"}, {"value": "0.75"}, {"value": "2.52"}]],
+      [[{"value": "desktop"}, {"value": "Country L"}], [{"value": "36"}, {"value": "36"}, {"value": "0.69"}, {"value": "3.00"}]],
+      [[{"value": "desktop"}, {"value": "Country M"}], [{"value": "33"}, {"value": "33"}, {"value": "0.67"}, {"value": "21.87"}]],
+      [[{"value": "desktop"}, {"value": "Country N"}], [{"value": "33"}, {"value": "33"}, {"value": "0.70"}, {"value": "4.45"}]],
+      [[{"value": "mobile"}, {"value": "Country D"}], [{"value": "31"}, {"value": "27"}, {"value": "0.55"}, {"value": "101.19"}]],
+      [[{"value": "desktop"}, {"value": "Country O"}], [{"value": "29"}, {"value": "25"}, {"value": "0.76"}, {"value": "2.01"}]],
+      [[{"value": "desktop"}, {"value": "Country P"}], [{"value": "28"}, {"value": "24"}, {"value": "0.79"}, {"value": "2.01"}]],
+      [[{"value": "desktop"}, {"value": "Country Q"}], [{"value": "28"}, {"value": "27"}, {"value": "0.75"}, {"value": "22.06"}]],
+      [[{"value": "desktop"}, {"value": "Country R"}], [{"value": "27"}, {"value": "27"}, {"value": "0.70"}, {"value": "3.28"}]],
+      [[{"value": "desktop"}, {"value": "Country S"}], [{"value": "24"}, {"value": "24"}, {"value": "0.75"}, {"value": "2.67"}]],
+      [[{"value": "mobile"}, {"value": "Country B"}], [{"value": "24"}, {"value": "22"}, {"value": "0.46"}, {"value": "58.33"}]],
+      [[{"value": "desktop"}, {"value": "Country T"}], [{"value": "22"}, {"value": "22"}, {"value": "0.64"}, {"value": "2.84"}]],
+      [[{"value": "desktop"}, {"value": "Country U"}], [{"value": "20"}, {"value": "14"}, {"value": "0.70"}, {"value": "77.97"}]],
+      [[{"value": "desktop"}, {"value": "Country V"}], [{"value": "18"}, {"value": "18"}, {"value": "0.67"}, {"value": "4.81"}]],
+      [[{"value": "desktop"}, {"value": "Country W"}], [{"value": "15"}, {"value": "15"}, {"value": "0.87"}, {"value": "1.77"}]],
+      [[{"value": "desktop"}, {"value": "Country X"}], [{"value": "14"}, {"value": "14"}, {"value": "0.71"}, {"value": "63.97"}]],
+      [[{"value": "desktop"}, {"value": "Country Y"}], [{"value": "13"}, {"value": "13"}, {"value": "0.69"}, {"value": "62.18"}]],
+      [[{"value": "desktop"}, {"value": "Country Z"}], [{"value": "12"}, {"value": "12"}, {"value": "0.75"}, {"value": "2.42"}]],
+      [[{"value": "mobile"}, {"value": "Country AA"}], [{"value": "12"}, {"value": "12"}, {"value": "1"}, {"value": "1.34"}]],
+      [[{"value": "desktop"}, {"value": "(not set)"}], [{"value": "7"}, {"value": "7"}, {"value": "0.57"}, {"value": "6.16"}]]
+    ]
+  }
+}

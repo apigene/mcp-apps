@@ -1,0 +1,4 @@
+{
+  "uiElements": ["form", "card"],
+  "mcpFeatures": ["tool-result", "host-context"]
+}

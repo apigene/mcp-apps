@@ -1,0 +1,142 @@
+{
+  "product": {
+    "id": "gid://shopify/p/7dGRj5jMPPRqz18caEdYtm",
+    "description": "A sleeveless bodycon maxi dress with a twisted asymmetric neckline and premium stretch jersey for standout style and comfort.",
+    "selectedOptions": [
+      { "name": "Colour", "value": "Red" },
+      { "name": "Size", "value": "US 0" }
+    ],
+    "rating": {
+      "rating": 4.4,
+      "count": 21
+    },
+    "featuredVariantId": "gid://shopify/ProductVariant/43356431974597?shop=24904138798",
+    "featuredVariantMedia": [
+      {
+        "url": "https://cdn.shopify.com/s/files/1/0249/0413/8798/files/uploaded_image_0_f9ld2.jpg?v=1761388783",
+        "altText": "front"
+      }
+    ],
+    "variants": [
+      {
+        "id": "gid://shopify/ProductVariant/43356431974597?shop=24904138798",
+        "productId": "gid://shopify/Product/7836389212357",
+        "displayName": "Lita | Red Twisted Asymmetric Maxi Dress",
+        "productDescription": "A must-have maxi dress in premium stretch jersey with a twisted asymmetric neckline. Bodycon fit, sleeveless, maxi length. Premium jersey (95% Polyester, 5% Elastane), 155cm length.",
+        "availableForSale": true,
+        "price": { "amount": 9500, "currency": "USD" },
+        "media": [
+          { "url": "https://cdn.shopify.com/s/files/1/0249/0413/8798/files/uploaded_image_0_f9ld2.jpg?v=1761388783", "altText": "front" }
+        ],
+        "shop": {
+          "id": "gid://shopify/Shop/24904138798",
+          "name": "Demo Fashion Store",
+          "onlineStoreUrl": "https://demo-store.example.com",
+          "privacyPolicy": { "url": "https://demo-store.example.com/policies/privacy" },
+          "refundPolicy": { "url": "https://demo-store.example.com/policies/refund" },
+          "termsOfService": { "url": "https://demo-store.example.com/policies/terms" }
+        },
+        "variantUrl": "https://demo-store.example.com/products/lita-red-maxi-dress?variant=43356431974597",
+        "checkoutUrl": "https://demo-store.example.com/cart/43356431974597:1",
+        "rating": { "rating": 5, "count": 2 },
+        "secondhand": false
+      },
+      {
+        "id": "gid://shopify/ProductVariant/43356432040133?shop=24904138798",
+        "productId": "gid://shopify/Product/7836389212357",
+        "displayName": "Lita | Red Twisted Asymmetric Maxi Dress",
+        "productDescription": "A must-have maxi dress in premium stretch jersey with a twisted asymmetric neckline. Bodycon fit, sleeveless, maxi length.",
+        "availableForSale": true,
+        "price": { "amount": 9500, "currency": "USD" },
+        "media": [
+          { "url": "https://cdn.shopify.com/s/files/1/0249/0413/8798/files/uploaded_image_0_f9ld2.jpg?v=1761388783", "altText": "front" }
+        ],
+        "shop": {
+          "id": "gid://shopify/Shop/24904138798",
+          "name": "Demo Fashion Store",
+          "onlineStoreUrl": "https://demo-store.example.com",
+          "privacyPolicy": { "url": "https://demo-store.example.com/policies/privacy" },
+          "refundPolicy": { "url": "https://demo-store.example.com/policies/refund" },
+          "termsOfService": { "url": "https://demo-store.example.com/policies/terms" }
+        },
+        "variantUrl": "https://demo-store.example.com/products/lita-red-maxi-dress?variant=43356432040133",
+        "checkoutUrl": "https://demo-store.example.com/cart/43356432040133:1",
+        "rating": { "rating": 5, "count": 2 },
+        "secondhand": false
+      },
+      {
+        "id": "gid://shopify/ProductVariant/43356432138437?shop=24904138798",
+        "productId": "gid://shopify/Product/7836389212357",
+        "displayName": "Lita | Red Twisted Asymmetric Maxi Dress",
+        "productDescription": "A must-have maxi dress in premium stretch jersey with a twisted asymmetric neckline. Bodycon fit, sleeveless, maxi length.",
+        "availableForSale": true,
+        "price": { "amount": 9500, "currency": "USD" },
+        "media": [
+          { "url": "https://cdn.shopify.com/s/files/1/0249/0413/8798/files/uploaded_image_0_f9ld2.jpg?v=1761388783", "altText": "front" }
+        ],
+        "shop": {
+          "id": "gid://shopify/Shop/24904138798",
+          "name": "Demo Fashion Store",
+          "onlineStoreUrl": "https://demo-store.example.com",
+          "privacyPolicy": { "url": "https://demo-store.example.com/policies/privacy" },
+          "refundPolicy": { "url": "https://demo-store.example.com/policies/refund" },
+          "termsOfService": { "url": "https://demo-store.example.com/policies/terms" }
+        },
+        "variantUrl": "https://demo-store.example.com/products/lita-red-maxi-dress?variant=43356432138437",
+        "checkoutUrl": "https://demo-store.example.com/cart/43356432138437:1",
+        "rating": { "rating": 5, "count": 2 },
+        "secondhand": false
+      },
+      {
+        "id": "gid://shopify/ProductVariant/43672166990021?shop=24904138798",
+        "productId": "gid://shopify/Product/7952087154885",
+        "displayName": "Lita | Black Twisted Asymmetric Maxi Dress",
+        "productDescription": "A must-have maxi dress in black premium stretch jersey with a twisted asymmetric neckline. Bodycon fit, sleeveless, maxi length.",
+        "availableForSale": true,
+        "price": { "amount": 9500, "currency": "USD" },
+        "media": [
+          { "url": "https://cdn.shopify.com/s/files/1/0249/0413/8798/files/CL13493100204_lita-black-web-1.jpg?v=1770633789", "altText": "lita-black" }
+        ],
+        "shop": {
+          "id": "gid://shopify/Shop/24904138798",
+          "name": "Demo Fashion Store",
+          "onlineStoreUrl": "https://demo-store.example.com",
+          "privacyPolicy": { "url": "https://demo-store.example.com/policies/privacy" },
+          "refundPolicy": { "url": "https://demo-store.example.com/policies/refund" },
+          "termsOfService": { "url": "https://demo-store.example.com/policies/terms" }
+        },
+        "variantUrl": "https://demo-store.example.com/products/lita-black-maxi-dress?variant=43672166990021",
+        "checkoutUrl": "https://demo-store.example.com/cart/43672166990021:1",
+        "rating": { "rating": 2.8, "count": 4 },
+        "secondhand": false
+      }
+    ],
+    "topFeatures": [
+      "Twisted asymmetric neckline: Creates a bold, modern look that stands out at events",
+      "Premium stretch jersey fabric: Ensures a comfortable, bodycon fit that hugs every curve",
+      "Sleeveless maxi length: Offers breathability and a contemporary silhouette",
+      "Gold accents and tousled bun: Adds a touch of elegance and classic style",
+      "Double-layered construction: Enhances durability and comfort"
+    ],
+    "techSpecs": [
+      "Material: 95% Polyester, 5% Elastane",
+      "Length: 155 cm (maxi)",
+      "Fit: Bodycon",
+      "Neckline: Asymmetric",
+      "Sleeve: Sleeveless",
+      "Pattern options: Solid, Floral, Animal, Leopard Print"
+    ],
+    "attributes": [
+      { "name": "Neckline", "values": ["Asymmetric"] },
+      { "name": "Skirt/Dress length type", "values": ["Maxi"] },
+      { "name": "Fabric", "values": ["Polyester"] },
+      { "name": "Clothing features", "values": ["Stretchable"] },
+      { "name": "Sleeve length type", "values": ["Sleeveless"] },
+      { "name": "Dress occasion", "values": ["Formal", "Party", "Wedding"] },
+      { "name": "Pattern", "values": ["Solid"] },
+      { "name": "Age group", "values": ["Adults"] }
+    ],
+    "uniqueSellingPoint": "Twisted asymmetric neckline with gold accents and premium stretch jersey for a flattering, modern silhouette."
+  },
+  "instructions": "Use markdown to render product titles as links to their respective product pages using the URL property."
+}

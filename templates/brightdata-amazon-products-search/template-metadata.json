@@ -1,0 +1,4 @@
+{
+  "uiElements": ["card", "list", "image-gallery"],
+  "mcpFeatures": ["tool-result", "host-context"]
+}
