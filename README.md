@@ -1,4 +1,4 @@
-# Apigene MCP Apps Templates
+# Apigene MCP Apps Examples
 
 Open-source repository of MCP App templates and local tooling.
 
@@ -17,13 +17,13 @@ Open-source repository of MCP App templates and local tooling.
 
 ## Quick Start
 
-### 1) Run Lab + MCP HTTP (default)
+### 1) Run MCP App Playground + MCP Server (default)
 
 ```bash
 npx mcp-app-playground
 ```
 
-With no arguments, starts the MCP Apps Playground and MCP server and opens the lab in your browser. You can also run:
+With no arguments, starts the MCP Apps Playground and MCP server and opens the playground in your browser. You can also run:
 
 ```bash
 npx mcp-app-playground start
