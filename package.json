@@ -41,6 +41,7 @@
   ],
   "scripts": {
     "build": "echo 'No build step — examples run as ES modules'",
+    "dev": "node bin/mcp-app-playground.mjs start",
     "start": "node bin/mcp-app-playground.mjs start",
     "lab": "node playground/playground-app/server.mjs",
     "list": "node bin/mcp-app-playground.mjs list",

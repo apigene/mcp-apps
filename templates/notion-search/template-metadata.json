@@ -1,4 +1,0 @@
-{
-  "uiElements": ["list", "search", "pagination"],
-  "mcpFeatures": ["tool-result", "host-context"]
-}

@@ -1,4 +1,0 @@
-{
-  "uiElements": ["list", "search", "table"],
-  "mcpFeatures": ["tool-result", "host-context"]
-}

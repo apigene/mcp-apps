@@ -265,8 +265,8 @@ let filters = {
 /** Selected log IDs for "Send to LLM" (stable id: log.id or fallback index in list) */
 let selectedLogIds = new Set<string>();
 
-/** Whether the filters section is expanded (collapsible) */
-let filtersExpanded = true;
+/** Whether the filters section is expanded (collapsible) — collapsed by default */
+let filtersExpanded = false;
 
 function getLogId(log: any, index: number): string {
   return log?.id != null ? String(log.id) : `idx-${index}`;
@@ -1130,6 +1130,7 @@ window.addEventListener("message", (event: MessageEvent) => {
 
       if (msg.params.theme) {
         applyDocumentTheme(msg.params.theme);
+        document.body.classList.toggle("dark", msg.params.theme === "dark");
       }
 
       if (msg.params.styles?.css?.fonts) {
@@ -1225,6 +1226,13 @@ if (detailViewEl) {
 // Setup automatic size change notifications
 // The SDK will monitor DOM changes and notify the host automatically
 const cleanupResize = app.setupSizeChangedNotifications();
+
+// Apply initial theme from system preference so the app follows host/system theme from first paint.
+// Host can override later via ui/notifications/host-context-changed.
+const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+const initialTheme = prefersDark ? "dark" : "light";
+applyDocumentTheme(initialTheme);
+document.body.classList.toggle("dark", prefersDark);
 
 // Clean up on page unload
 window.addEventListener("beforeunload", () => {
