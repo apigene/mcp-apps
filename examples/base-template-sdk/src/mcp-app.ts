@@ -2,15 +2,19 @@
    BASE TEMPLATE (SDK UTILITIES VERSION) FOR MCP APPS
    ============================================
 
-   This file uses the official @modelcontextprotocol/ext-apps SDK
+   This template uses the official @modelcontextprotocol/ext-apps SDK
    for utilities only (theme helpers, types, auto-resize).
 
-   Benefits of this approach:
-   - SDK utilities for theme, fonts, and styling
-   - Full TypeScript type safety
-   - Manual message handling for proxy compatibility
-   - Works with run-action.html proxy layer
-   - No SDK connection conflicts with proxy initialization
+   It does NOT call app.connect() because the proxy handles initialization.
+
+   Use this template when:
+   - Running behind run-action.html or similar proxy
+   - Deploying to MCP Apps Playground
+   - Working with APIGINE
+
+   Do NOT use this template when:
+   - Connecting directly to Claude Desktop, ChatGPT, etc.
+   - Need full SDK capabilities (use base-template instead)
 
    See README.md for customization guidelines.
    ============================================ */
@@ -43,10 +47,10 @@ const APP_VERSION = "1.0.0"; // TODO: Replace with your app version
    EXTERNAL DEPENDENCIES
    ============================================
    If you use external libraries (like Chart.js), import or declare them here.
-   
+
    For npm packages:
    import Chart from "chart.js/auto";
-   
+
    For CDN scripts (requires CSP configuration):
    declare const Chart: any;
    ============================================ */
@@ -135,7 +139,7 @@ function showEmpty(message: string = "No data available.") {
 /* ============================================
    TEMPLATE-SPECIFIC FUNCTIONS
    ============================================
-   
+
    Add your template-specific utility functions here.
    Examples:
    - Data normalization functions
@@ -152,10 +156,10 @@ function showEmpty(message: string = "No data available.") {
 /* ============================================
    TEMPLATE-SPECIFIC RENDER FUNCTION
    ============================================
-   
+
    This is the main function you need to implement.
    It receives the data and renders it in the app.
-   
+
    Guidelines:
    1. Always validate data before rendering
    2. Use unwrapData() to handle nested structures
@@ -202,77 +206,84 @@ function renderData(data: any) {
 }
 
 /* ============================================
-   SDK UTILITIES ONLY (NO CONNECTION)
+   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
    ============================================
 
-   We use the SDK only for utilities (theme helpers, types).
-   Message handling is done manually to work with the proxy.
+   We create the SDK App instance for utilities only.
+   The proxy handles ui/initialize, so we do NOT call app.connect().
    ============================================ */
 
-// Create app instance
 const app = new App({
   name: APP_NAME,
   version: APP_VERSION,
 });
 
 /* ============================================
-   DIRECT MESSAGE HANDLING
+   MANUAL MESSAGE HANDLING FOR PROXY COMPATIBILITY
    ============================================
 
    Handle messages manually to work with the proxy layer.
-   The proxy already handles ui/initialize, so we listen for notifications.
+   The proxy already handles ui/initialize, so we only
+   listen for notifications.
    ============================================ */
 
 window.addEventListener("message", (event: MessageEvent) => {
   const msg = event.data;
 
-  if (!msg) return;
+  if (!msg || msg.jsonrpc !== "2.0") return;
 
-  // Handle JSON-RPC 2.0 protocol messages
-  if (msg.jsonrpc === "2.0") {
-    // Handle tool result notifications
-    if (msg.method === "ui/notifications/tool-result" && msg.params) {
-      console.info("Received tool result from proxy");
-      const data = msg.params.structuredContent || msg.params;
-      renderData(data);
-      return;
-    }
+  switch (msg.method) {
+    // Handle tool result notifications (main data)
+    case "ui/notifications/tool-result":
+      console.info("Tool result received");
+      const data = msg.params?.structuredContent || msg.params;
+      if (data !== undefined) {
+        renderData(data);
+      } else {
+        console.warn("Tool result received but no data found:", msg);
+        showEmpty("No data received");
+      }
+      break;
 
-    // Handle host context changes
-    if (msg.method === "ui/notifications/host-context-changed" && msg.params) {
+    // Handle tool input notifications (optional - for loading states)
+    case "ui/notifications/tool-input":
+      console.info("Tool input received:", msg.params?.arguments);
+      // TODO: You can use this for initial rendering or context
+      // Example: Show loading state with input parameters
+      break;
+
+    // Handle host context changes (theme, display mode, fonts)
+    case "ui/notifications/host-context-changed":
       console.info("Host context changed:", msg.params);
 
-      if (msg.params.theme) {
+      if (msg.params?.theme) {
         applyDocumentTheme(msg.params.theme);
       }
 
-      if (msg.params.styles?.css?.fonts) {
+      if (msg.params?.styles?.css?.fonts) {
         applyHostFonts(msg.params.styles.css.fonts);
       }
 
-      if (msg.params.styles?.variables) {
+      if (msg.params?.styles?.variables) {
         applyHostStyleVariables(msg.params.styles.variables);
       }
 
-      if (msg.params.displayMode === "fullscreen") {
+      if (msg.params?.displayMode === "fullscreen") {
         document.body.classList.add("fullscreen-mode");
       } else {
         document.body.classList.remove("fullscreen-mode");
       }
-
-      return;
-    }
+      break;
 
     // Handle tool cancellation
-    if (msg.method === "ui/notifications/tool-cancelled") {
+    case "ui/notifications/tool-cancelled":
       const reason = msg.params?.reason || "Unknown reason";
       console.info("Tool cancelled:", reason);
       showError(`Operation cancelled: ${reason}`);
-      return;
-    }
+      break;
 
-    // Handle resource teardown
-    if (msg.id !== undefined && msg.method === "ui/resource-teardown") {
+    // Handle resource teardown (requires response)
+    case "ui/resource-teardown":
       console.info("Resource teardown requested");
 
       // TODO: Clean up your resources here
@@ -281,37 +292,37 @@ window.addEventListener("message", (event: MessageEvent) => {
       // - Destroy chart instances
       // - Remove event listeners
 
-      window.parent.postMessage(
-        {
-          jsonrpc: "2.0",
-          id: msg.id,
-          result: {},
-        },
-        "*",
-      );
-      return;
-    }
-
-    return;
+      // Send response to host (required for teardown)
+      if (msg.id !== undefined) {
+        window.parent.postMessage(
+          {
+            jsonrpc: "2.0",
+            id: msg.id,
+            result: {},
+          },
+          "*"
+        );
+      }
+      break;
   }
-
 });
 
 /* ============================================
-   APP INITIALIZATION
+   AUTO-RESIZE VIA SDK
    ============================================
-   
-   No SDK connection needed - the proxy handles ui/initialize.
-   We only set up auto-resize and lifecycle cleanup.
+
+   Use SDK's setupSizeChangedNotifications() to automatically
+   notify the host when content size changes.
    ============================================ */
 
-// Setup automatic size change notifications
-// The SDK will monitor DOM changes and notify the host automatically
 const cleanupResize = app.setupSizeChangedNotifications();
 
-// Optional: Clean up on page unload
+// Clean up on page unload
 window.addEventListener("beforeunload", () => {
   cleanupResize();
 });
 
-console.info("MCP App initialized (SDK utilities mode)");
+console.info("MCP App initialized (proxy mode - SDK utilities only)");
+
+// Export empty object to ensure this file is treated as an ES module
+export {};
