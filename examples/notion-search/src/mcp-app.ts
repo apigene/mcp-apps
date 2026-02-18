@@ -1,4 +1,34 @@
 /* ============================================
+   NOTION SEARCH MCP APP (SDK VERSION)
+   ============================================
+
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   for utilities only (theme helpers, types, auto-resize).
+
+   It does NOT call app.connect() because the proxy handles initialization.
+   ============================================ */
+
+/* ============================================
+   SDK IMPORTS
+   ============================================ */
+
+import {
+  App,
+  applyDocumentTheme,
+  applyHostFonts,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
+
+// Import styles (will be bundled by Vite)
+import "./global.css";
+import "./mcp-app.css";
+
+/* ============================================
+   APP CONFIGURATION
+   ============================================ */
+
+
+/* ============================================
    Notion Search MCP App
    ============================================
    Renders Notion search API results (body.results) with
@@ -17,14 +47,6 @@ function unwrapData(data: any): any {
   return raw;
 }
 
-function initializeDarkMode() {
-  if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-    document.body.classList.add("dark");
-  }
-  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e: MediaQueryListEvent) => {
-    document.body.classList.toggle("dark", e.matches);
-  });
-}
 
 function escapeHtml(str: any): string {
   if (typeof str !== "string") return str;
@@ -174,29 +196,6 @@ window.addEventListener("message", function (event: MessageEvent) {
   }
 });
 
-let requestIdCounter = 1;
-function sendRequest(method: string, params: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const id = requestIdCounter++;
-    window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, "*");
-    const listener = (event: MessageEvent) => {
-      if (event.data?.id === id) {
-        window.removeEventListener("message", listener);
-        if (event.data?.result) resolve(event.data.result);
-        else if (event.data?.error) reject(new Error(event.data.error.message || "Unknown error"));
-      }
-    };
-    window.addEventListener("message", listener);
-    setTimeout(() => {
-      window.removeEventListener("message", listener);
-      reject(new Error("Request timeout"));
-    }, 5000);
-  });
-}
-
-function sendNotification(method: string, params: any) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, "*");
-}
 
 let currentDisplayMode = "inline";
 function handleDisplayModeChange(mode: string) {
@@ -213,30 +212,6 @@ function handleDisplayModeChange(mode: string) {
   setTimeout(() => notifySizeChanged(), 100);
 }
 
-function notifySizeChanged() {
-  const w = document.body.scrollWidth || document.documentElement.scrollWidth;
-  const h = document.body.scrollHeight || document.documentElement.scrollHeight;
-  sendNotification("ui/notifications/size-changed", { width: w, height: h });
-}
-
-let sizeChangeTimeout: ReturnType<typeof setTimeout> | null = null;
-function debouncedNotifySizeChanged() {
-  if (sizeChangeTimeout) clearTimeout(sizeChangeTimeout);
-  sizeChangeTimeout = setTimeout(() => notifySizeChanged(), 100);
-}
-
-let resizeObserver: ResizeObserver | null = null;
-function setupSizeObserver() {
-  if (typeof ResizeObserver !== "undefined") {
-    resizeObserver = new ResizeObserver(() => debouncedNotifySizeChanged());
-    resizeObserver.observe(document.body);
-  } else {
-    window.addEventListener("resize", debouncedNotifySizeChanged);
-    const mo = new MutationObserver(debouncedNotifySizeChanged);
-    mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["style", "class"] });
-  }
-  setTimeout(() => notifySizeChanged(), 100);
-}
 
 sendRequest("ui/initialize", {
   appCapabilities: { availableDisplayModes: ["inline", "fullscreen"] },
@@ -259,6 +234,29 @@ sendRequest("ui/initialize", {
   })
   .catch(() => {});
 
-initializeDarkMode();
-setupSizeObserver();
+export {};
+
+/* ============================================
+   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
+   ============================================ */
+
+const app = new App({
+  name: APP_NAME,
+  version: APP_VERSION,
+});
+
+/* ============================================
+   AUTO-RESIZE VIA SDK
+   ============================================ */
+
+const cleanupResize = app.setupSizeChangedNotifications();
+
+// Clean up on page unload
+window.addEventListener("beforeunload", () => {
+  cleanupResize();
+});
+
+console.info("MCP App initialized (proxy mode - SDK utilities only)");
+
+// Export empty object to ensure this file is treated as an ES module
 export {};

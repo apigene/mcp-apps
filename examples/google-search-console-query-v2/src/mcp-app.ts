@@ -45,6 +45,38 @@ import "./global.css";
 import "./mcp-app.css";
 
 /* ============================================
+   GOOGLE SEARCH CONSOLE QUERY V2 MCP APP (SDK VERSION)
+   ============================================
+
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   for utilities only (theme helpers, types, auto-resize).
+
+   It does NOT call app.connect() because the proxy handles initialization.
+   ============================================ */
+
+/* ============================================
+   SDK IMPORTS
+   ============================================ */
+
+import {
+  App,
+  applyDocumentTheme,
+  applyHostFonts,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
+
+// Import styles (will be bundled by Vite)
+import "./global.css";
+import "./mcp-app.css";
+
+/* ============================================
+   APP CONFIGURATION
+   ============================================ */
+
+const APP_NAME = "Google Search Console Query V2";
+const APP_VERSION = "1.0.0";
+
+/* ============================================
    COMMON UTILITY FUNCTIONS
    ============================================ */
 
@@ -111,18 +143,6 @@ function unwrapData(data: any): any {
   return data;
 }
 
-/**
- * Initialize dark mode based on system preference
- */
-function initializeDarkMode() {
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.body.classList.add('dark');
-  }
-  
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e: MediaQueryListEvent) => {
-    document.body.classList.toggle('dark', e.matches);
-  });
-}
 
 /**
  * Escape HTML to prevent XSS attacks
@@ -1539,9 +1559,6 @@ function renderData(data: any) {
       }
       
       // Notify host of size change after rendering completes
-      setTimeout(() => {
-        notifySizeChanged();
-      }, 100);
     };
     
     // Wait for Chart.js to be available, then render charts
@@ -1566,7 +1583,6 @@ function renderData(data: any) {
         if (pieCanvas) {
           showChartError(pieCanvas.closest('.chart-card'), 'Chart.js library failed to load. CDN may be blocked by browser security policies.');
         }
-        notifySizeChanged();
       } else if (attempts < maxAttempts) {
         // Chart.js not loaded yet, wait and retry
         setTimeout(() => waitForChartJS(attempts + 1, maxAttempts), 50);
@@ -1581,7 +1597,6 @@ function renderData(data: any) {
         if (pieCanvas) {
           showChartError(pieCanvas.closest('.chart-card'), 'Chart.js library failed to load. Please check your network connection or browser security settings.');
         }
-        notifySizeChanged();
       }
     };
     
@@ -1601,7 +1616,6 @@ function renderData(data: any) {
       if (pieCanvas) {
         showChartError(pieCanvas.closest('.chart-card'), 'Chart.js CDN blocked. Please allow external scripts or use a different environment.');
       }
-      notifySizeChanged();
     });
     
     // Start waiting for Chart.js
@@ -1610,10 +1624,6 @@ function renderData(data: any) {
   } catch (error: any) {
     console.error('[mcp-app]', 'Render error:', error);
     showError(`Error rendering dashboard: ${error.message}`);
-    // Notify size even on error
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
   }
 }
 
@@ -1660,7 +1670,6 @@ function openQueryPanel() {
     }
   }
   panel.classList.add('query-panel-open');
-  notifySizeChanged();
 }
 
 /**
@@ -1670,7 +1679,6 @@ function closeQueryPanel() {
   const panel = document.getElementById('query-filters-panel');
   if (panel) {
     panel.classList.remove('query-panel-open');
-    notifySizeChanged();
   }
 }
 
@@ -1932,33 +1940,47 @@ window.addEventListener('message', function(event: MessageEvent) {
       break;
       
     case 'ui/notifications/host-context-changed':
-      if (msg.params?.theme === 'dark') {
-        document.body.classList.add('dark');
-      } else if (msg.params?.theme === 'light') {
-        document.body.classList.remove('dark');
+      console.info("Host context changed:", msg.params);
+
+      if (msg.params?.theme) {
+        applyDocumentTheme(msg.params.theme);
       }
-      // Handle display mode changes
-      if (msg.params?.displayMode) {
-        handleDisplayModeChange(msg.params.displayMode);
+
+      if (msg.params?.styles?.css?.fonts) {
+        applyHostFonts(msg.params.styles.css.fonts);
       }
-      // Re-render charts with new theme
-      const lineCanvas = document.getElementById('linechart') as HTMLCanvasElement;
-      const pieCanvas = document.getElementById('piechart') as HTMLCanvasElement;
-      if (lineCanvas && lineChartInstance) {
-        const chartData = (lineChartInstance as any).data;
-        const visibleSeries = new Set<number>();
-        chartData.datasets.forEach((_: any, i: number) => {
-          const legendItem = document.querySelector(`[data-series-index="${i}"]`);
-          if (legendItem && !legendItem.classList.contains('disabled')) {
-            visibleSeries.add(i);
-          }
-        });
-        const lineChartData = { labels: chartData.labels, series: chartData.datasets.map((d: any) => ({ name: d.label, data: d.data })) };
-        renderLineChart(lineCanvas, lineChartData, visibleSeries);
+
+      if (msg.params?.styles?.variables) {
+        applyHostStyleVariables(msg.params.styles.variables);
       }
-      if (pieCanvas && pieChartInstance) {
-        const chartData = (pieChartInstance as any).data;
-        renderPieChart(pieCanvas, chartData.datasets[0].data, CHART_COLORS, chartData.labels);
+
+      if (msg.params?.displayMode === 'fullscreen') {
+        document.body.classList.add('fullscreen-mode');
+      } else {
+        document.body.classList.remove('fullscreen-mode');
+      }
+      break;
+
+    // Handle tool cancellation
+    case 'ui/notifications/tool-cancelled':
+      const reason = msg.params?.reason || "Unknown reason";
+      console.info("Tool cancelled:", reason);
+      showError(`Operation cancelled: ${reason}`);
+      break;
+
+    // Handle resource teardown (requires response)
+    case 'ui/resource-teardown':
+      console.info("Resource teardown requested");
+
+      if (msg.id !== undefined) {
+        window.parent.postMessage(
+          {
+            jsonrpc: "2.0",
+            id: msg.id,
+            result: {},
+          },
+          "*"
+        );
       }
       break;
       
@@ -1974,17 +1996,7 @@ window.addEventListener('message', function(event: MessageEvent) {
         console.log('[mcp-app]', 'Tool input stored for New query panel:', lastToolInput);
       }
       break;
-      
-    case 'ui/notifications/tool-cancelled':
-      // Tool cancellation notification - Host MUST send this if tool is cancelled
-      const reason = msg.params?.reason || 'Tool execution was cancelled';
-      showError(`Operation cancelled: ${reason}`);
-      // Clean up any ongoing operations
-      // - Stop timers
-      // - Cancel pending requests
-      // - Reset UI state
-      break;
-      
+
     case 'ui/notifications/initialized':
       // Initialization notification (optional - handle if needed)
       break;
@@ -2073,9 +2085,6 @@ function handleDisplayModeChange(mode: string) {
     }
   }
   // Notify host of size change after mode change
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
 }
 
 function requestDisplayMode(mode: string): Promise<any> {
@@ -2121,9 +2130,7 @@ function debouncedNotifySizeChanged() {
   if (sizeChangeTimeout) {
     clearTimeout(sizeChangeTimeout);
   }
-  sizeChangeTimeout = setTimeout(() => {
-    notifySizeChanged();
-  }, 100); // Wait 100ms after last change
+  sizeChangeTimeout = // Wait 100ms after last change
 }
 
 // Use ResizeObserver to detect size changes
@@ -2156,65 +2163,6 @@ function setupSizeObserver() {
    You typically don't need to modify this section.
    ============================================ */
 
-// Initialize MCP App - REQUIRED for MCP Apps protocol
-sendRequest('ui/initialize', {
-  appCapabilities: {
-    availableDisplayModes: ["inline", "fullscreen"]
-  },
-  clientInfo: {
-    name: APP_NAME,
-    version: APP_VERSION
-  },
-  protocolVersion: PROTOCOL_VERSION
-}).then((result: any) => {
-  isConnected = true;
-  // Extract host context from initialization result
-  const ctx = result.hostContext || result;
-  
-  // Extract host capabilities for future use
-  const hostCapabilities = result.hostCapabilities;
-  
-  // Send initialized notification after successful initialization
-  sendNotification('ui/notifications/initialized', {});
-  // Send initial size so host can size the iframe
-  setTimeout(() => notifySizeChanged(), 100);
-  // Apply theme from host context
-  if (ctx?.theme === 'dark') {
-    document.body.classList.add('dark');
-  } else if (ctx?.theme === 'light') {
-    document.body.classList.remove('dark');
-  }
-  // Handle display mode from host context
-  if (ctx?.displayMode) {
-    handleDisplayModeChange(ctx.displayMode);
-  }
-  // Handle container dimensions if provided
-  if (ctx?.containerDimensions) {
-    const dims = ctx.containerDimensions;
-    if (dims.width) {
-      document.body.style.width = dims.width + 'px';
-    }
-    if (dims.height) {
-      document.body.style.height = dims.height + 'px';
-    }
-    if (dims.maxWidth) {
-      document.body.style.maxWidth = dims.maxWidth + 'px';
-    }
-    if (dims.maxHeight) {
-      document.body.style.maxHeight = dims.maxHeight + 'px';
-    }
-  }
-}).catch(err => {
-  console.warn('[mcp-app]', 'Failed to initialize MCP App:', err);
-  // Allow size notifications even if init failed (e.g. timeout in playground)
-  isConnected = true;
-});
-
-initializeDarkMode();
-
-// Setup size observer to notify host of content size changes
-// This is critical for the host to properly size the iframe
-setupSizeObserver();
 
 /* ============================================
    ADVANCED INTERACTIVE FEATURES
@@ -2324,6 +2272,27 @@ function sortTable(table: HTMLTableElement, columnIndex: number) {
   rows.forEach(row => tbody.appendChild(row));
 }
 
+/* ============================================
+   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
+   ============================================ */
+
+const app = new App({
+  name: APP_NAME,
+  version: APP_VERSION,
+});
+
+/* ============================================
+   AUTO-RESIZE VIA SDK
+   ============================================ */
+
+const cleanupResize = app.setupSizeChangedNotifications();
+
+// Clean up on page unload
+window.addEventListener("beforeunload", () => {
+  cleanupResize();
+});
+
+console.info("MCP App initialized (proxy mode - SDK utilities only)");
+
 // Export empty object to ensure this file is treated as an ES module
-// This prevents TypeScript from treating top-level declarations as global
 export {};

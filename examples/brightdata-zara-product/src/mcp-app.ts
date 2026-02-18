@@ -15,6 +15,36 @@ const APP_VERSION = "2.0.0";
 const PROTOCOL_VERSION = "2026-01-26"; // MCP Apps protocol version
 
 /* ============================================
+   BRIGHTDATA ZARA PRODUCT MCP APP (SDK VERSION)
+   ============================================
+
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   for utilities only (theme helpers, types, auto-resize).
+
+   It does NOT call app.connect() because the proxy handles initialization.
+   ============================================ */
+
+/* ============================================
+   SDK IMPORTS
+   ============================================ */
+
+import {
+  App,
+  applyDocumentTheme,
+  applyHostFonts,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
+
+// Import styles (will be bundled by Vite)
+import "./global.css";
+import "./mcp-app.css";
+
+/* ============================================
+   APP CONFIGURATION
+   ============================================ */
+
+
+/* ============================================
    COMMON UTILITY FUNCTIONS
    ============================================ */
 
@@ -76,18 +106,6 @@ function unwrapData(data: any): any {
   return data;
 }
 
-/**
- * Initialize dark mode based on system preference
- */
-function initializeDarkMode() {
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.body.classList.add('dark');
-  }
-  
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e: MediaQueryListEvent) => {
-    document.body.classList.toggle('dark', e.matches);
-  });
-}
 
 /**
  * Escape HTML to prevent XSS attacks
@@ -343,17 +361,10 @@ function renderData(data: any) {
     });
     
     // Notify host of size change after rendering completes
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
     
   } catch (error: any) {
     console.error('Render error:', error);
     showError(`Error rendering product data: ${error.message}`);
-    // Notify size even on error
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
   }
 }
 
@@ -417,16 +428,48 @@ window.addEventListener('message', function(event: MessageEvent) {
       break;
       
     case 'ui/notifications/host-context-changed':
-      if (msg.params?.theme === 'dark') {
-        document.body.classList.add('dark');
-      } else if (msg.params?.theme === 'light') {
-        document.body.classList.remove('dark');
+      console.info("Host context changed:", msg.params);
+
+      if (msg.params?.theme) {
+        applyDocumentTheme(msg.params.theme);
       }
-      // Handle display mode changes
-      if (msg.params?.displayMode) {
-        handleDisplayModeChange(msg.params.displayMode);
+
+      if (msg.params?.styles?.css?.fonts) {
+        applyHostFonts(msg.params.styles.css.fonts);
       }
-      // Re-render if needed (e.g., for charts that need theme updates)
+
+      if (msg.params?.styles?.variables) {
+        applyHostStyleVariables(msg.params.styles.variables);
+      }
+
+      if (msg.params?.displayMode === 'fullscreen') {
+        document.body.classList.add('fullscreen-mode');
+      } else {
+        document.body.classList.remove('fullscreen-mode');
+      }
+      break;
+
+    // Handle tool cancellation
+    case 'ui/notifications/tool-cancelled':
+      const reason = msg.params?.reason || "Unknown reason";
+      console.info("Tool cancelled:", reason);
+      showError(`Operation cancelled: ${reason}`);
+      break;
+
+    // Handle resource teardown (requires response)
+    case 'ui/resource-teardown':
+      console.info("Resource teardown requested");
+
+      if (msg.id !== undefined) {
+        window.parent.postMessage(
+          {
+            jsonrpc: "2.0",
+            id: msg.id,
+            result: {},
+          },
+          "*"
+        );
+      }
       break;
       
     case 'ui/notifications/tool-input':
@@ -438,17 +481,7 @@ window.addEventListener('message', function(event: MessageEvent) {
         // Example: Could show loading state with input parameters
       }
       break;
-      
-    case 'ui/notifications/tool-cancelled':
-      // Tool cancellation notification - Host MUST send this if tool is cancelled
-      const reason = msg.params?.reason || 'Tool execution was cancelled';
-      showError(`Operation cancelled: ${reason}`);
-      // Clean up any ongoing operations
-      // - Stop timers
-      // - Cancel pending requests
-      // - Reset UI state
-      break;
-      
+
     case 'ui/notifications/initialized':
       // Initialization notification (optional - handle if needed)
       break;
@@ -466,199 +499,26 @@ window.addEventListener('message', function(event: MessageEvent) {
 });
 
 /* ============================================
-   MCP COMMUNICATION
+   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
    ============================================ */
 
-let requestIdCounter = 1;
-function sendRequest(method: string, params: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const id = requestIdCounter++;
-    window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, '*');
-    
-    const listener = (event: MessageEvent) => {
-      if (event.data?.id === id) {
-        window.removeEventListener('message', listener);
-        if (event.data?.result) {
-          resolve(event.data.result);
-        } else if (event.data?.error) {
-          reject(new Error(event.data.error.message || 'Unknown error'));
-        }
-      }
-    };
-    window.addEventListener('message', listener);
-    
-    // Timeout after 5 seconds
-    setTimeout(() => {
-      window.removeEventListener('message', listener);
-      reject(new Error('Request timeout'));
-    }, 5000);
-  });
-}
-
-function sendNotification(method: string, params: any) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, '*');
-}
-
-/* ============================================
-   DISPLAY MODE HANDLING
-   ============================================ */
-
-let currentDisplayMode = 'inline';
-
-function handleDisplayModeChange(mode: string) {
-  currentDisplayMode = mode;
-  if (mode === 'fullscreen') {
-    document.body.classList.add('fullscreen-mode');
-    // Adjust layout for fullscreen if needed
-    const container = document.querySelector('.container');
-    if (container) {
-      (container as HTMLElement).style.maxWidth = '100%';
-      (container as HTMLElement).style.padding = '20px';
-    }
-  } else {
-    document.body.classList.remove('fullscreen-mode');
-    // Restore normal layout
-    const container = document.querySelector('.container');
-    if (container) {
-      (container as HTMLElement).style.maxWidth = '';
-      (container as HTMLElement).style.padding = '';
-    }
-  }
-  // Notify host of size change after mode change
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
-
-function requestDisplayMode(mode: string): Promise<any> {
-  return sendRequest('ui/request-display-mode', { mode: mode })
-    .then(result => {
-      if (result?.mode) {
-        handleDisplayModeChange(result.mode);
-      }
-      return result;
-    })
-    .catch(err => {
-      console.warn('Failed to request display mode:', err);
-      throw err;
-    });
-}
-
-// Make function globally accessible for testing/debugging
-(window as any).requestDisplayMode = requestDisplayMode;
-
-/* ============================================
-   SIZE CHANGE NOTIFICATIONS
-   ============================================ */
-
-function notifySizeChanged() {
-  const width = document.body.scrollWidth || document.documentElement.scrollWidth;
-  const height = document.body.scrollHeight || document.documentElement.scrollHeight;
-  
-  sendNotification('ui/notifications/size-changed', {
-    width: width,
-    height: height
-  });
-}
-
-// Debounce function to avoid too many notifications
-let sizeChangeTimeout: NodeJS.Timeout | null = null;
-function debouncedNotifySizeChanged() {
-  if (sizeChangeTimeout) {
-    clearTimeout(sizeChangeTimeout);
-  }
-  sizeChangeTimeout = setTimeout(() => {
-    notifySizeChanged();
-  }, 100); // Wait 100ms after last change
-}
-
-// Use ResizeObserver to detect size changes
-let resizeObserver: ResizeObserver | null = null;
-function setupSizeObserver() {
-  if (typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => {
-      debouncedNotifySizeChanged();
-    });
-    resizeObserver.observe(document.body);
-  } else {
-    // Fallback: use window resize and mutation observer
-    window.addEventListener('resize', debouncedNotifySizeChanged);
-    const mutationObserver = new MutationObserver(debouncedNotifySizeChanged);
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['style', 'class']
-    });
-  }
-  
-  // Send initial size after a short delay to ensure content is rendered
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
-
-/* ============================================
-   INITIALIZATION
-   ============================================ */
-
-// Initialize MCP App - REQUIRED for MCP Apps protocol
-sendRequest('ui/initialize', {
-  appCapabilities: {
-    availableDisplayModes: ["inline", "fullscreen"]
-  },
-  clientInfo: {
-    name: APP_NAME,
-    version: APP_VERSION
-  },
-  protocolVersion: PROTOCOL_VERSION
-}).then((result: any) => {
-  // Extract host context from initialization result
-  const ctx = result.hostContext || result;
-  
-  // Extract host capabilities for future use
-  const hostCapabilities = result.hostCapabilities;
-  
-  // Send initialized notification after successful initialization
-  sendNotification('ui/notifications/initialized', {});
-  
-  // Apply theme from host context
-  if (ctx?.theme === 'dark') {
-    document.body.classList.add('dark');
-  } else if (ctx?.theme === 'light') {
-    document.body.classList.remove('dark');
-  }
-  // Handle display mode from host context
-  if (ctx?.displayMode) {
-    handleDisplayModeChange(ctx.displayMode);
-  }
-  // Handle container dimensions if provided
-  if (ctx?.containerDimensions) {
-    const dims = ctx.containerDimensions;
-    if (dims.width) {
-      document.body.style.width = dims.width + 'px';
-    }
-    if (dims.height) {
-      document.body.style.height = dims.height + 'px';
-    }
-    if (dims.maxWidth) {
-      document.body.style.maxWidth = dims.maxWidth + 'px';
-    }
-    if (dims.maxHeight) {
-      document.body.style.maxHeight = dims.maxHeight + 'px';
-    }
-  }
-}).catch(err => {
-  console.warn('Failed to initialize MCP App:', err);
-  // Fallback to system preference if initialization fails
+const app = new App({
+  name: APP_NAME,
+  version: APP_VERSION,
 });
 
-initializeDarkMode();
+/* ============================================
+   AUTO-RESIZE VIA SDK
+   ============================================ */
 
-// Setup size observer to notify host of content size changes
-// This is critical for the host to properly size the iframe
-setupSizeObserver();
+const cleanupResize = app.setupSizeChangedNotifications();
+
+// Clean up on page unload
+window.addEventListener("beforeunload", () => {
+  cleanupResize();
+});
+
+console.info("MCP App initialized (proxy mode - SDK utilities only)");
 
 // Export empty object to ensure this file is treated as an ES module
-// This prevents TypeScript from treating top-level declarations as global
 export {};

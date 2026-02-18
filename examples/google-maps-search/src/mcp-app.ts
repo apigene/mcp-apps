@@ -1,38 +1,34 @@
 /* ============================================
-   BASE TEMPLATE FOR MCP APPS
+   GOOGLE MAPS SEARCH MCP APP (SDK VERSION)
    ============================================
-   
-   This file contains all common logic shared across MCP apps.
-   Customize the sections marked with "TEMPLATE-SPECIFIC" below.
-   
-   Common Features:
-   - MCP Protocol message handling (JSON-RPC 2.0)
-   - Dark mode support
-   - Display mode handling (inline/fullscreen)
-   - Size change notifications
-   - Data extraction utilities
-   - Error handling
-   
-   See README.md for customization guidelines.
+
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   for utilities only (theme helpers, types, auto-resize).
+
+   It does NOT call app.connect() because the proxy handles initialization.
    ============================================ */
+
+/* ============================================
+   SDK IMPORTS
+   ============================================ */
+
+import {
+  App,
+  applyDocumentTheme,
+  applyHostFonts,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
+
+// Import styles (will be bundled by Vite)
+import "./global.css";
+import "./mcp-app.css";
 
 /* ============================================
    APP CONFIGURATION
-   ============================================
-   TEMPLATE-SPECIFIC: Update these values for your app
    ============================================ */
 
-const APP_NAME = "Google Maps Search";  // Google Maps Places Search Results App
-const APP_VERSION = "1.0.0";         // Version 1.0.0
-const PROTOCOL_VERSION = "2026-01-26"; // MCP Apps protocol version
-
-/* ============================================
-   EXTERNAL DEPENDENCIES
-   ============================================
-   If you use external libraries (like Chart.js), declare them here.
-   Example:
-   declare const Chart: any;
-   ============================================ */
+const APP_NAME = "Google Maps Search";
+const APP_VERSION = "1.0.0";
 
 /* ============================================
    COMMON UTILITY FUNCTIONS
@@ -96,18 +92,6 @@ function unwrapData(data: any): any {
   return data;
 }
 
-/**
- * Initialize dark mode based on system preference
- */
-function initializeDarkMode() {
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.body.classList.add('dark');
-  }
-  
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e: MediaQueryListEvent) => {
-    document.body.classList.toggle('dark', e.matches);
-  });
-}
 
 /**
  * Escape HTML to prevent XSS attacks
@@ -324,10 +308,6 @@ function renderData(data: any) {
   } catch (error: any) {
     console.error('Render error:', error);
     showError(`Error rendering data: ${error.message}`);
-    // Notify size even on error
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
   }
 }
 
@@ -578,14 +558,47 @@ window.addEventListener('message', function(event: MessageEvent) {
       break;
       
     case 'ui/notifications/host-context-changed':
-      if (msg.params?.theme === 'dark') {
-        document.body.classList.add('dark');
-      } else if (msg.params?.theme === 'light') {
-        document.body.classList.remove('dark');
+      console.info("Host context changed:", msg.params);
+
+      if (msg.params?.theme) {
+        applyDocumentTheme(msg.params.theme);
       }
-      // Handle display mode changes
-      if (msg.params?.displayMode) {
-        handleDisplayModeChange(msg.params.displayMode);
+
+      if (msg.params?.styles?.css?.fonts) {
+        applyHostFonts(msg.params.styles.css.fonts);
+      }
+
+      if (msg.params?.styles?.variables) {
+        applyHostStyleVariables(msg.params.styles.variables);
+      }
+
+      if (msg.params?.displayMode === 'fullscreen') {
+        document.body.classList.add('fullscreen-mode');
+      } else {
+        document.body.classList.remove('fullscreen-mode');
+      }
+      break;
+
+    // Handle tool cancellation
+    case 'ui/notifications/tool-cancelled':
+      const reason = msg.params?.reason || "Unknown reason";
+      console.info("Tool cancelled:", reason);
+      showError(`Operation cancelled: ${reason}`);
+      break;
+
+    // Handle resource teardown (requires response)
+    case 'ui/resource-teardown':
+      console.info("Resource teardown requested");
+
+      if (msg.id !== undefined) {
+        window.parent.postMessage(
+          {
+            jsonrpc: "2.0",
+            id: msg.id,
+            result: {},
+          },
+          "*"
+        );
       }
       break;
       
@@ -595,12 +608,7 @@ window.addEventListener('message', function(event: MessageEvent) {
         console.log('Tool input received:', toolArguments);
       }
       break;
-      
-    case 'ui/notifications/tool-cancelled':
-      const reason = msg.params?.reason || 'Tool execution was cancelled';
-      showError(`Operation cancelled: ${reason}`);
-      break;
-      
+
     case 'ui/notifications/initialized':
       break;
       
@@ -663,38 +671,6 @@ let resizeObserver: ResizeObserver | null = null;
 let lastReportedWidth: number = 0;
 let lastReportedHeight: number = 0;
 
-function notifySizeChanged() {
-  // Debounce size notifications
-  if (sizeChangeTimeout) {
-    clearTimeout(sizeChangeTimeout);
-  }
-  
-  sizeChangeTimeout = window.setTimeout(() => {
-    // Use scrollWidth/scrollHeight to get content size, not layout size
-    // This prevents feedback loops when the iframe is resized
-    const width = document.body.scrollWidth || document.documentElement.scrollWidth;
-    const height = document.body.scrollHeight || document.documentElement.scrollHeight;
-    
-    // Only notify if size changed significantly (more than 1px difference)
-    // This prevents infinite feedback loops
-    const widthDiff = Math.abs(width - lastReportedWidth);
-    const heightDiff = Math.abs(height - lastReportedHeight);
-    
-    if (widthDiff > 1 || heightDiff > 1) {
-      lastReportedWidth = width;
-      lastReportedHeight = height;
-      
-      window.parent.postMessage({
-        jsonrpc: "2.0",
-        method: "ui/notifications/size-changed",
-        params: {
-          width: width,
-          height: height
-        }
-      }, '*');
-    }
-  }, 100);
-}
 
 // Observe size changes on document.body instead of app element
 // This prevents feedback loops when the iframe is resized
@@ -741,8 +717,6 @@ function handleDisplayModeChange(mode: string) {
    ============================================ */
 
 // Initialize dark mode
-initializeDarkMode();
-
 // Notify host that we're ready
 window.parent.postMessage({
   jsonrpc: "2.0",
@@ -754,3 +728,28 @@ window.parent.postMessage({
 setTimeout(() => {
   notifySizeChanged();
 }, 100);
+
+/* ============================================
+   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
+   ============================================ */
+
+const app = new App({
+  name: APP_NAME,
+  version: APP_VERSION,
+});
+
+/* ============================================
+   AUTO-RESIZE VIA SDK
+   ============================================ */
+
+const cleanupResize = app.setupSizeChangedNotifications();
+
+// Clean up on page unload
+window.addEventListener("beforeunload", () => {
+  cleanupResize();
+});
+
+console.info("MCP App initialized (proxy mode - SDK utilities only)");
+
+// Export empty object to ensure this file is treated as an ES module
+export {};

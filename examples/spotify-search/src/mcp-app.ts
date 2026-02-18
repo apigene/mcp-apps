@@ -1,38 +1,34 @@
 /* ============================================
-   BASE TEMPLATE FOR MCP APPS
+   SPOTIFY SEARCH MCP APP (SDK VERSION)
    ============================================
-   
-   This file contains all common logic shared across MCP apps.
-   Customize the sections marked with "TEMPLATE-SPECIFIC" below.
-   
-   Common Features:
-   - MCP Protocol message handling (JSON-RPC 2.0)
-   - Dark mode support
-   - Display mode handling (inline/fullscreen)
-   - Size change notifications
-   - Data extraction utilities
-   - Error handling
-   
-   See README.md for customization guidelines.
+
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   for utilities only (theme helpers, types, auto-resize).
+
+   It does NOT call app.connect() because the proxy handles initialization.
    ============================================ */
+
+/* ============================================
+   SDK IMPORTS
+   ============================================ */
+
+import {
+  App,
+  applyDocumentTheme,
+  applyHostFonts,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
+
+// Import styles (will be bundled by Vite)
+import "./global.css";
+import "./mcp-app.css";
 
 /* ============================================
    APP CONFIGURATION
-   ============================================
-   TEMPLATE-SPECIFIC: Update these values for your app
    ============================================ */
 
-const APP_NAME = "Spotify Search";  // Spotify Search Results App
-const APP_VERSION = "1.0.0";         // Version 1.0.0
-const PROTOCOL_VERSION = "2026-01-26"; // MCP Apps protocol version
-
-/* ============================================
-   EXTERNAL DEPENDENCIES
-   ============================================
-   If you use external libraries (like Chart.js), declare them here.
-   Example:
-   declare const Chart: any;
-   ============================================ */
+const APP_NAME = "Spotify Search";
+const APP_VERSION = "1.0.0";
 
 /* ============================================
    COMMON UTILITY FUNCTIONS
@@ -110,18 +106,6 @@ function unwrapData(data: any): any {
   return data;
 }
 
-/**
- * Initialize dark mode based on system preference
- */
-function initializeDarkMode() {
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.body.classList.add('dark');
-  }
-  
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e: MediaQueryListEvent) => {
-    document.body.classList.toggle('dark', e.matches);
-  });
-}
 
 /**
  * Escape HTML to prevent XSS attacks
@@ -477,10 +461,6 @@ function renderData(data: any) {
     console.error('Render error:', error);
     console.error('Data that failed to render:', data);
     showError(`Error rendering data: ${error.message}`);
-    // Notify size even on error
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
   }
 }
 
@@ -1106,4 +1086,29 @@ setupSizeObserver();
 
 // Export empty object to ensure this file is treated as an ES module
 // This prevents TypeScript from treating top-level declarations as global
+export {};
+
+/* ============================================
+   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
+   ============================================ */
+
+const app = new App({
+  name: APP_NAME,
+  version: APP_VERSION,
+});
+
+/* ============================================
+   AUTO-RESIZE VIA SDK
+   ============================================ */
+
+const cleanupResize = app.setupSizeChangedNotifications();
+
+// Clean up on page unload
+window.addEventListener("beforeunload", () => {
+  cleanupResize();
+});
+
+console.info("MCP App initialized (proxy mode - SDK utilities only)");
+
+// Export empty object to ensure this file is treated as an ES module
 export {};
