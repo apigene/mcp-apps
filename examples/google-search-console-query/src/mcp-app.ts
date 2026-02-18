@@ -2085,7 +2085,6 @@ function setupToolbarInteractions() {
         if (tableContainer) tableContainer.style.display = 'none';
       }
       
-      setTimeout(() => notifySizeChanged(), 100);
     });
   });
   

@@ -208,12 +208,10 @@ function renderData(data: any) {
     html += '</div>';
 
     app.innerHTML = html;
-    setTimeout(() => notifySizeChanged(), 50);
-  } catch (err: any) {
+      } catch (err: any) {
     console.error("Render error:", err);
     showError("Error rendering calendar: " + err.message);
-    setTimeout(() => notifySizeChanged(), 50);
-  }
+      }
 }
 
 window.addEventListener("message", function (event: MessageEvent) {
@@ -267,8 +265,7 @@ function handleDisplayModeChange(mode: string) {
     const el = document.querySelector(".gcal-widget");
     if (el) (el as HTMLElement).style.maxWidth = "";
   }
-  setTimeout(() => notifySizeChanged(), 100);
-}
+  }
 
 
 sendRequest("ui/initialize", {

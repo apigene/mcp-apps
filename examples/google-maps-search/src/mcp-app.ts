@@ -300,11 +300,6 @@ function renderData(data: any) {
     // Render list view
     renderPlacesList(places);
     
-    // Notify host of size change after rendering completes
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
-    
   } catch (error: any) {
     console.error('Render error:', error);
     showError(`Error rendering data: ${error.message}`);
@@ -659,45 +654,7 @@ function sendRequest(method: string, params: any): Promise<any> {
 }
 
 /* ============================================
-   SIZE MANAGEMENT
-   ============================================
-   
-   Functions for notifying the host of size changes.
-   You typically don't need to modify this section.
-   ============================================ */
-
-let sizeChangeTimeout: number | null = null;
-let resizeObserver: ResizeObserver | null = null;
-let lastReportedWidth: number = 0;
-let lastReportedHeight: number = 0;
-
-
-// Observe size changes on document.body instead of app element
-// This prevents feedback loops when the iframe is resized
-if (typeof ResizeObserver !== 'undefined') {
-  resizeObserver = new ResizeObserver(() => {
-    notifySizeChanged();
-  });
-  
-  resizeObserver.observe(document.body);
-} else {
-  // Fallback for browsers without ResizeObserver
-  window.addEventListener('resize', notifySizeChanged);
-  const mutationObserver = new MutationObserver(notifySizeChanged);
-  mutationObserver.observe(document.body, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['style', 'class']
-  });
-}
-
-/* ============================================
    DISPLAY MODE HANDLING
-   ============================================
-   
-   Handle display mode changes (inline/fullscreen/pip).
-   You typically don't need to modify this section.
    ============================================ */
 
 function handleDisplayModeChange(mode: string) {
@@ -706,28 +663,7 @@ function handleDisplayModeChange(mode: string) {
   } else {
     document.body.classList.remove('fullscreen-mode');
   }
-  notifySizeChanged();
 }
-
-/* ============================================
-   INITIALIZATION
-   ============================================
-   
-   Initialize the app when the page loads.
-   ============================================ */
-
-// Initialize dark mode
-// Notify host that we're ready
-window.parent.postMessage({
-  jsonrpc: "2.0",
-  method: "ui/notifications/initialized",
-  params: {}
-}, '*');
-
-// Initial size notification
-setTimeout(() => {
-  notifySizeChanged();
-}, 100);
 
 /* ============================================
    SDK APP INSTANCE (PROXY MODE - NO CONNECT)

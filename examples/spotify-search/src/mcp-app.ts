@@ -820,17 +820,18 @@ window.addEventListener('message', function(event: MessageEvent) {
       break;
       
     case 'ui/notifications/host-context-changed':
-      if (msg.params?.theme === 'dark') {
-        document.body.classList.add('dark');
-      } else if (msg.params?.theme === 'light') {
-        document.body.classList.remove('dark');
+      if (msg.params?.theme) {
+        applyDocumentTheme(msg.params.theme);
       }
-      // Handle display mode changes
+      if (msg.params?.styles?.css?.fonts) {
+        applyHostFonts(msg.params.styles.css.fonts);
+      }
+      if (msg.params?.styles?.variables) {
+        applyHostStyleVariables(msg.params.styles.variables);
+      }
       if (msg.params?.displayMode) {
         handleDisplayModeChange(msg.params.displayMode);
       }
-      // Re-render if needed (e.g., for charts that need theme updates)
-      // You may want to add logic here to re-render your content with new theme
       break;
       
     case 'ui/notifications/tool-input':
@@ -1017,76 +1018,6 @@ function setupSizeObserver() {
     notifySizeChanged();
   }, 100);
 }
-
-/* ============================================
-   INITIALIZATION
-   ============================================
-   
-   Initializes the MCP app and sets up all required features.
-   You typically don't need to modify this section.
-   ============================================ */
-
-// Initialize MCP App - REQUIRED for MCP Apps protocol
-sendRequest('ui/initialize', {
-  appCapabilities: {
-    availableDisplayModes: ["inline", "fullscreen"]
-  },
-  clientInfo: {
-    name: APP_NAME,
-    version: APP_VERSION
-  },
-  protocolVersion: PROTOCOL_VERSION
-}).then((result: any) => {
-  // Extract host context from initialization result
-  const ctx = result.hostContext || result;
-  
-  // Extract host capabilities for future use
-  const hostCapabilities = result.hostCapabilities;
-  
-  // Send initialized notification after successful initialization
-  sendNotification('ui/notifications/initialized', {});
-  // Apply theme from host context
-  if (ctx?.theme === 'dark') {
-    document.body.classList.add('dark');
-  } else if (ctx?.theme === 'light') {
-    document.body.classList.remove('dark');
-  }
-  // Handle display mode from host context
-  if (ctx?.displayMode) {
-    handleDisplayModeChange(ctx.displayMode);
-  }
-  // Handle container dimensions if provided
-  if (ctx?.containerDimensions) {
-    const dims = ctx.containerDimensions;
-    if (dims.width) {
-      document.body.style.width = dims.width + 'px';
-    }
-    if (dims.height) {
-      document.body.style.height = dims.height + 'px';
-    }
-    if (dims.maxWidth) {
-      document.body.style.maxWidth = dims.maxWidth + 'px';
-    }
-    if (dims.maxHeight) {
-      document.body.style.maxHeight = dims.maxHeight + 'px';
-    }
-  }
-}).catch(err => {
-  console.error('Failed to initialize MCP App:', err);
-  console.error('Initialization error details:', err);
-  // Fallback to system preference if initialization fails
-  // Continue anyway - initialization failure shouldn't prevent rendering
-});
-
-initializeDarkMode();
-
-// Setup size observer to notify host of content size changes
-// This is critical for the host to properly size the iframe
-setupSizeObserver();
-
-// Export empty object to ensure this file is treated as an ES module
-// This prevents TypeScript from treating top-level declarations as global
-export {};
 
 /* ============================================
    SDK APP INSTANCE (PROXY MODE - NO CONNECT)

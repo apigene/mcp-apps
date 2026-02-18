@@ -958,8 +958,7 @@ function updateSelectionUI() {
     }
   }
   
-  notifySizeChanged();
-}
+  }
 
 /**
  * Show candidate modal
@@ -1108,8 +1107,7 @@ function updateSelectionUI() {
   modal.classList.add('active');
   document.body.style.overflow = 'hidden';
   
-  notifySizeChanged();
-};
+  };
 
 /**
  * Close candidate modal
@@ -1120,8 +1118,7 @@ function updateSelectionUI() {
     modal.classList.remove('active');
   }
   document.body.style.overflow = '';
-  notifySizeChanged();
-};
+  };
 
 // Close modal on escape key
 document.addEventListener('keydown', function(e) {

@@ -930,7 +930,6 @@ function openLink(url: string): void {
   `;
   
   modal.classList.add('active');
-  setTimeout(() => notifySizeChanged(), 50);
 };
 
 (window as any).closeProductModal = function(event: Event) {
@@ -938,7 +937,6 @@ function openLink(url: string): void {
   if (modal) {
     modal.classList.remove('active');
   }
-  setTimeout(() => notifySizeChanged(), 50);
 };
 
 (window as any).showCompareView = function() {
@@ -1035,7 +1033,6 @@ function openLink(url: string): void {
   `;
   
   modal.classList.add('active');
-  setTimeout(() => notifySizeChanged(), 50);
 };
 
 (window as any).closeCompareModal = function(event: Event) {
@@ -1043,7 +1040,6 @@ function openLink(url: string): void {
   if (modal) {
     modal.classList.remove('active');
   }
-  setTimeout(() => notifySizeChanged(), 50);
 };
 
 (window as any).setView = function(view: 'grid' | 'list') {

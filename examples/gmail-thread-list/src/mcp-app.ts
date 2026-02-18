@@ -239,12 +239,10 @@ function renderData(data: any) {
       });
     });
 
-    setTimeout(() => notifySizeChanged(), 50);
-  } catch (err: any) {
+      } catch (err: any) {
     console.error("Render error:", err);
     showError(`Error rendering inbox: ${err.message}`);
-    setTimeout(() => notifySizeChanged(), 50);
-  }
+      }
 }
 
 window.addEventListener("message", function (event: MessageEvent) {
@@ -308,8 +306,7 @@ function handleDisplayModeChange(mode: string) {
     const container = document.querySelector(".gmail-widget");
     if (container) (container as HTMLElement).style.maxWidth = "";
   }
-  setTimeout(() => notifySizeChanged(), 100);
-}
+  }
 
 function requestDisplayMode(mode: string): Promise<any> {
   return sendRequest("ui/request-display-mode", { mode })
