@@ -352,8 +352,7 @@ function renderRichTextBlock(block: any): string {
    1. Always validate data before rendering
    2. Use unwrapData() to handle nested structures
    3. Use escapeHtml() when inserting user content
-   4. Call notifySizeChanged() after rendering completes
-   5. Handle errors gracefully with try/catch
+   4. Handle errors gracefully with try/catch
    ============================================ */
 
 // Store messages for filtering/searching
@@ -473,12 +472,7 @@ function renderData(data: any) {
     
     // Setup event listeners for search and filters
     setupSearchAndFilters();
-    
-    // Notify host of size change after rendering completes
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
-    
+
   } catch (error: any) {
     console.error('Render error:', error);
     showError(`Error rendering data: ${error.message}`);
@@ -612,11 +606,6 @@ function setupSearchAndFilters() {
     if (messagesList) {
       messagesList.innerHTML = filteredMessages.map(m => renderMessage(m)).join('');
     }
-    
-    // Notify size change
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
   }
   
   // Event listeners
@@ -666,18 +655,6 @@ window.addEventListener('message', function(event: MessageEvent) {
     const reason = msg.params?.reason || 'Resource teardown requested';
     
     // Clean up resources
-    // - Clear any timers
-    if (sizeChangeTimeout) {
-      clearTimeout(sizeChangeTimeout);
-      sizeChangeTimeout = null;
-    }
-    
-    // - Disconnect observers
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-    
     // - Cancel any pending requests (if you track them)
     // - Destroy chart instances, etc. (template-specific cleanup)
     
@@ -827,10 +804,6 @@ function handleDisplayModeChange(mode: string) {
       (container as HTMLElement).style.padding = '';
     }
   }
-  // Notify host of size change after mode change
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
 }
 
 function requestDisplayMode(mode: string): Promise<any> {
@@ -849,62 +822,6 @@ function requestDisplayMode(mode: string): Promise<any> {
 
 // Make function globally accessible for testing/debugging
 (window as any).requestDisplayMode = requestDisplayMode;
-
-/* ============================================
-   SIZE CHANGE NOTIFICATIONS
-   ============================================
-   
-   Notifies the host when the content size changes.
-   This is critical for proper iframe sizing.
-   You typically don't need to modify this section.
-   ============================================ */
-
-function notifySizeChanged() {
-  const width = document.body.scrollWidth || document.documentElement.scrollWidth;
-  const height = document.body.scrollHeight || document.documentElement.scrollHeight;
-  
-  sendNotification('ui/notifications/size-changed', {
-    width: width,
-    height: height
-  });
-}
-
-// Debounce function to avoid too many notifications
-let sizeChangeTimeout: NodeJS.Timeout | null = null;
-function debouncedNotifySizeChanged() {
-  if (sizeChangeTimeout) {
-    clearTimeout(sizeChangeTimeout);
-  }
-  sizeChangeTimeout = setTimeout(() => {
-    notifySizeChanged();
-  }, 100); // Wait 100ms after last change
-}
-
-// Use ResizeObserver to detect size changes
-let resizeObserver: ResizeObserver | null = null;
-function setupSizeObserver() {
-  if (typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => {
-      debouncedNotifySizeChanged();
-    });
-    resizeObserver.observe(document.body);
-  } else {
-    // Fallback: use window resize and mutation observer
-    window.addEventListener('resize', debouncedNotifySizeChanged);
-    const mutationObserver = new MutationObserver(debouncedNotifySizeChanged);
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['style', 'class']
-    });
-  }
-  
-  // Send initial size after a short delay to ensure content is rendered
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
 
 /* ============================================
    SDK APP INSTANCE (PROXY MODE - NO CONNECT)

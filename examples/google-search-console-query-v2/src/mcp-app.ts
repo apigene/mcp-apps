@@ -1012,8 +1012,7 @@ function renderPieChart(canvas: HTMLCanvasElement, values: number[], colors: str
    1. Always validate data before rendering
    2. Use unwrapData() to handle nested structures
    3. Use escapeHtml() when inserting user content
-   4. Call notifySizeChanged() after rendering completes
-   5. Handle errors gracefully with try/catch
+   4. Handle errors gracefully with try/catch
    ============================================ */
 
 /**
@@ -1890,18 +1889,6 @@ window.addEventListener('message', function(event: MessageEvent) {
     const reason = msg.params?.reason || 'Resource teardown requested';
     
     // Clean up resources
-    // - Clear any timers
-    if (sizeChangeTimeout) {
-      clearTimeout(sizeChangeTimeout);
-      sizeChangeTimeout = null;
-    }
-    
-    // - Disconnect observers
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-    
     // - Cancel any pending requests (if you track them)
     // - Destroy chart instances, etc. (template-specific cleanup)
     if (lineChartInstance) {
@@ -2051,9 +2038,6 @@ function sendNotification(method: string, params: any) {
   window.parent.postMessage({ jsonrpc: "2.0", method, params }, '*');
 }
 
-// Only send size-changed after host has acknowledged connection (avoids "Not connected" errors)
-let isConnected = false;
-
 /* ============================================
    DISPLAY MODE HANDLING
    ============================================
@@ -2105,57 +2089,6 @@ function requestDisplayMode(mode: string): Promise<any> {
 (window as any).requestDisplayMode = requestDisplayMode;
 
 /* ============================================
-   SIZE CHANGE NOTIFICATIONS
-   ============================================
-   
-   Notifies the host when the content size changes.
-   This is critical for proper iframe sizing.
-   You typically don't need to modify this section.
-   ============================================ */
-
-function notifySizeChanged() {
-  if (!isConnected) return;
-  const width = document.body.scrollWidth || document.documentElement.scrollWidth;
-  const height = document.body.scrollHeight || document.documentElement.scrollHeight;
-  
-  sendNotification('ui/notifications/size-changed', {
-    width: width,
-    height: height
-  });
-}
-
-// Debounce function to avoid too many notifications
-let sizeChangeTimeout: NodeJS.Timeout | null = null;
-function debouncedNotifySizeChanged() {
-  if (sizeChangeTimeout) {
-    clearTimeout(sizeChangeTimeout);
-  }
-  sizeChangeTimeout = // Wait 100ms after last change
-}
-
-// Use ResizeObserver to detect size changes
-let resizeObserver: ResizeObserver | null = null;
-function setupSizeObserver() {
-  if (typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => {
-      debouncedNotifySizeChanged();
-    });
-    resizeObserver.observe(document.body);
-  } else {
-    // Fallback: use window resize and mutation observer
-    window.addEventListener('resize', debouncedNotifySizeChanged);
-    const mutationObserver = new MutationObserver(debouncedNotifySizeChanged);
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['style', 'class']
-    });
-  }
-  // Initial size is sent after init completes (in init .then())
-}
-
-/* ============================================
    INITIALIZATION
    ============================================
    
@@ -2194,8 +2127,6 @@ function setupToolbarInteractions() {
         if (chartsContainer) (chartsContainer as HTMLElement).style.display = 'grid';
         if (tableContainer) tableContainer.style.display = 'none';
       }
-      
-      setTimeout(() => notifySizeChanged(), 100);
     });
   });
   

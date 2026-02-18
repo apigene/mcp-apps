@@ -1,9 +1,37 @@
 /* ============================================
-   MCP PROTOCOL MESSAGE FORMAT
+   TAVILY SEARCH MCP APP (SDK VERSION)
+   ============================================
+
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   for utilities only (theme helpers, types, auto-resize).
+
+   It does NOT call app.connect() because the proxy handles initialization.
    ============================================ */
 
 /* ============================================
-   COMMON UTILITY FUNCTIONS (From base template)
+   SDK IMPORTS
+   ============================================ */
+
+import {
+  App,
+  applyDocumentTheme,
+  applyHostFonts,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
+
+// Import styles (will be bundled by Vite)
+import "./global.css";
+import "./mcp-app.css";
+
+/* ============================================
+   APP CONFIGURATION
+   ============================================ */
+
+const APP_NAME = "Tavily Search";
+const APP_VERSION = "1.0.0";
+
+/* ============================================
+   COMMON UTILITY FUNCTIONS
    ============================================ */
 
 function extractData(msg: any) {
@@ -46,16 +74,6 @@ function unwrapData(data: any): any {
   }
   
   return data;
-}
-
-function initializeDarkMode() {
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.body.classList.add('dark');
-  }
-  
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e: MediaQueryListEvent) => {
-    document.body.classList.toggle('dark', e.matches);
-  });
 }
 
 function escapeHtml(str: any): string {
@@ -670,20 +688,9 @@ function renderData(data: any) {
 
     // Render initial results
     renderFilteredResults();
-    
-    // Notify host of size change after rendering completes
-    // Use setTimeout to ensure DOM is fully updated
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
-    
   } catch (error: any) {
     console.error('Render error:', error);
     showError(`Error rendering search results: ${error.message}`);
-    // Notify size even on error
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
   }
 }
 
@@ -714,12 +721,15 @@ window.addEventListener('message', function(event: MessageEvent) {
       break;
       
     case 'ui/notifications/host-context-changed':
-      if (msg.params?.theme === 'dark') {
-        document.body.classList.add('dark');
-      } else if (msg.params?.theme === 'light') {
-        document.body.classList.remove('dark');
+      if (msg.params?.theme) {
+        applyDocumentTheme(msg.params.theme);
       }
-      // Handle display mode changes
+      if (msg.params?.styles?.css?.fonts) {
+        applyHostFonts(msg.params.styles.css.fonts);
+      }
+      if (msg.params?.styles?.variables) {
+        applyHostStyleVariables(msg.params.styles.variables);
+      }
       if (msg.params?.displayMode) {
         handleDisplayModeChange(msg.params.displayMode);
       }
@@ -776,7 +786,6 @@ function handleDisplayModeChange(mode: string) {
   currentDisplayMode = mode;
   if (mode === 'fullscreen') {
     document.body.classList.add('fullscreen-mode');
-    // Adjust layout for fullscreen if needed
     const container = document.querySelector('.container');
     if (container) {
       (container as HTMLElement).style.maxWidth = '100%';
@@ -784,17 +793,12 @@ function handleDisplayModeChange(mode: string) {
     }
   } else {
     document.body.classList.remove('fullscreen-mode');
-    // Restore normal layout
     const container = document.querySelector('.container');
     if (container) {
       (container as HTMLElement).style.maxWidth = '';
       (container as HTMLElement).style.padding = '';
     }
   }
-  // Notify host of size change after mode change
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
 }
 
 function requestDisplayMode(mode: string): Promise<any> {
@@ -811,108 +815,26 @@ function requestDisplayMode(mode: string): Promise<any> {
     });
 }
 
-// Make function globally accessible for testing/debugging
-// You can call: requestDisplayMode('fullscreen') or requestDisplayMode('inline') from browser console
 (window as any).requestDisplayMode = requestDisplayMode;
 
 /* ============================================
-   SIZE CHANGE NOTIFICATIONS
+   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
    ============================================ */
 
-function sendNotification(method: string, params: any) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, '*');
-}
-
-function notifySizeChanged() {
-  const width = document.body.scrollWidth || document.documentElement.scrollWidth;
-  const height = document.body.scrollHeight || document.documentElement.scrollHeight;
-  
-  sendNotification('ui/notifications/size-changed', {
-    width: width,
-    height: height
-  });
-}
-
-// Debounce function to avoid too many notifications
-let sizeChangeTimeout: NodeJS.Timeout | null = null;
-function debouncedNotifySizeChanged() {
-  if (sizeChangeTimeout) {
-    clearTimeout(sizeChangeTimeout);
-  }
-  sizeChangeTimeout = setTimeout(() => {
-    notifySizeChanged();
-  }, 100); // Wait 100ms after last change
-}
-
-// Use ResizeObserver to detect size changes
-let resizeObserver: ResizeObserver | null = null;
-function setupSizeObserver() {
-  if (typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => {
-      debouncedNotifySizeChanged();
-    });
-    resizeObserver.observe(document.body);
-  } else {
-    // Fallback: use window resize and mutation observer
-    window.addEventListener('resize', debouncedNotifySizeChanged);
-    const mutationObserver = new MutationObserver(debouncedNotifySizeChanged);
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['style', 'class']
-    });
-  }
-  
-  // Send initial size after a short delay to ensure content is rendered
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
-
-/* ============================================
-   INITIALIZATION
-   ============================================ */
-
-// Initialize MCP App - REQUIRED for MCP Apps protocol
-sendRequest('ui/initialize', {
-  appCapabilities: {
-    availableDisplayModes: ["inline", "fullscreen"]
-  }
-}).then((ctx: any) => {
-  // Apply theme from host context
-  if (ctx?.theme === 'dark') {
-    document.body.classList.add('dark');
-  } else if (ctx?.theme === 'light') {
-    document.body.classList.remove('dark');
-  }
-  // Handle display mode from host context
-  if (ctx?.displayMode) {
-    handleDisplayModeChange(ctx.displayMode);
-  }
-  // Handle container dimensions if provided
-  if (ctx?.containerDimensions) {
-    const dims = ctx.containerDimensions;
-    if (dims.width) {
-      document.body.style.width = dims.width + 'px';
-    }
-    if (dims.height) {
-      document.body.style.height = dims.height + 'px';
-    }
-    if (dims.maxWidth) {
-      document.body.style.maxWidth = dims.maxWidth + 'px';
-    }
-    if (dims.maxHeight) {
-      document.body.style.maxHeight = dims.maxHeight + 'px';
-    }
-  }
-}).catch(err => {
-  console.warn('Failed to initialize MCP App:', err);
-  // Fallback to system preference if initialization fails
+const app = new App({
+  name: APP_NAME,
+  version: APP_VERSION,
 });
 
-initializeDarkMode();
+/* ============================================
+   AUTO-RESIZE VIA SDK
+   ============================================ */
 
-// Setup size observer to notify host of content size changes
-// This is critical for the host to properly size the iframe
-setupSizeObserver();
+const cleanupResize = app.setupSizeChangedNotifications();
+
+// Clean up on page unload
+window.addEventListener("beforeunload", () => {
+  cleanupResize();
+});
+
+console.info("MCP App initialized (proxy mode - SDK utilities only)");
