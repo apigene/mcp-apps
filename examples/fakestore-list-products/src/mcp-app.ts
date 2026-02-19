@@ -213,3 +213,8 @@ window.addEventListener("message", (event: MessageEvent) => {
 
 const cleanupResize = app.setupSizeChangedNotifications();
 window.addEventListener("beforeunload", () => cleanupResize());
+
+console.info("Fake Store MCP App initialized");
+
+// Export empty object to ensure this file is treated as an ES module
+export {};

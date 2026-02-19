@@ -700,27 +700,50 @@ function renderData(data: any) {
 
 window.addEventListener('message', function(event: MessageEvent) {
   const msg = event.data;
-  
+
   if (!msg || msg.jsonrpc !== '2.0') {
     return;
   }
-  
+
+  // Handle requests that require responses (like ui/resource-teardown)
+  if (msg.id !== undefined && msg.method === 'ui/resource-teardown') {
+    console.info("Resource teardown requested");
+
+    // Send response to host (required for teardown)
+    window.parent.postMessage({
+      jsonrpc: "2.0",
+      id: msg.id,
+      result: {}
+    }, '*');
+
+    return;
+  }
+
   if (msg.id !== undefined && !msg.method) {
     return;
   }
-  
+
   switch (msg.method) {
+    // Handle tool result notifications (main data)
     case 'ui/notifications/tool-result':
+      console.info("Tool result received");
       const data = msg.params?.structuredContent || msg.params;
       if (data !== undefined) {
         renderData(data);
       } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
+        console.warn('Tool result received but no data found:', msg);
         showEmpty('No data received');
       }
       break;
-      
+
+    // Handle tool input notifications (optional - for loading states)
+    case 'ui/notifications/tool-input':
+      console.info("Tool input received:", msg.params?.arguments);
+      break;
+
+    // Handle host context changes (theme, display mode, fonts)
     case 'ui/notifications/host-context-changed':
+      console.info("Host context changed:", msg.params);
       if (msg.params?.theme) {
         applyDocumentTheme(msg.params.theme);
       }
@@ -734,7 +757,18 @@ window.addEventListener('message', function(event: MessageEvent) {
         handleDisplayModeChange(msg.params.displayMode);
       }
       break;
-      
+
+    // Handle tool cancellation
+    case 'ui/notifications/tool-cancelled':
+      const reason = msg.params?.reason || "Unknown reason";
+      console.info("Tool cancelled:", reason);
+      showError(`Operation cancelled: ${reason}`);
+      break;
+
+    // Handle initialization notification (optional)
+    case 'ui/notifications/initialized':
+      break;
+
     default:
       if (msg.params) {
         const fallbackData = msg.params.structuredContent || msg.params;
@@ -838,3 +872,6 @@ window.addEventListener("beforeunload", () => {
 });
 
 console.info("MCP App initialized (proxy mode - SDK utilities only)");
+
+// Export empty object to ensure this file is treated as an ES module
+export {};

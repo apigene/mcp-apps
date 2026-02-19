@@ -419,6 +419,20 @@ window.addEventListener('message', function(event: MessageEvent) {
     return;
   }
   
+  // Handle requests that require responses (like ui/resource-teardown)
+  if (msg.id !== undefined && msg.method === 'ui/resource-teardown') {
+    console.info("Resource teardown requested");
+
+    // Send response to host (required for teardown)
+    window.parent.postMessage({
+      jsonrpc: "2.0",
+      id: msg.id,
+      result: {}
+    }, '*');
+
+    return;
+  }
+
   switch (msg.method) {
     case 'ui/notifications/tool-result':
       const data = msg.params?.structuredContent || msg.params;

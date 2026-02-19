@@ -366,3 +366,6 @@ window.addEventListener("beforeunload", () => {
 });
 
 console.info("MCP App initialized (SDK utilities mode)");
+
+// Export empty object to ensure this file is treated as an ES module
+export {};
