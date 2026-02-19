@@ -1,11 +1,12 @@
 /* ============================================
-   GMAIL THREAD LIST MCP APP (SDK VERSION)
+   GMAIL THREAD LIST MCP APP (STANDALONE MODE)
    ============================================
 
    This app uses the official @modelcontextprotocol/ext-apps SDK
-   for utilities only (theme helpers, types, auto-resize).
+   in standalone mode with app.connect().
 
-   It does NOT call app.connect() because the proxy handles initialization.
+   Renders Gmail API threads list (users.me.threads) as a
+   Gmail-style inbox widget with follow-up actions.
    ============================================ */
 
 /* ============================================
@@ -28,18 +29,7 @@ import "./mcp-app.css";
    ============================================ */
 
 const APP_NAME = "Gmail Thread List";
-
-
-/* ============================================
-   Gmail Inbox MCP App
-   ============================================
-   Renders Gmail API threads list (users.me.threads) as a
-   Gmail-style inbox widget with follow-up actions.
-   ============================================ */
-
-
 const APP_VERSION = "1.0.0";
-const PROTOCOL_VERSION = "2026-01-26";
 
 const GMAIL_INBOX_URL = "https://mail.google.com/mail/u/0/#inbox/";
 
@@ -155,6 +145,9 @@ function iconMail(): string {
   return `<svg class="gmail-icon gmail-icon-thread" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>`;
 }
 
+// Store threads for reply button handler
+let currentThreads: any[] = [];
+
 function renderThreadRow(thread: any, index: number): string {
   const id = thread.id || "";
   const snippet = truncateSnippet(thread.snippet || "");
@@ -168,7 +161,7 @@ function renderThreadRow(thread: any, index: number): string {
       </div>
       <div class="gmail-thread-actions">
         <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="gmail-action-icon gmail-open" title="Open in Gmail">${iconOpenInNew()}</a>
-        <button type="button" class="gmail-action-icon gmail-reply-prompt" data-thread-id="${escapeHtml(id)}" title="Reply">${iconReply()}</button>
+        <button type="button" class="gmail-action-icon gmail-reply-prompt" data-thread-id="${escapeHtml(id)}" data-thread-index="${index}" title="Reply">${iconReply()}</button>
       </div>
     </div>
   `;
@@ -190,6 +183,9 @@ function renderData(data: any) {
       showEmpty("No threads in this date range.");
       return;
     }
+
+    // Store threads for reply handler
+    currentThreads = threads;
 
     let html = '<div class="gmail-widget">';
     html += '<header class="gmail-header">';
@@ -225,146 +221,131 @@ function renderData(data: any) {
     app.innerHTML = html;
 
     // Reply buttons: suggest a follow-up to the host
-    app.querySelectorAll(".gmail-reply-prompt").forEach((btn, i) => {
+    app.querySelectorAll(".gmail-reply-prompt").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         e.preventDefault();
         const threadId = (btn as HTMLElement).getAttribute("data-thread-id");
-        const thread = threads[i];
+        const threadIndex = parseInt((btn as HTMLElement).getAttribute("data-thread-index") || "0", 10);
+        const thread = currentThreads[threadIndex];
         const snippet = thread ? truncateSnippet(thread.snippet || "", 80) : "";
         const msg = `Reply to Gmail thread ${threadId}${snippet ? `: "${snippet}"` : ""}`;
-        sendNotification("ui/notifications/follow-up-suggestion", { message: msg, threadId });
+        // Copy to clipboard as fallback action
         if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
           navigator.clipboard.writeText(msg).catch(() => {});
         }
       });
     });
 
-      } catch (err: any) {
+  } catch (err: any) {
     console.error("Render error:", err);
     showError(`Error rendering inbox: ${err.message}`);
-      }
+  }
 }
 
-window.addEventListener("message", function (event: MessageEvent) {
-  const msg = event.data;
-  if (!msg || msg.jsonrpc !== "2.0") return;
+/* ============================================
+   HOST CONTEXT HANDLER
+   ============================================ */
 
-  if (msg.id !== undefined && msg.method === "ui/resource-teardown") {
-    if (sizeChangeTimeout) {
-      clearTimeout(sizeChangeTimeout);
-      sizeChangeTimeout = null;
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
     }
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-    window.parent.postMessage({ jsonrpc: "2.0", id: msg.id, result: {} }, "*");
+  }
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
+  }
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
+  }
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
+}
+
+/* ============================================
+   SDK APP INSTANCE (STANDALONE MODE)
+   ============================================ */
+
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  console.info("Resource teardown requested");
+  // Add any cleanup logic specific to this app
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  console.info("Tool input received:", params.arguments);
+};
+
+app.ontoolresult = (params) => {
+  console.info("Tool result received");
+
+  // Check for tool execution errors
+  if (params.isError) {
+    console.error("Tool execution failed:", params.content);
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
     return;
   }
 
-  if (msg.id !== undefined && !msg.method) return;
-
-  switch (msg.method) {
-    case "ui/notifications/tool-result":
-      const data = msg.params?.structuredContent ?? msg.params;
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        showEmpty("No data received.");
-      }
-      break;
-    case "ui/notifications/host-context-changed":
-      if (msg.params?.theme === "dark") document.body.classList.add("dark");
-      else if (msg.params?.theme === "light") document.body.classList.remove("dark");
-      if (msg.params?.displayMode) handleDisplayModeChange(msg.params.displayMode);
-      break;
-    case "ui/notifications/tool-input":
-      break;
-    case "ui/notifications/tool-cancelled":
-      showError(`Cancelled: ${msg.params?.reason || "Tool cancelled"}`);
-      break;
-    case "ui/notifications/initialized":
-      break;
-    default:
-      if (msg.params) {
-        const fallback = msg.params.structuredContent ?? msg.params;
-        if (fallback && fallback !== msg) renderData(fallback);
-      }
-  }
-});
-
-
-let currentDisplayMode = "inline";
-function handleDisplayModeChange(mode: string) {
-  currentDisplayMode = mode;
-  if (mode === "fullscreen") {
-    document.body.classList.add("fullscreen-mode");
-    const container = document.querySelector(".gmail-widget");
-    if (container) (container as HTMLElement).style.maxWidth = "100%";
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
   } else {
-    document.body.classList.remove("fullscreen-mode");
-    const container = document.querySelector(".gmail-widget");
-    if (container) (container as HTMLElement).style.maxWidth = "";
+    console.warn("Tool result received but no data found:", params);
+    showEmpty("No data received");
   }
-  }
+};
 
-function requestDisplayMode(mode: string): Promise<any> {
-  return sendRequest("ui/request-display-mode", { mode })
-    .then((result) => {
-      if (result?.mode) handleDisplayModeChange(result.mode);
-      return result;
-    })
-    .catch((err) => {
-      console.warn("Failed to request display mode:", err);
-      throw err;
-    });
-}
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  console.info("Tool cancelled:", reason);
+  showError(`Operation cancelled: ${reason}`);
+};
 
+app.onerror = (error) => {
+  console.error("App error:", error);
+};
 
-sendRequest("ui/initialize", {
-  appCapabilities: { availableDisplayModes: ["inline", "fullscreen"] },
-  appInfo: { name: APP_NAME, version: APP_VERSION },
-  protocolVersion: PROTOCOL_VERSION,
-})
-  .then((result: any) => {
-    const ctx = result.hostContext ?? result;
-    sendNotification("ui/notifications/initialized", {});
-    if (ctx?.theme === "dark") document.body.classList.add("dark");
-    else if (ctx?.theme === "light") document.body.classList.remove("dark");
-    if (ctx?.displayMode) handleDisplayModeChange(ctx.displayMode);
-    if (ctx?.containerDimensions) {
-      const d = ctx.containerDimensions;
-      if (d.width) document.body.style.width = d.width + "px";
-      if (d.height) document.body.style.height = d.height + "px";
-      if (d.maxWidth) document.body.style.maxWidth = d.maxWidth + "px";
-      if (d.maxHeight) document.body.style.maxHeight = d.maxHeight + "px";
+app.onhostcontextchanged = (ctx) => {
+  console.info("Host context changed:", ctx);
+  handleHostContextChanged(ctx);
+};
+
+/* ============================================
+   CONNECT TO HOST
+   ============================================ */
+
+app
+  .connect()
+  .then(() => {
+    console.info("MCP App connected to host");
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
     }
   })
-  .catch(() => {});
-
-export {};
-
-/* ============================================
-   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
-   ============================================ */
-
-const app = new App({
-  name: APP_NAME,
-  version: APP_VERSION,
-});
-
-/* ============================================
-   AUTO-RESIZE VIA SDK
-   ============================================ */
-
-const cleanupResize = app.setupSizeChangedNotifications();
-
-// Clean up on page unload
-window.addEventListener("beforeunload", () => {
-  cleanupResize();
-});
-
-console.info("MCP App initialized (proxy mode - SDK utilities only)");
+  .catch((error) => {
+    console.error("Failed to connect to MCP host:", error);
+  });
 
 // Export empty object to ensure this file is treated as an ES module
 export {};

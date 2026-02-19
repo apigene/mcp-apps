@@ -45,13 +45,11 @@ import "./global.css";
 import "./mcp-app.css";
 
 /* ============================================
-   GOOGLE SEARCH CONSOLE QUERY MCP APP (SDK VERSION)
+   GOOGLE SEARCH CONSOLE QUERY MCP APP (STANDALONE MODE)
    ============================================
 
    This app uses the official @modelcontextprotocol/ext-apps SDK
-   for utilities only (theme helpers, types, auto-resize).
-
-   It does NOT call app.connect() because the proxy handles initialization.
+   in standalone mode with app.connect() for full MCP integration.
    ============================================ */
 
 /* ============================================
@@ -100,46 +98,43 @@ function extractData(msg: any) {
  */
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  // Format 0: API response wrapper { status_code, body: { rows, responseAggregationType } } (e.g. Search Console)
-  if (data.body && Array.isArray(data.body.rows)) {
-    return data.body;
-  }
-  
-  // Format 1: Standard table format { columns: [], rows: [] }
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
-  // Format 2: Nested in message.template_data (3rd party MCP clients)
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
-  // Format 3: Nested in message.response_content (3rd party MCP clients)
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
-  // Format 4: Common nested patterns
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
-  // Format 5: Direct rows array
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  // Format 6: If data itself is an array
-  if (Array.isArray(data)) {
-    return { rows: data };
+
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
-  
+
   return data;
 }
 
@@ -1752,7 +1747,7 @@ function runQueryWithFilters() {
     }
   };
   console.log('[mcp-app]', 'tools/call payload:', JSON.stringify(toolCallPayload, null, 2));
-  sendRequest('tools/call', toolCallPayload)
+  app.callTool(toolCallPayload.name, toolCallPayload.arguments)
     .then((result: any) => {
       if (result?.isError) {
         showError(result?.message || 'Query returned an error.');
@@ -1847,9 +1842,9 @@ function formatRequestAndResponseForLLM(
     (btn as HTMLButtonElement).disabled = true;
     btn.classList.add('send-loading');
   }
-  sendRequest('ui/message', {
+  app.sendMessage({
     role: 'user',
-    content: [{ type: 'text', text }],
+    content: { type: 'text', text },
   })
     .then((result: any) => {
       if (result?.isError) {
@@ -1871,187 +1866,36 @@ function formatRequestAndResponseForLLM(
 };
 
 /* ============================================
-   MESSAGE HANDLER (Standardized MCP Protocol)
-   ============================================
-   
-   This handles all incoming messages from the MCP host.
-   You typically don't need to modify this section.
+   HOST CONTEXT HANDLER
    ============================================ */
 
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    return;
-  }
-  
-  // Handle requests that require responses (like ui/resource-teardown)
-  if (msg.id !== undefined && msg.method === 'ui/resource-teardown') {
-    const reason = msg.params?.reason || 'Resource teardown requested';
-    
-    // Clean up resources
-    // - Clear any timers
-    if (sizeChangeTimeout) {
-      clearTimeout(sizeChangeTimeout);
-      sizeChangeTimeout = null;
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
     }
-    
-    // - Disconnect observers
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-    
-    // - Cancel any pending requests (if you track them)
-    // - Destroy chart instances, etc. (template-specific cleanup)
-    if (lineChartInstance) {
-      lineChartInstance.destroy();
-      lineChartInstance = null;
-    }
-    if (pieChartInstance) {
-      pieChartInstance.destroy();
-      pieChartInstance = null;
-    }
-    
-    // Send response to host
-    window.parent.postMessage({
-      jsonrpc: "2.0",
-      id: msg.id,
-      result: {}
-    }, '*');
-    
-    return; // Don't process further
   }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
   }
-  console.log('[mcp-app]', 'message received:', msg);
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      console.log('[mcp-app]', 'ui/notifications/tool-result:', msg.params);
-      const data = msg.params?.structuredContent || msg.params;
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        console.warn('[mcp-app]', 'ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      console.info("Host context changed:", msg.params);
 
-      if (msg.params?.theme) {
-        applyDocumentTheme(msg.params.theme);
-      }
-
-      if (msg.params?.styles?.css?.fonts) {
-        applyHostFonts(msg.params.styles.css.fonts);
-      }
-
-      if (msg.params?.styles?.variables) {
-        applyHostStyleVariables(msg.params.styles.variables);
-      }
-
-      if (msg.params?.displayMode === 'fullscreen') {
-        document.body.classList.add('fullscreen-mode');
-      } else {
-        document.body.classList.remove('fullscreen-mode');
-      }
-      break;
-
-    // Handle tool cancellation
-    case 'ui/notifications/tool-cancelled':
-      const reason = msg.params?.reason || "Unknown reason";
-      console.info("Tool cancelled:", reason);
-      showError(`Operation cancelled: ${reason}`);
-      break;
-
-    // Handle resource teardown (requires response)
-    case 'ui/resource-teardown':
-      console.info("Resource teardown requested");
-
-      if (msg.id !== undefined) {
-        window.parent.postMessage(
-          {
-            jsonrpc: "2.0",
-            id: msg.id,
-            result: {},
-          },
-          "*"
-        );
-      }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      console.log('[mcp-app]', 'ui/notifications/tool-input:', msg.params);
-      // Tool input notification - Host sends complete tool arguments (e.g. run_action_ui args)
-      const toolArguments = msg.params?.arguments;
-      if (toolArguments && typeof toolArguments === 'object') {
-        lastToolInput = toolArguments as Record<string, unknown>;
-        if (toolArguments.context && typeof toolArguments.context === 'object') {
-          lastRequestContext = toolArguments.context as Record<string, unknown>;
-        }
-        console.log('[mcp-app]', 'Tool input stored for New query panel:', lastToolInput);
-      }
-      break;
-
-    case 'ui/notifications/initialized':
-      // Initialization notification (optional - handle if needed)
-      break;
-      
-    default:
-      // Unknown method - try to extract data as fallback
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('[mcp-app]', 'Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      }
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
   }
-});
 
-/* ============================================
-   MCP COMMUNICATION
-   ============================================
-   
-   Functions for communicating with the MCP host.
-   You typically don't need to modify this section.
-   ============================================ */
-
-
-// Only send size-changed after host has acknowledged connection (avoids "Not connected" errors)
-let isConnected = false;
-
-/* ============================================
-   DISPLAY MODE HANDLING
-   ============================================
-   
-   Handles switching between inline and fullscreen display modes.
-   You may want to customize handleDisplayModeChange() to adjust
-   your layout for fullscreen mode.
-   ============================================ */
-
-
-/* ============================================
-   SIZE CHANGE NOTIFICATIONS
-   ============================================
-   
-   Notifies the host when the content size changes.
-   This is critical for proper iframe sizing.
-   You typically don't need to modify this section.
-   ============================================ */
-
-
-/* ============================================
-   INITIALIZATION
-   ============================================
-   
-   Initializes the MCP app and sets up all required features.
-   You typically don't need to modify this section.
-   ============================================ */
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
+}
 
 
 /* ============================================
@@ -2162,26 +2006,92 @@ function sortTable(table: HTMLTableElement, columnIndex: number) {
 }
 
 /* ============================================
-   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
+   SDK APP INSTANCE (STANDALONE MODE)
    ============================================ */
 
-const app = new App({
-  name: APP_NAME,
-  version: APP_VERSION,
-});
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  console.info("Resource teardown requested");
+  // Clean up chart instances
+  if (lineChartInstance) {
+    lineChartInstance.destroy();
+    lineChartInstance = null;
+  }
+  if (pieChartInstance) {
+    pieChartInstance.destroy();
+    pieChartInstance = null;
+  }
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  console.info("Tool input received:", params.arguments);
+  const toolArguments = params.arguments;
+  if (toolArguments && typeof toolArguments === 'object') {
+    lastToolInput = toolArguments as Record<string, unknown>;
+    if ((toolArguments as any).context && typeof (toolArguments as any).context === 'object') {
+      lastRequestContext = (toolArguments as any).context as Record<string, unknown>;
+    }
+    console.log('[mcp-app]', 'Tool input stored for New query panel:', lastToolInput);
+  }
+};
+
+app.ontoolresult = (params) => {
+  console.info("Tool result received");
+
+  // Check for tool execution errors
+  if (params.isError) {
+    console.error("Tool execution failed:", params.content);
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    console.warn("Tool result received but no data found:", params);
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  console.info("Tool cancelled:", reason);
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  console.error("App error:", error);
+};
+
+app.onhostcontextchanged = (ctx) => {
+  console.info("Host context changed:", ctx);
+  handleHostContextChanged(ctx);
+};
 
 /* ============================================
-   AUTO-RESIZE VIA SDK
+   CONNECT TO HOST
    ============================================ */
 
-const cleanupResize = app.setupSizeChangedNotifications();
+app
+  .connect()
+  .then(() => {
+    console.info("MCP App connected to host");
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    console.error("Failed to connect to MCP host:", error);
+  });
 
-// Clean up on page unload
-window.addEventListener("beforeunload", () => {
-  cleanupResize();
-});
-
-console.info("MCP App initialized (proxy mode - SDK utilities only)");
-
-// Export empty object to ensure this file is treated as an ES module
 export {};

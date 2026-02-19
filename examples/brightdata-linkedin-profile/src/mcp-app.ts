@@ -1,11 +1,9 @@
 /* ============================================
-   BRIGHTDATA LINKEDIN PROFILE MCP APP (SDK VERSION)
+   BRIGHTDATA LINKEDIN PROFILE MCP APP (STANDALONE MODE)
    ============================================
 
    This app uses the official @modelcontextprotocol/ext-apps SDK
-   for utilities only (theme helpers, types, auto-resize).
-
-   It does NOT call app.connect() because the proxy handles initialization.
+   in standalone mode with app.connect() for full MCP integration.
    ============================================ */
 
 /* ============================================
@@ -54,41 +52,43 @@ function extractData(msg: any) {
  */
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  // Format 1: Standard table format { columns: [], rows: [] }
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
-  // Format 2: Nested in message.template_data (3rd party MCP clients)
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
-  // Format 3: Nested in message.response_content (3rd party MCP clients)
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
-  // Format 4: Common nested patterns
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
-  // Format 5: Direct rows array
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  // Format 6: If data itself is an array
-  if (Array.isArray(data)) {
-    return { rows: data };
+
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
-  
+
   return data;
 }
 
@@ -127,7 +127,7 @@ function showEmpty(message: string = 'No data available.') {
 /* ============================================
    TEMPLATE-SPECIFIC FUNCTIONS
    ============================================
-   
+
    Add your template-specific utility functions here.
    Examples:
    - Data normalization functions
@@ -174,7 +174,7 @@ function renderPersonCard(person: any, index: number): string {
   const name = escapeHtml(person.name || 'Unknown');
   const location = escapeHtml(person.location || '');
   const profileLink = escapeHtml(person.profile_link || '#');
-  
+
   return `
     <div class="person-card">
       <a href="${profileLink}" target="_blank" rel="noopener noreferrer" class="person-link">
@@ -204,10 +204,10 @@ function renderRecommendationCard(recommendation: string, index: number): string
 /* ============================================
    TEMPLATE-SPECIFIC RENDER FUNCTION
    ============================================
-   
+
    This is the main function you need to implement.
    It receives the data and renders it in the app.
-   
+
    Guidelines:
    1. Always validate data before rendering
    2. Use unwrapData() to handle nested structures
@@ -221,7 +221,7 @@ function renderRecommendationCard(recommendation: string, index: number): string
 function renderData(data: any) {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   if (!data) {
     showEmpty('No LinkedIn profile data received');
     return;
@@ -230,7 +230,7 @@ function renderData(data: any) {
   try {
     // Unwrap nested structures
     const unwrapped = unwrapData(data);
-    
+
     // Handle array response (body is an array)
     let profile: any;
     if (Array.isArray(unwrapped)) {
@@ -242,12 +242,12 @@ function renderData(data: any) {
     } else {
       profile = unwrapped;
     }
-    
+
     if (!profile) {
       showEmpty('No profile data found');
       return;
     }
-    
+
     const name = profile.name || `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Unknown';
     const location = profile.location || profile.city || '';
     const about = profile.about || '';
@@ -261,7 +261,7 @@ function renderData(data: any) {
     const connections = profile.connections || 0;
     const followers = profile.followers || 0;
     const recommendationsCount = profile.recommendations_count || recommendations.length;
-    
+
     app.innerHTML = `
       <div class="linkedin-container">
         <!-- Profile Header -->
@@ -269,7 +269,7 @@ function renderData(data: any) {
           <div class="profile-banner" style="${profile.banner_image ? `background-image: url('${escapeHtml(profile.banner_image)}');` : ''}"></div>
           <div class="profile-content">
             <div class="profile-avatar-wrapper">
-              ${avatar 
+              ${avatar
                 ? `<img src="${escapeHtml(avatar)}" alt="${escapeHtml(name)}" class="profile-avatar" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />`
                 : ''
               }
@@ -279,7 +279,7 @@ function renderData(data: any) {
             </div>
             <div class="profile-info">
               <h1 class="profile-name">${escapeHtml(name)}</h1>
-              ${currentCompany.name 
+              ${currentCompany.name
                 ? `<div class="profile-company">
                     <a href="${escapeHtml(currentCompany.link || '#')}" target="_blank" rel="noopener noreferrer" class="company-link">
                       ${escapeHtml(currentCompany.name)}
@@ -287,14 +287,14 @@ function renderData(data: any) {
                   </div>`
                 : ''
               }
-              ${location 
+              ${location
                 ? `<div class="profile-location">
                     <span class="location-icon">📍</span>
                     ${escapeHtml(location)}
                   </div>`
                 : ''
               }
-              ${url 
+              ${url
                 ? `<div class="profile-link">
                     <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="linkedin-link">
                       ${escapeHtml(url)}
@@ -304,21 +304,21 @@ function renderData(data: any) {
               }
             </div>
             <div class="profile-stats">
-              ${connections > 0 
+              ${connections > 0
                 ? `<div class="stat-item">
                     <div class="stat-value">${formatNumber(connections)}</div>
                     <div class="stat-label">Connections</div>
                   </div>`
                 : ''
               }
-              ${followers > 0 
+              ${followers > 0
                 ? `<div class="stat-item">
                     <div class="stat-value">${formatNumber(followers)}</div>
                     <div class="stat-label">Followers</div>
                   </div>`
                 : ''
               }
-              ${recommendationsCount > 0 
+              ${recommendationsCount > 0
                 ? `<div class="stat-item">
                     <div class="stat-value">${formatNumber(recommendationsCount)}</div>
                     <div class="stat-label">Recommendations</div>
@@ -330,7 +330,7 @@ function renderData(data: any) {
         </div>
 
         <!-- About Section -->
-        ${about 
+        ${about
           ? `<div class="section">
               <h2 class="section-title">About</h2>
               <div class="section-content">
@@ -341,18 +341,18 @@ function renderData(data: any) {
         }
 
         <!-- Education Section -->
-        ${education.length > 0 
+        ${education.length > 0
           ? `<div class="section">
               <h2 class="section-title">Education</h2>
               <div class="section-content">
                 ${education.map((edu: any) => `
                   <div class="education-item">
                     <div class="education-title">${escapeHtml(edu.title || edu.name || '')}</div>
-                    ${edu.url 
+                    ${edu.url
                       ? `<a href="${escapeHtml(edu.url)}" target="_blank" rel="noopener noreferrer" class="education-link">${escapeHtml(edu.title || edu.name || '')}</a>`
                       : ''
                     }
-                    ${edu.start_year || edu.end_year 
+                    ${edu.start_year || edu.end_year
                       ? `<div class="education-period">${formatEducationPeriod(edu.start_year, edu.end_year)}</div>`
                       : ''
                     }
@@ -364,7 +364,7 @@ function renderData(data: any) {
         }
 
         <!-- Languages Section -->
-        ${languages.length > 0 
+        ${languages.length > 0
           ? `<div class="section">
               <h2 class="section-title">Languages</h2>
               <div class="section-content">
@@ -372,7 +372,7 @@ function renderData(data: any) {
                   ${languages.map((lang: any) => `
                     <div class="language-item">
                       <span class="language-name">${escapeHtml(lang.title || lang.name || '')}</span>
-                      ${lang.subtitle && lang.subtitle !== '-' 
+                      ${lang.subtitle && lang.subtitle !== '-'
                         ? `<span class="language-level">${escapeHtml(lang.subtitle)}</span>`
                         : ''
                       }
@@ -385,7 +385,7 @@ function renderData(data: any) {
         }
 
         <!-- Recommendations Section -->
-        ${recommendations.length > 0 
+        ${recommendations.length > 0
           ? `<div class="section">
               <h2 class="section-title">Recommendations (${recommendations.length})</h2>
               <div class="section-content">
@@ -398,7 +398,7 @@ function renderData(data: any) {
         }
 
         <!-- People Also Viewed Section -->
-        ${peopleAlsoViewed.length > 0 
+        ${peopleAlsoViewed.length > 0
           ? `<div class="section">
               <h2 class="section-title">People Also Viewed</h2>
               <div class="section-content">
@@ -419,148 +419,9 @@ function renderData(data: any) {
 }
 
 /* ============================================
-   MESSAGE HANDLER (Standardized MCP Protocol)
-   ============================================
-   
-   This handles all incoming messages from the MCP host.
-   You typically don't need to modify this section.
-   ============================================ */
-
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    return;
-  }
-  
-  // Handle requests that require responses (like ui/resource-teardown)
-  if (msg.id !== undefined && msg.method === 'ui/resource-teardown') {
-    const reason = msg.params?.reason || 'Resource teardown requested';
-    
-    // Clean up resources
-    // - Cancel any pending requests (if you track them)
-    // - Destroy chart instances, etc. (template-specific cleanup)
-    
-    // Send response to host
-    window.parent.postMessage({
-      jsonrpc: "2.0",
-      id: msg.id,
-      result: {}
-    }, '*');
-    
-    return; // Don't process further
-  }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
-  }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      const data = msg.params?.structuredContent || msg.params;
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      if (msg.params?.theme) {
-        applyDocumentTheme(msg.params.theme);
-      }
-      if (msg.params?.styles?.css?.fonts) {
-        applyHostFonts(msg.params.styles.css.fonts);
-      }
-      if (msg.params?.styles?.variables) {
-        applyHostStyleVariables(msg.params.styles.variables);
-      }
-      if (msg.params?.displayMode) {
-        handleDisplayModeChange(msg.params.displayMode);
-      }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      // Tool input notification - Host MUST send this with complete tool arguments
-      const toolArguments = msg.params?.arguments;
-      if (toolArguments) {
-        // Store tool arguments for reference (may be needed for context)
-        // Template-specific: You can use this for initial rendering or context
-        console.log('Tool input received:', toolArguments);
-        // Example: Show loading state with input parameters
-        // Example: Store for later use in renderData()
-      }
-      break;
-      
-    case 'ui/notifications/tool-cancelled':
-      // Tool cancellation notification - Host MUST send this if tool is cancelled
-      const reason = msg.params?.reason || 'Tool execution was cancelled';
-      showError(`Operation cancelled: ${reason}`);
-      // Clean up any ongoing operations
-      // - Stop timers
-      // - Cancel pending requests
-      // - Reset UI state
-      break;
-      
-    case 'ui/notifications/initialized':
-      // Initialization notification (optional - handle if needed)
-      break;
-      
-    default:
-      // Unknown method - try to extract data as fallback
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      }
-  }
-});
-
-/* ============================================
-   MCP COMMUNICATION
-   ============================================
-   
-   Functions for communicating with the MCP host.
-   You typically don't need to modify this section.
-   ============================================ */
-
-let requestIdCounter = 1;
-function sendRequest(method: string, params: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const id = requestIdCounter++;
-    window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, '*');
-    
-    const listener = (event: MessageEvent) => {
-      if (event.data?.id === id) {
-        window.removeEventListener('message', listener);
-        if (event.data?.result) {
-          resolve(event.data.result);
-        } else if (event.data?.error) {
-          reject(new Error(event.data.error.message || 'Unknown error'));
-        }
-      }
-    };
-    window.addEventListener('message', listener);
-    
-    // Timeout after 5 seconds
-    setTimeout(() => {
-      window.removeEventListener('message', listener);
-      reject(new Error('Request timeout'));
-    }, 5000);
-  });
-}
-
-function sendNotification(method: string, params: any) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, '*');
-}
-
-/* ============================================
    DISPLAY MODE HANDLING
    ============================================
-   
+
    Handles switching between inline and fullscreen display modes.
    You may want to customize handleDisplayModeChange() to adjust
    your layout for fullscreen mode.
@@ -589,44 +450,108 @@ function handleDisplayModeChange(mode: string) {
   }
 }
 
-function requestDisplayMode(mode: string): Promise<any> {
-  return sendRequest('ui/request-display-mode', { mode: mode })
-    .then(result => {
-      if (result?.mode) {
-        handleDisplayModeChange(result.mode);
-      }
-      return result;
-    })
-    .catch(err => {
-      console.warn('Failed to request display mode:', err);
-      throw err;
-    });
+/* ============================================
+   HOST CONTEXT HANDLER
+   ============================================ */
+
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
+  }
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
+  }
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
+  }
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
 }
 
-// Make function globally accessible for testing/debugging
-(window as any).requestDisplayMode = requestDisplayMode;
-
 /* ============================================
-   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
+   SDK APP INSTANCE (STANDALONE MODE)
    ============================================ */
 
-const app = new App({
-  name: APP_NAME,
-  version: APP_VERSION,
-});
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  console.info("Resource teardown requested");
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  console.info("Tool input received:", params.arguments);
+};
+
+app.ontoolresult = (params) => {
+  console.info("Tool result received");
+
+  // Check for tool execution errors
+  if (params.isError) {
+    console.error("Tool execution failed:", params.content);
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    console.warn("Tool result received but no data found:", params);
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  console.info("Tool cancelled:", reason);
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  console.error("App error:", error);
+};
+
+app.onhostcontextchanged = (ctx) => {
+  console.info("Host context changed:", ctx);
+  handleHostContextChanged(ctx);
+};
 
 /* ============================================
-   AUTO-RESIZE VIA SDK
+   CONNECT TO HOST
    ============================================ */
 
-const cleanupResize = app.setupSizeChangedNotifications();
+app
+  .connect()
+  .then(() => {
+    console.info("MCP App connected to host");
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    console.error("Failed to connect to MCP host:", error);
+  });
 
-// Clean up on page unload
-window.addEventListener("beforeunload", () => {
-  cleanupResize();
-});
-
-console.info("MCP App initialized (proxy mode - SDK utilities only)");
-
-// Export empty object to ensure this file is treated as an ES module
 export {};

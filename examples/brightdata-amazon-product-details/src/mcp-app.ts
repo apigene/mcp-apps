@@ -1,24 +1,12 @@
 /* ============================================
-   AMAZON PRODUCT DETAILS MCP APP
+   AMAZON PRODUCT DETAILS MCP APP (STANDALONE MODE)
    ============================================
-   
+
    Displays a single Amazon product with full details: title, description,
    images, pricing, variations, features, product details, delivery, etc.
    Expects API response format: { status_code: 200, body: [product] }
-   ============================================ */
 
-const APP_NAME = "Amazon Product Details";
-
-const PROTOCOL_VERSION = "2026-01-26";
-
-/* ============================================
-   BRIGHTDATA AMAZON PRODUCT DETAILS MCP APP (SDK VERSION)
-   ============================================
-
-   This app uses the official @modelcontextprotocol/ext-apps SDK
-   for utilities only (theme helpers, types, auto-resize).
-
-   It does NOT call app.connect() because the proxy handles initialization.
+   Uses app.connect() for standalone MCP Apps protocol communication.
    ============================================ */
 
 /* ============================================
@@ -40,22 +28,12 @@ import "./mcp-app.css";
    APP CONFIGURATION
    ============================================ */
 
-
+const APP_NAME = "Amazon Product Details";
 const APP_VERSION = "1.0.0";
 
 /* ============================================
    COMMON UTILITY FUNCTIONS
    ============================================ */
-
-function extractData(msg: any) {
-  if (msg?.params?.structuredContent !== undefined) {
-    return msg.params.structuredContent;
-  }
-  if (msg?.params !== undefined) {
-    return msg.params;
-  }
-  return msg;
-}
 
 function unwrapData(data: any): any {
   if (!data) return null;
@@ -317,66 +295,11 @@ function renderData(data: any) {
 }
 
 /* ============================================
-   MESSAGE HANDLER
-   ============================================ */
-
-window.addEventListener("message", function (event: MessageEvent) {
-  const msg = event.data;
-  if (!msg || msg.jsonrpc !== "2.0") {
-    if (msg && typeof msg === "object" && (msg.status_code !== undefined || msg.body !== undefined || msg.message?.status_code !== undefined)) {
-      renderData(msg);
-    }
-    return;
-  }
-  if (msg.id !== undefined && msg.method === "ui/resource-teardown") {
-    if (sizeChangeTimeout) {
-      clearTimeout(sizeChangeTimeout);
-      sizeChangeTimeout = null;
-    }
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-    window.parent.postMessage({ jsonrpc: "2.0", id: msg.id, result: {} }, "*");
-    return;
-  }
-  if (msg.id !== undefined && !msg.method) return;
-
-  switch (msg.method) {
-    case "ui/notifications/tool-result":
-      const data = msg.params?.structuredContent ?? msg.params;
-      if (data !== undefined) renderData(data);
-      else showEmpty("No data received");
-      break;
-    case "ui/notifications/host-context-changed":
-      if (msg.params?.theme === "dark") document.body.classList.add("dark");
-      else if (msg.params?.theme === "light") document.body.classList.remove("dark");
-      if (msg.params?.displayMode) handleDisplayModeChange(msg.params.displayMode);
-      break;
-    case "ui/notifications/tool-input":
-      if (msg.params?.arguments) console.log("Tool input:", msg.params.arguments);
-      break;
-    case "ui/notifications/tool-cancelled":
-      showError(`Cancelled: ${msg.params?.reason ?? "Tool cancelled"}`);
-      break;
-    case "ui/notifications/initialized":
-      break;
-    default:
-      if (msg.params) {
-        const fallback = msg.params.structuredContent ?? msg.params;
-        if (fallback && fallback !== msg) renderData(fallback);
-      } else if (msg.message ?? msg.status_code ?? msg.body) {
-        renderData(msg);
-      }
-  }
-});
-
-
-/* ============================================
-   DISPLAY MODE & SIZE
+   DISPLAY MODE HANDLER
    ============================================ */
 
 let currentDisplayMode = "inline";
+
 function handleDisplayModeChange(mode: string) {
   currentDisplayMode = mode;
   document.body.classList.toggle("fullscreen-mode", mode === "fullscreen");
@@ -387,38 +310,110 @@ function handleDisplayModeChange(mode: string) {
   }
 }
 
-function requestDisplayMode(mode: string): Promise<any> {
-  return sendRequest("ui/request-display-mode", { mode }).then((r) => {
-    if (r?.mode) handleDisplayModeChange(r.mode);
-    return r;
-  });
+/* ============================================
+   HOST CONTEXT HANDLER
+   ============================================ */
+
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
+  }
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
+  }
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
+  }
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+    handleDisplayModeChange("fullscreen");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+    handleDisplayModeChange("inline");
+  }
 }
-(window as any).requestDisplayMode = requestDisplayMode;
-
-
-export {};
 
 /* ============================================
-   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
+   SDK APP INSTANCE (STANDALONE MODE)
    ============================================ */
 
-const app = new App({
-  name: APP_NAME,
-  version: APP_VERSION,
-});
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  console.info("Resource teardown requested");
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  console.info("Tool input received:", params.arguments);
+};
+
+app.ontoolresult = (params) => {
+  console.info("Tool result received");
+
+  // Check for tool execution errors
+  if (params.isError) {
+    console.error("Tool execution failed:", params.content);
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    console.warn("Tool result received but no data found:", params);
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  console.info("Tool cancelled:", reason);
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  console.error("App error:", error);
+};
+
+app.onhostcontextchanged = (ctx) => {
+  console.info("Host context changed:", ctx);
+  handleHostContextChanged(ctx);
+};
 
 /* ============================================
-   AUTO-RESIZE VIA SDK
+   CONNECT TO HOST
    ============================================ */
 
-const cleanupResize = app.setupSizeChangedNotifications();
+app
+  .connect()
+  .then(() => {
+    console.info("MCP App connected to host");
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    console.error("Failed to connect to MCP host:", error);
+  });
 
-// Clean up on page unload
-window.addEventListener("beforeunload", () => {
-  cleanupResize();
-});
-
-console.info("MCP App initialized (proxy mode - SDK utilities only)");
-
-// Export empty object to ensure this file is treated as an ES module
 export {};

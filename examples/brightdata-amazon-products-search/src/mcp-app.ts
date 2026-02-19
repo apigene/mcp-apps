@@ -1,28 +1,12 @@
 /* ============================================
-   AMAZON SHOPPING MCP APP
+   AMAZON SHOPPING MCP APP (STANDALONE MODE)
    ============================================
-   
+
    Displays Amazon product search results in an Amazon-style shopping layout.
    Handles product images, prices, ratings, Prime badges, and variations.
    Based on BrightData scraping API response format.
-   ============================================ */
 
-/* ============================================
-   APP CONFIGURATION
-   ============================================ */
-
-const APP_NAME = "Amazon Shopping";
-
-const PROTOCOL_VERSION = "2026-01-26"; // MCP Apps protocol version
-
-/* ============================================
-   BRIGHTDATA AMAZON PRODUCTS SEARCH MCP APP (SDK VERSION)
-   ============================================
-
-   This app uses the official @modelcontextprotocol/ext-apps SDK
-   for utilities only (theme helpers, types, auto-resize).
-
-   It does NOT call app.connect() because the proxy handles initialization.
+   Uses app.connect() for standalone MCP Apps protocol communication.
    ============================================ */
 
 /* ============================================
@@ -44,7 +28,7 @@ import "./mcp-app.css";
    APP CONFIGURATION
    ============================================ */
 
-
+const APP_NAME = "Amazon Shopping";
 const APP_VERSION = "1.0.0";
 
 /* ============================================
@@ -52,88 +36,48 @@ const APP_VERSION = "1.0.0";
    ============================================ */
 
 /**
- * Extract data from MCP protocol messages
- * Handles standard JSON-RPC 2.0 format from run-action.html
- */
-function extractData(msg: any) {
-  if (msg?.params?.structuredContent !== undefined) {
-    return msg.params.structuredContent;
-  }
-  if (msg?.params !== undefined) {
-    return msg.params;
-  }
-  return msg;
-}
-
-/**
  * Unwrap nested API response structures
  * Handles various wrapper formats from different MCP clients
  */
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  // Handle Claude format: {message: {status_code: 200, response_content: {...}}}
-  if (data.message && typeof data.message === 'object') {
-    const msg = data.message;
-    if (msg.status_code !== undefined) {
-      // Support both response_content and body fields
-      const content = msg.response_content || msg.body;
-      if (content !== undefined) {
-        return {
-          status_code: msg.status_code,
-          body: content,
-          response_content: content
-        };
-      }
-    }
-  }
-  
-  // Handle direct BrightData response format: {status_code: 200, body: {...}} or {status_code: 200, response_content: {...}}
-  if (data.status_code !== undefined) {
-    const content = data.body || data.response_content;
-    if (content !== undefined) {
-      return {
-        status_code: data.status_code,
-        body: content,
-        response_content: content
-      };
-    }
-  }
-  
-  // Format 1: Standard table format { columns: [], rows: [] }
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
-  // Format 2: Nested in message.template_data (3rd party MCP clients)
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
-  // Format 3: Nested in message.response_content (3rd party MCP clients)
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
-  // Format 4: Common nested patterns
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
-  // Format 5: Direct rows array
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  // Format 6: If data itself is an array
-  if (Array.isArray(data)) {
-    return { rows: data };
+
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
-  
+
   return data;
 }
 
@@ -181,11 +125,11 @@ function extractProducts(data: any): any[] {
 
   // Handle BrightData format: {status_code: 200, body: [...]}
   const content = unwrapped.body || unwrapped.response_content;
-  
+
   if (content && Array.isArray(content)) {
     return content;
   }
-  
+
   if (Array.isArray(unwrapped)) {
     return unwrapped;
   }
@@ -207,11 +151,11 @@ function formatPrice(price: number | null | undefined, currency: string | null |
  */
 function renderStars(rating: number | null | undefined, numRatings: number | null | undefined): string {
   if (!rating || rating === 0) return '<span class="no-rating">No ratings</span>';
-  
+
   const fullStars = Math.floor(rating);
   const hasHalfStar = rating % 1 >= 0.5;
   const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
-  
+
   let starsHtml = '';
   for (let i = 0; i < fullStars; i++) {
     starsHtml += '<span class="star star-full">★</span>';
@@ -222,7 +166,7 @@ function renderStars(rating: number | null | undefined, numRatings: number | nul
   for (let i = 0; i < emptyStars; i++) {
     starsHtml += '<span class="star star-empty">★</span>';
   }
-  
+
   const ratingsText = numRatings ? `(${numRatings.toLocaleString()})` : '';
   return `<div class="rating">${starsHtml} <span class="rating-text">${rating.toFixed(1)} ${ratingsText}</span></div>`;
 }
@@ -245,17 +189,17 @@ function renderProductCard(product: any, index: number): string {
   const badge = product.badge || '';
   const variations = product.variations || [];
   const sponsored = product.sponsored === 'true' || product.sponsored === true;
-  
+
   const hasDiscount = initialPrice && initialPrice > 0 && finalPrice && finalPrice < initialPrice;
   const discountPercent = hasDiscount ? Math.round(((initialPrice - finalPrice) / initialPrice) * 100) : 0;
-  
+
   return `
     <div class="product-card" data-asin="${escapeHtml(asin)}">
       <div class="product-image-container">
         ${image ? `
-          <img 
-            src="${escapeHtml(image)}" 
-            alt="${escapeHtml(name)}" 
+          <img
+            src="${escapeHtml(image)}"
+            alt="${escapeHtml(name)}"
             class="product-image"
             loading="lazy"
             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"
@@ -272,18 +216,18 @@ function renderProductCard(product: any, index: number): string {
         ${badge ? `<div class="product-badge">${escapeHtml(badge)}</div>` : ''}
         ${hasDiscount ? `<div class="discount-badge">-${discountPercent}%</div>` : ''}
       </div>
-      
+
       <div class="product-info">
         ${brand ? `<div class="product-brand">${escapeHtml(brand)}</div>` : ''}
-        
+
         <h3 class="product-title">
           <a href="${escapeHtml(url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">
             ${escapeHtml(name)}
           </a>
         </h3>
-        
+
         ${renderStars(rating, numRatings)}
-        
+
         <div class="product-price-section">
           ${hasDiscount ? `
             <div class="price-row">
@@ -296,21 +240,21 @@ function renderProductCard(product: any, index: number): string {
             </div>
           `}
         </div>
-        
+
         ${isPrime ? '<div class="prime-badge">Prime</div>' : ''}
-        
+
         ${variations.length > 0 ? `
           <div class="product-variations">
             <div class="variations-label">Available in:</div>
             <div class="variations-list">
-              ${variations.slice(0, 5).map((v: any) => 
+              ${variations.slice(0, 5).map((v: any) =>
                 `<span class="variation-chip">${escapeHtml(v.name || v)}</span>`
               ).join('')}
               ${variations.length > 5 ? `<span class="variation-chip-more">+${variations.length - 5} more</span>` : ''}
             </div>
           </div>
         ` : ''}
-        
+
         <a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="product-link" onclick="event.stopPropagation()">
           View on Amazon →
         </a>
@@ -325,7 +269,7 @@ function renderProductCard(product: any, index: number): string {
 function renderData(data: any) {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   if (!data) {
     showEmpty('No data received');
     return;
@@ -334,7 +278,7 @@ function renderData(data: any) {
   try {
     // Extract products
     const products = extractProducts(data);
-    
+
     if (!products || products.length === 0) {
       showEmpty('No products found');
       return;
@@ -347,7 +291,7 @@ function renderData(data: any) {
     // Create container
     const container = document.createElement('div');
     container.className = 'amazon-container';
-    
+
     // Header
     const header = document.createElement('div');
     header.className = 'header';
@@ -373,18 +317,16 @@ function renderData(data: any) {
     const productsGrid = document.createElement('div');
     productsGrid.className = 'products-grid';
     productsGrid.id = 'products-grid';
-    
+
     regularProducts.forEach((product: any, index: number) => {
       productsGrid.innerHTML += renderProductCard(product, index);
     });
-    
+
     container.appendChild(productsGrid);
 
     app.innerHTML = '';
     app.appendChild(container);
-    
-    // Notify host of size change after rendering completes
-    
+
   } catch (error: any) {
     console.error('Render error:', error);
     showError(`Error rendering products: ${error.message}`);
@@ -392,154 +334,107 @@ function renderData(data: any) {
 }
 
 /* ============================================
-   MESSAGE HANDLER (Standardized MCP Protocol)
+   HOST CONTEXT HANDLER
    ============================================ */
 
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    // Handle direct data (not wrapped in JSON-RPC)
-    if (msg && typeof msg === 'object') {
-      if (msg.message && msg.message.status_code !== undefined) {
-        renderData(msg);
-        return;
-      }
-      if (msg.status_code !== undefined || msg.body !== undefined || msg.response_content !== undefined) {
-        renderData(msg);
-        return;
-      }
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
     }
-    return;
   }
-  
-  // Handle requests that require responses (like ui/resource-teardown)
-  if (msg.id !== undefined && msg.method === 'ui/resource-teardown') {
-    const reason = msg.params?.reason || 'Resource teardown requested';
-    
-    if (sizeChangeTimeout) {
-      clearTimeout(sizeChangeTimeout);
-      sizeChangeTimeout = null;
-    }
-    
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-    
-    window.parent.postMessage({
-      jsonrpc: "2.0",
-      id: msg.id,
-      result: {}
-    }, '*');
-    
-    return;
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
   }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
   }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      const data = msg.params?.structuredContent || msg.params;
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      console.info("Host context changed:", msg.params);
 
-      if (msg.params?.theme) {
-        applyDocumentTheme(msg.params.theme);
-      }
-
-      if (msg.params?.styles?.css?.fonts) {
-        applyHostFonts(msg.params.styles.css.fonts);
-      }
-
-      if (msg.params?.styles?.variables) {
-        applyHostStyleVariables(msg.params.styles.variables);
-      }
-
-      if (msg.params?.displayMode === 'fullscreen') {
-        document.body.classList.add('fullscreen-mode');
-      } else {
-        document.body.classList.remove('fullscreen-mode');
-      }
-      break;
-
-    // Handle tool cancellation
-    case 'ui/notifications/tool-cancelled':
-      const reason = msg.params?.reason || "Unknown reason";
-      console.info("Tool cancelled:", reason);
-      showError(`Operation cancelled: ${reason}`);
-      break;
-
-    // Handle resource teardown (requires response)
-    case 'ui/resource-teardown':
-      console.info("Resource teardown requested");
-
-      if (msg.id !== undefined) {
-        window.parent.postMessage(
-          {
-            jsonrpc: "2.0",
-            id: msg.id,
-            result: {},
-          },
-          "*"
-        );
-      }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      const toolArguments = msg.params?.arguments;
-      if (toolArguments) {
-        console.log('Tool input received:', toolArguments);
-      }
-      break;
-
-    case 'ui/notifications/initialized':
-      break;
-      
-    default:
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      } else if (msg.message || msg.status_code || msg.body || msg.response_content) {
-        renderData(msg);
-      }
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
   }
-});
+}
 
 /* ============================================
-   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
+   SDK APP INSTANCE (STANDALONE MODE)
    ============================================ */
 
-const app = new App({
-  name: APP_NAME,
-  version: APP_VERSION,
-});
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  console.info("Resource teardown requested");
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  console.info("Tool input received:", params.arguments);
+};
+
+app.ontoolresult = (params) => {
+  console.info("Tool result received");
+
+  // Check for tool execution errors
+  if (params.isError) {
+    console.error("Tool execution failed:", params.content);
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    console.warn("Tool result received but no data found:", params);
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  console.info("Tool cancelled:", reason);
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  console.error("App error:", error);
+};
+
+app.onhostcontextchanged = (ctx) => {
+  console.info("Host context changed:", ctx);
+  handleHostContextChanged(ctx);
+};
 
 /* ============================================
-   AUTO-RESIZE VIA SDK
+   CONNECT TO HOST
    ============================================ */
 
-const cleanupResize = app.setupSizeChangedNotifications();
+app
+  .connect()
+  .then(() => {
+    console.info("MCP App connected to host");
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    console.error("Failed to connect to MCP host:", error);
+  });
 
-// Clean up on page unload
-window.addEventListener("beforeunload", () => {
-  cleanupResize();
-});
-
-console.info("MCP App initialized (proxy mode - SDK utilities only)");
-
-// Export empty object to ensure this file is treated as an ES module
 export {};

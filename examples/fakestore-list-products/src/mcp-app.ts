@@ -1,5 +1,9 @@
 /* ============================================
-   FAKE STORE SDK TEMPLATE (PROXY COMPATIBLE)
+   FAKE STORE MCP APP (STANDALONE MODE)
+   ============================================
+
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   in standalone mode with app.connect().
    ============================================ */
 
 import {
@@ -167,54 +171,108 @@ function renderData(data: any) {
   }
 }
 
-const app = new App({
-  name: APP_NAME,
-  version: APP_VERSION,
-});
+/* ============================================
+   HOST CONTEXT HANDLER
+   ============================================ */
 
-window.addEventListener("message", (event: MessageEvent) => {
-  const msg = event.data;
-  if (!msg) return;
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
 
-  if (msg.jsonrpc === "2.0") {
-    if (msg.method === "ui/notifications/tool-result" && msg.params) {
-      const data = msg.params.structuredContent || msg.params;
-      renderData(data);
-      return;
-    }
-
-    if (msg.method === "ui/notifications/host-context-changed" && msg.params) {
-      if (msg.params.theme) applyDocumentTheme(msg.params.theme);
-      if (msg.params.styles?.css?.fonts) applyHostFonts(msg.params.styles.css.fonts);
-      if (msg.params.styles?.variables) {
-        applyHostStyleVariables(msg.params.styles.variables);
-      }
-
-      if (msg.params.displayMode === "fullscreen") {
-        document.body.classList.add("fullscreen-mode");
-      } else {
-        document.body.classList.remove("fullscreen-mode");
-      }
-      return;
-    }
-
-    if (msg.method === "ui/notifications/tool-cancelled") {
-      const reason = msg.params?.reason || "Unknown reason";
-      showError(`Operation cancelled: ${reason}`);
-      return;
-    }
-
-    if (msg.id !== undefined && msg.method === "ui/resource-teardown") {
-      window.parent.postMessage({ jsonrpc: "2.0", id: msg.id, result: {} }, "*");
-      return;
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
     }
   }
-});
 
-const cleanupResize = app.setupSizeChangedNotifications();
-window.addEventListener("beforeunload", () => cleanupResize());
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
+  }
 
-console.info("Fake Store MCP App initialized");
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
+  }
 
-// Export empty object to ensure this file is treated as an ES module
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
+}
+
+/* ============================================
+   SDK APP INSTANCE (STANDALONE MODE)
+   ============================================ */
+
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  console.info("Resource teardown requested");
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  console.info("Tool input received:", params.arguments);
+};
+
+app.ontoolresult = (params) => {
+  console.info("Tool result received");
+
+  // Check for tool execution errors
+  if (params.isError) {
+    console.error("Tool execution failed:", params.content);
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    console.warn("Tool result received but no data found:", params);
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  console.info("Tool cancelled:", reason);
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  console.error("App error:", error);
+};
+
+app.onhostcontextchanged = (ctx) => {
+  console.info("Host context changed:", ctx);
+  handleHostContextChanged(ctx);
+};
+
+/* ============================================
+   CONNECT TO HOST
+   ============================================ */
+
+app
+  .connect()
+  .then(() => {
+    console.info("MCP App connected to host");
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    console.error("Failed to connect to MCP host:", error);
+  });
+
 export {};

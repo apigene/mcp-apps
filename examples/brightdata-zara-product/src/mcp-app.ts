@@ -1,7 +1,7 @@
 /* ============================================
    ZARA PRODUCT MCP APP
    ============================================
-   
+
    Displays Zara product information in a beautiful card layout.
    Handles product details, images, pricing, and availability.
    ============================================ */
@@ -12,16 +12,13 @@
 
 const APP_NAME = "Zara Product";
 const APP_VERSION = "2.0.0";
-const PROTOCOL_VERSION = "2026-01-26"; // MCP Apps protocol version
 
 /* ============================================
-   BRIGHTDATA ZARA PRODUCT MCP APP (SDK VERSION)
+   BRIGHTDATA ZARA PRODUCT MCP APP (STANDALONE MODE)
    ============================================
 
    This app uses the official @modelcontextprotocol/ext-apps SDK
-   for utilities only (theme helpers, types, auto-resize).
-
-   It does NOT call app.connect() because the proxy handles initialization.
+   in standalone mode with app.connect() for full MCP integration.
    ============================================ */
 
 /* ============================================
@@ -38,11 +35,6 @@ import {
 // Import styles (will be bundled by Vite)
 import "./global.css";
 import "./mcp-app.css";
-
-/* ============================================
-   APP CONFIGURATION
-   ============================================ */
-
 
 /* ============================================
    COMMON UTILITY FUNCTIONS
@@ -68,41 +60,43 @@ function extractData(msg: any) {
  */
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  // Format 1: Standard table format { columns: [], rows: [] }
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
-  // Format 2: Nested in message.template_data (3rd party MCP clients)
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
-  // Format 3: Nested in message.response_content (3rd party MCP clients)
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
-  // Format 4: Common nested patterns
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
-  // Format 5: Direct rows array
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  // Format 6: If data itself is an array
-  if (Array.isArray(data)) {
-    return { rows: data };
+
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
-  
+
   return data;
 }
 
@@ -146,7 +140,7 @@ function showEmpty(message: string = 'No product data available.') {
  */
 function formatPrice(price: number, currency: string): string {
   if (!price && price !== 0) return 'Price not available';
-  
+
   // Currency symbol mapping
   const currencySymbols: Record<string, string> = {
     'ILS': '₪',
@@ -155,7 +149,7 @@ function formatPrice(price: number, currency: string): string {
     'GBP': '£',
     'JPY': '¥',
   };
-  
+
   const symbol = currencySymbols[currency] || currency;
   return `${symbol}${price.toFixed(2)}`;
 }
@@ -165,22 +159,22 @@ function formatPrice(price: number, currency: string): string {
  */
 function extractProductData(data: any): any {
   const unwrapped = unwrapData(data);
-  
+
   // Handle Zara API response format: { status_code: 200, body: [...] }
   if (unwrapped?.body && Array.isArray(unwrapped.body) && unwrapped.body.length > 0) {
     return unwrapped.body[0]; // Get first product
   }
-  
+
   // Handle direct product object
   if (unwrapped?.product_name || unwrapped?.product_id) {
     return unwrapped;
   }
-  
+
   // Handle array of products
   if (Array.isArray(unwrapped) && unwrapped.length > 0) {
     return unwrapped[0];
   }
-  
+
   return unwrapped;
 }
 
@@ -191,10 +185,10 @@ function renderImageGallery(images: string[]): string {
   if (!images || images.length === 0) {
     return '<div class="no-images">No images available</div>';
   }
-  
+
   const mainImage = images[0];
   const thumbnails = images.slice(0, 6); // Show up to 6 thumbnails
-  
+
   return `
     <div class="image-gallery">
       <div class="main-image">
@@ -220,7 +214,7 @@ function renderImageGallery(images: string[]): string {
 function renderData(data: any) {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   if (!data) {
     showEmpty('No product data received');
     return;
@@ -228,12 +222,12 @@ function renderData(data: any) {
 
   try {
     const product = extractProductData(data);
-    
+
     if (!product || !product.product_name) {
       showEmpty('Invalid product data format');
       return;
     }
-    
+
     const {
       product_name,
       price,
@@ -253,7 +247,7 @@ function renderData(data: any) {
       category_id,
       product_id
     } = product;
-    
+
     app.innerHTML = `
       <div class="container">
         <div class="product-card">
@@ -266,12 +260,12 @@ function renderData(data: any) {
               ${formatPrice(price, currency || 'USD')}
             </div>
           </div>
-          
+
           <div class="product-content">
             <div class="product-images">
               ${renderImageGallery(image)}
             </div>
-            
+
             <div class="product-details">
               <div class="product-info">
                 ${colour ? `
@@ -282,21 +276,21 @@ function renderData(data: any) {
                     </span>
                   </div>
                 ` : ''}
-                
+
                 <div class="info-item">
                   <span class="info-label">Availability:</span>
                   <span class="info-value availability-badge ${availability ? 'available' : 'unavailable'}">
                     ${availability ? (low_on_stock ? 'Low Stock' : 'In Stock') : 'Out of Stock'}
                   </span>
                 </div>
-                
+
                 ${sku ? `
                   <div class="info-item">
                     <span class="info-label">SKU:</span>
                     <span class="info-value">${escapeHtml(sku)}</span>
                   </div>
                 ` : ''}
-                
+
                 ${product_family ? `
                   <div class="info-item">
                     <span class="info-label">Category:</span>
@@ -304,21 +298,21 @@ function renderData(data: any) {
                   </div>
                 ` : ''}
               </div>
-              
+
               ${description ? `
                 <div class="product-description">
                   <h3>Description</h3>
                   <p>${escapeHtml(description)}</p>
                 </div>
               ` : ''}
-              
+
               ${dimension && dimension !== description ? `
                 <div class="product-dimensions">
                   <h3>Details</h3>
                   <p>${escapeHtml(dimension)}</p>
                 </div>
               ` : ''}
-              
+
               ${url ? `
                 <div class="product-actions">
                   <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="view-product-btn">
@@ -328,7 +322,7 @@ function renderData(data: any) {
               ` : ''}
             </div>
           </div>
-          
+
           ${you_may_also_like && you_may_also_like.length > 0 ? `
             <div class="related-products">
               <h3>You May Also Like</h3>
@@ -344,11 +338,11 @@ function renderData(data: any) {
         </div>
       </div>
     `;
-    
+
     // Setup image gallery interaction
     const thumbnails = app.querySelectorAll('.thumbnail');
     const mainImage = app.querySelector('.main-image img') as HTMLImageElement;
-    
+
     thumbnails.forEach((thumb) => {
       thumb.addEventListener('click', () => {
         const imageUrl = thumb.getAttribute('data-image');
@@ -359,9 +353,7 @@ function renderData(data: any) {
         }
       });
     });
-    
-    // Notify host of size change after rendering completes
-    
+
   } catch (error: any) {
     console.error('Render error:', error);
     showError(`Error rendering product data: ${error.message}`);
@@ -369,156 +361,107 @@ function renderData(data: any) {
 }
 
 /* ============================================
-   MESSAGE HANDLER (Standardized MCP Protocol)
+   HOST CONTEXT HANDLER
    ============================================ */
 
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    return;
-  }
-  
-  // Handle requests that require responses (like ui/resource-teardown)
-  if (msg.id !== undefined && msg.method === 'ui/resource-teardown') {
-    const reason = msg.params?.reason || 'Resource teardown requested';
-    
-    // Clean up resources
-    // - Clear any timers
-    if (sizeChangeTimeout) {
-      clearTimeout(sizeChangeTimeout);
-      sizeChangeTimeout = null;
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
     }
-    
-    // - Disconnect observers
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-    
-    // - Clean up any image gallery event listeners
-    const thumbnails = document.querySelectorAll('.thumbnail');
-    thumbnails.forEach(thumb => {
-      // Event listeners will be cleaned up when DOM is removed
-    });
-    
-    // Send response to host
-    window.parent.postMessage({
-      jsonrpc: "2.0",
-      id: msg.id,
-      result: {}
-    }, '*');
-    
-    return; // Don't process further
   }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
   }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      const data = msg.params?.structuredContent || msg.params;
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      console.info("Host context changed:", msg.params);
 
-      if (msg.params?.theme) {
-        applyDocumentTheme(msg.params.theme);
-      }
-
-      if (msg.params?.styles?.css?.fonts) {
-        applyHostFonts(msg.params.styles.css.fonts);
-      }
-
-      if (msg.params?.styles?.variables) {
-        applyHostStyleVariables(msg.params.styles.variables);
-      }
-
-      if (msg.params?.displayMode === 'fullscreen') {
-        document.body.classList.add('fullscreen-mode');
-      } else {
-        document.body.classList.remove('fullscreen-mode');
-      }
-      break;
-
-    // Handle tool cancellation
-    case 'ui/notifications/tool-cancelled':
-      const reason = msg.params?.reason || "Unknown reason";
-      console.info("Tool cancelled:", reason);
-      showError(`Operation cancelled: ${reason}`);
-      break;
-
-    // Handle resource teardown (requires response)
-    case 'ui/resource-teardown':
-      console.info("Resource teardown requested");
-
-      if (msg.id !== undefined) {
-        window.parent.postMessage(
-          {
-            jsonrpc: "2.0",
-            id: msg.id,
-            result: {},
-          },
-          "*"
-        );
-      }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      // Tool input notification - Host MUST send this with complete tool arguments
-      const toolArguments = msg.params?.arguments;
-      if (toolArguments) {
-        // Store tool arguments for reference (may be needed for context)
-        console.log('Tool input received:', toolArguments);
-        // Example: Could show loading state with input parameters
-      }
-      break;
-
-    case 'ui/notifications/initialized':
-      // Initialization notification (optional - handle if needed)
-      break;
-      
-    default:
-      // Unknown method - try to extract data as fallback
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      }
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
   }
-});
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
+}
 
 /* ============================================
-   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
+   SDK APP INSTANCE (STANDALONE MODE)
    ============================================ */
 
-const app = new App({
-  name: APP_NAME,
-  version: APP_VERSION,
-});
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  console.info("Resource teardown requested");
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  console.info("Tool input received:", params.arguments);
+};
+
+app.ontoolresult = (params) => {
+  console.info("Tool result received");
+
+  // Check for tool execution errors
+  if (params.isError) {
+    console.error("Tool execution failed:", params.content);
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    console.warn("Tool result received but no data found:", params);
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  console.info("Tool cancelled:", reason);
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  console.error("App error:", error);
+};
+
+app.onhostcontextchanged = (ctx) => {
+  console.info("Host context changed:", ctx);
+  handleHostContextChanged(ctx);
+};
 
 /* ============================================
-   AUTO-RESIZE VIA SDK
+   CONNECT TO HOST
    ============================================ */
 
-const cleanupResize = app.setupSizeChangedNotifications();
+app
+  .connect()
+  .then(() => {
+    console.info("MCP App connected to host");
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    console.error("Failed to connect to MCP host:", error);
+  });
 
-// Clean up on page unload
-window.addEventListener("beforeunload", () => {
-  cleanupResize();
-});
-
-console.info("MCP App initialized (proxy mode - SDK utilities only)");
-
-// Export empty object to ensure this file is treated as an ES module
 export {};

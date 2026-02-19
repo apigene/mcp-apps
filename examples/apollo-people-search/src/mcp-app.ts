@@ -1,11 +1,9 @@
 /* ============================================
-   APOLLO PEOPLE SEARCH MCP APP (SDK VERSION)
+   APOLLO PEOPLE SEARCH MCP APP (STANDALONE MODE)
    ============================================
 
    This app uses the official @modelcontextprotocol/ext-apps SDK
-   for utilities only (theme helpers, types, auto-resize).
-
-   It does NOT call app.connect() because the proxy handles initialization.
+   in standalone mode with app.connect() for direct host communication.
    ============================================ */
 
 /* ============================================
@@ -35,60 +33,48 @@ const APP_VERSION = "1.0.0";
    ============================================ */
 
 /**
- * Extract data from MCP protocol messages
- * Handles standard JSON-RPC 2.0 format from run-action.html
- */
-function extractData(msg: any) {
-  if (msg?.params?.structuredContent !== undefined) {
-    return msg.params.structuredContent;
-  }
-  if (msg?.params !== undefined) {
-    return msg.params;
-  }
-  return msg;
-}
-
-/**
  * Unwrap nested API response structures
  * Handles various wrapper formats from different MCP clients
  */
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  // Format 1: Standard table format { columns: [], rows: [] }
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
-  // Format 2: Nested in message.template_data (3rd party MCP clients)
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
-  // Format 3: Nested in message.response_content (3rd party MCP clients)
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
-  // Format 4: Common nested patterns
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
-  // Format 5: Direct rows array
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  // Format 6: If data itself is an array
-  if (Array.isArray(data)) {
-    return { rows: data };
+
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
-  
+
   return data;
 }
 
@@ -197,8 +183,8 @@ function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '-';
   try {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
       day: 'numeric',
       year: 'numeric'
     });
@@ -239,7 +225,7 @@ function renderPersonCard(person: any, index: number): string {
   const title = person.title || '';
   const company = person.organization?.name || '';
   const initials = getInitials(firstName, lastName);
-  
+
   const hasEmail = person.has_email === true;
   const hasPhone = person.has_direct_phone === 'Yes';
   const hasLocation = person.has_city || person.has_state || person.has_country;
@@ -275,22 +261,22 @@ function renderPersonDetail(person: any): string {
   const title = person.title || null;
   const company = person.organization?.name || null;
   const initials = getInitials(firstName, lastName);
-  
+
   const email = person.email || null;
   const phone = person.phone_numbers?.[0]?.raw_number || person.phone || null;
   const linkedin = person.linkedin_url || person.linkedin || null;
   const twitter = person.twitter_url || person.twitter || null;
   const github = person.github_url || person.github || null;
   const apolloUrl = person.apollo_url || person.url || null;
-  
+
   const city = person.city || null;
   const state = person.state || null;
   const country = person.country || null;
   const location = [city, state, country].filter(Boolean).join(', ') || null;
-  
+
   const lastRefreshed = person.last_refreshed_at || null;
   const personId = person.id || null;
-  
+
   const hasEmail = person.has_email === true;
   const hasPhone = person.has_direct_phone === 'Yes';
   const hasCity = person.has_city === true;
@@ -486,7 +472,7 @@ function showPersonDetail(person: any) {
 function renderData(data: any) {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   if (!data) {
     showEmpty('No data received');
     return;
@@ -495,7 +481,7 @@ function renderData(data: any) {
   try {
     // Extract people
     const people = extractPeople(data);
-    
+
     if (!people || people.length === 0) {
       showEmpty('No people found');
       return;
@@ -508,7 +494,7 @@ function renderData(data: any) {
     // Create container
     const container = document.createElement('div');
     container.className = 'people-container';
-    
+
     // Header
     const header = document.createElement('div');
     header.className = 'header';
@@ -528,7 +514,7 @@ function renderData(data: any) {
     // Controls
     const controls = document.createElement('div');
     controls.className = 'controls';
-    
+
     // Search box
     const searchBox = document.createElement('div');
     searchBox.className = 'search-box';
@@ -609,97 +595,6 @@ function renderData(data: any) {
   }
 }
 
-/* ============================================
-   MESSAGE HANDLER (Standardized MCP Protocol)
-   ============================================ */
-
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    return;
-  }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
-  }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      const data = msg.params?.structuredContent || msg.params;
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      console.info("Host context changed:", msg.params);
-
-      if (msg.params?.theme) {
-        applyDocumentTheme(msg.params.theme);
-      }
-
-      if (msg.params?.styles?.css?.fonts) {
-        applyHostFonts(msg.params.styles.css.fonts);
-      }
-
-      if (msg.params?.styles?.variables) {
-        applyHostStyleVariables(msg.params.styles.variables);
-      }
-
-      if (msg.params?.displayMode === 'fullscreen') {
-        document.body.classList.add('fullscreen-mode');
-      } else {
-        document.body.classList.remove('fullscreen-mode');
-      }
-      break;
-
-    // Handle tool cancellation
-    case 'ui/notifications/tool-cancelled':
-      const reason = msg.params?.reason || "Unknown reason";
-      console.info("Tool cancelled:", reason);
-      showError(`Operation cancelled: ${reason}`);
-      break;
-
-    // Handle resource teardown (requires response)
-    case 'ui/resource-teardown':
-      console.info("Resource teardown requested");
-
-      if (msg.id !== undefined) {
-        window.parent.postMessage(
-          {
-            jsonrpc: "2.0",
-            id: msg.id,
-            result: {},
-          },
-          "*"
-        );
-      }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      // Tool input notification (optional - handle if needed)
-      break;
-      
-    case 'ui/notifications/initialized':
-      // Initialization notification (optional - handle if needed)
-      break;
-      
-    default:
-      // Unknown method - try to extract data as fallback
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      }
-  }
-});
-
 // Close modal on overlay click
 document.addEventListener('click', function(e) {
   const modal = document.getElementById('person-modal');
@@ -716,26 +611,107 @@ document.addEventListener('keydown', function(e) {
 });
 
 /* ============================================
-   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
+   HOST CONTEXT HANDLER
    ============================================ */
 
-const app = new App({
-  name: APP_NAME,
-  version: APP_VERSION,
-});
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
+  }
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
+  }
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
+  }
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
+}
 
 /* ============================================
-   AUTO-RESIZE VIA SDK
+   SDK APP INSTANCE (STANDALONE MODE)
    ============================================ */
 
-const cleanupResize = app.setupSizeChangedNotifications();
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
 
-// Clean up on page unload
-window.addEventListener("beforeunload", () => {
-  cleanupResize();
-});
+app.onteardown = async () => {
+  console.info("Resource teardown requested");
+  return {};
+};
 
-console.info("MCP App initialized (proxy mode - SDK utilities only)");
+app.ontoolinput = (params) => {
+  console.info("Tool input received:", params.arguments);
+};
 
-// Export empty object to ensure this file is treated as an ES module
+app.ontoolresult = (params) => {
+  console.info("Tool result received");
+
+  // Check for tool execution errors
+  if (params.isError) {
+    console.error("Tool execution failed:", params.content);
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    console.warn("Tool result received but no data found:", params);
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  console.info("Tool cancelled:", reason);
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  console.error("App error:", error);
+};
+
+app.onhostcontextchanged = (ctx) => {
+  console.info("Host context changed:", ctx);
+  handleHostContextChanged(ctx);
+};
+
+/* ============================================
+   CONNECT TO HOST
+   ============================================ */
+
+app
+  .connect()
+  .then(() => {
+    console.info("MCP App connected to host");
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    console.error("Failed to connect to MCP host:", error);
+  });
+
 export {};

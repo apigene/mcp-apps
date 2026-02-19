@@ -1,11 +1,10 @@
 /* ============================================
-   GOOGLE DRIVE FILES LIST MCP APP (SDK VERSION)
+   GOOGLE DRIVE FILES LIST MCP APP (STANDALONE MODE)
    ============================================
 
    This app uses the official @modelcontextprotocol/ext-apps SDK
-   for utilities only (theme helpers, types, auto-resize).
+   in standalone mode with app.connect().
 
-   It does NOT call app.connect() because the proxy handles initialization.
    ============================================ */
 
 /* ============================================
@@ -46,35 +45,43 @@ function extractData(msg: any) {
 
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  if (Array.isArray(data)) {
-    return { rows: data };
+
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
-  
+
   return data;
 }
 
@@ -263,22 +270,22 @@ function extractFiles(data: any): any[] {
   if (data?.body?.files && Array.isArray(data.body.files)) {
     return data.body.files;
   }
-  
+
   // Handle direct files array
   if (data?.files && Array.isArray(data.files)) {
     return data.files;
   }
-  
+
   // Handle nested in response
   if (data?.response?.body?.files && Array.isArray(data.response.body.files)) {
     return data.response.body.files;
   }
-  
+
   // Handle array of file objects
   if (Array.isArray(data) && data.length > 0 && data[0].id && data[0].name) {
     return data;
   }
-  
+
   return [];
 }
 
@@ -294,7 +301,7 @@ let currentFilterType: string = 'all'; // 'all', 'folders', 'documents', 'spread
 function renderData(data: any) {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   if (!data) {
     showEmpty('No data received');
     return;
@@ -303,14 +310,14 @@ function renderData(data: any) {
   try {
     const unwrapped = unwrapData(data);
     allFiles = extractFiles(unwrapped);
-    
+
     if (allFiles.length === 0) {
       showEmpty('No files found in Google Drive.');
       return;
     }
-    
+
     renderFiles();
-    
+
   } catch (error: any) {
     console.error('Render error:', error);
     showError(`Error rendering data: ${error.message}`);
@@ -322,7 +329,7 @@ function renderData(data: any) {
  */
 function filterFiles(): any[] {
   let filtered = [...allFiles];
-  
+
   // Apply search filter
   if (currentSearchQuery.trim()) {
     const query = currentSearchQuery.toLowerCase().trim();
@@ -331,7 +338,7 @@ function filterFiles(): any[] {
       return fileName.includes(query);
     });
   }
-  
+
   // Apply type filter
   if (currentFilterType !== 'all') {
     filtered = filtered.filter((file: any) => {
@@ -348,9 +355,9 @@ function filterFiles(): any[] {
         case 'pdfs':
           return mimeType.includes('pdf');
         case 'other':
-          return !mimeType.includes('folder') && 
-                 !mimeType.includes('document') && 
-                 !mimeType.includes('spreadsheet') && 
+          return !mimeType.includes('folder') &&
+                 !mimeType.includes('document') &&
+                 !mimeType.includes('spreadsheet') &&
                  !mimeType.includes('presentation') &&
                  !mimeType.includes('pdf');
         default:
@@ -358,7 +365,7 @@ function filterFiles(): any[] {
       }
     });
   }
-  
+
   return filtered;
 }
 
@@ -367,21 +374,21 @@ function filterFiles(): any[] {
  */
 function getFileCounts() {
   const folders = allFiles.filter((f: any) => f.mimeType?.includes('folder'));
-  const documents = allFiles.filter((f: any) => 
-    !f.mimeType?.includes('folder') && f.mimeType?.includes('document') && 
+  const documents = allFiles.filter((f: any) =>
+    !f.mimeType?.includes('folder') && f.mimeType?.includes('document') &&
     !f.mimeType?.includes('spreadsheet') && !f.mimeType?.includes('presentation')
   );
   const spreadsheets = allFiles.filter((f: any) => f.mimeType?.includes('spreadsheet'));
   const presentations = allFiles.filter((f: any) => f.mimeType?.includes('presentation'));
   const pdfs = allFiles.filter((f: any) => f.mimeType?.includes('pdf'));
-  const other = allFiles.filter((f: any) => 
-    !f.mimeType?.includes('folder') && 
-    !f.mimeType?.includes('document') && 
-    !f.mimeType?.includes('spreadsheet') && 
+  const other = allFiles.filter((f: any) =>
+    !f.mimeType?.includes('folder') &&
+    !f.mimeType?.includes('document') &&
+    !f.mimeType?.includes('spreadsheet') &&
     !f.mimeType?.includes('presentation') &&
     !f.mimeType?.includes('pdf')
   );
-  
+
   return { folders, documents, spreadsheets, presentations, pdfs, other };
 }
 
@@ -391,27 +398,27 @@ function getFileCounts() {
 function renderFiles() {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   const filteredFiles = filterFiles();
   const counts = getFileCounts();
-  
+
   // Group filtered files by type
   const folders = filteredFiles.filter((f: any) => f.mimeType?.includes('folder'));
-  const documents = filteredFiles.filter((f: any) => 
-    !f.mimeType?.includes('folder') && f.mimeType?.includes('document') && 
+  const documents = filteredFiles.filter((f: any) =>
+    !f.mimeType?.includes('folder') && f.mimeType?.includes('document') &&
     !f.mimeType?.includes('spreadsheet') && !f.mimeType?.includes('presentation')
   );
   const spreadsheets = filteredFiles.filter((f: any) => f.mimeType?.includes('spreadsheet'));
   const presentations = filteredFiles.filter((f: any) => f.mimeType?.includes('presentation'));
   const pdfs = filteredFiles.filter((f: any) => f.mimeType?.includes('pdf'));
-  const otherFiles = filteredFiles.filter((f: any) => 
-    !f.mimeType?.includes('folder') && 
-    !f.mimeType?.includes('document') && 
-    !f.mimeType?.includes('spreadsheet') && 
+  const otherFiles = filteredFiles.filter((f: any) =>
+    !f.mimeType?.includes('folder') &&
+    !f.mimeType?.includes('document') &&
+    !f.mimeType?.includes('spreadsheet') &&
     !f.mimeType?.includes('presentation') &&
     !f.mimeType?.includes('pdf')
   );
-  
+
   app.innerHTML = `
     <div class="drive-container">
       <div class="drive-header">
@@ -430,15 +437,15 @@ function renderFiles() {
           </div>
         </div>
       </div>
-      
+
       <div class="drive-controls">
         <div class="search-container">
           <span class="material-icons search-icon">search</span>
-          <input 
-            type="text" 
-            id="search-input" 
-            class="search-input" 
-            placeholder="Search files..." 
+          <input
+            type="text"
+            id="search-input"
+            class="search-input"
+            placeholder="Search files..."
             value="${escapeHtml(currentSearchQuery)}"
           />
           ${currentSearchQuery ? `
@@ -447,7 +454,7 @@ function renderFiles() {
             </button>
           ` : ''}
         </div>
-        
+
         <div class="filter-tabs">
           <button class="filter-tab ${currentFilterType === 'all' ? 'active' : ''}" data-filter="all">
             <span class="material-icons">apps</span>
@@ -479,7 +486,7 @@ function renderFiles() {
           </button>
         </div>
       </div>
-      
+
       <div class="drive-content">
         ${filteredFiles.length === 0 ? `
           <div class="empty-state">
@@ -487,7 +494,7 @@ function renderFiles() {
             <p class="empty-message">No files match your search or filter criteria.</p>
           </div>
         ` : ''}
-        
+
         ${folders.length > 0 ? `
           <div class="file-section">
             <h2 class="section-title">
@@ -499,7 +506,7 @@ function renderFiles() {
             </div>
           </div>
         ` : ''}
-        
+
         ${documents.length > 0 ? `
           <div class="file-section">
             <h2 class="section-title">
@@ -511,7 +518,7 @@ function renderFiles() {
             </div>
           </div>
         ` : ''}
-        
+
         ${spreadsheets.length > 0 ? `
           <div class="file-section">
             <h2 class="section-title">
@@ -523,7 +530,7 @@ function renderFiles() {
             </div>
           </div>
         ` : ''}
-        
+
         ${presentations.length > 0 ? `
           <div class="file-section">
             <h2 class="section-title">
@@ -535,7 +542,7 @@ function renderFiles() {
             </div>
           </div>
         ` : ''}
-        
+
         ${pdfs.length > 0 ? `
           <div class="file-section">
             <h2 class="section-title">
@@ -547,7 +554,7 @@ function renderFiles() {
             </div>
           </div>
         ` : ''}
-        
+
         ${otherFiles.length > 0 ? `
           <div class="file-section">
             <h2 class="section-title">
@@ -562,11 +569,9 @@ function renderFiles() {
       </div>
     </div>
   `;
-  
+
   // Attach event listeners
   setupEventListeners();
-  
-  // Notify host of size change after rendering completes
 }
 
 /**
@@ -576,13 +581,13 @@ function setupEventListeners() {
   const searchInput = document.getElementById('search-input') as HTMLInputElement;
   const searchClear = document.getElementById('search-clear');
   const filterTabs = document.querySelectorAll('.filter-tab');
-  
+
   if (searchInput) {
     searchInput.addEventListener('input', (e) => {
       currentSearchQuery = (e.target as HTMLInputElement).value;
       renderFiles();
     });
-    
+
     searchInput.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         currentSearchQuery = '';
@@ -590,14 +595,14 @@ function setupEventListeners() {
       }
     });
   }
-  
+
   if (searchClear) {
     searchClear.addEventListener('click', () => {
       currentSearchQuery = '';
       renderFiles();
     });
   }
-  
+
   filterTabs.forEach(tab => {
     tab.addEventListener('click', () => {
       const filter = tab.getAttribute('data-filter');
@@ -618,7 +623,7 @@ function renderFileCard(file: any, index: number = 0): string {
   const fileColor = getFileColor(file.mimeType || '');
   const fileName = escapeHtml(file.name || 'Untitled');
   const fileId = escapeHtml(file.id || '');
-  
+
   return `
     <div class="file-card" data-file-id="${fileId}" style="--file-color: ${fileColor}; animation-delay: ${index * 0.03}s;">
       <div class="file-card-icon-wrapper">
@@ -660,114 +665,109 @@ function getFileTypeIcon(mimeType: string): string {
 }
 
 /* ============================================
-   MESSAGE HANDLER
+   HOST CONTEXT HANDLER
    ============================================ */
 
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    return;
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
   }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
   }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      const data = msg.params?.structuredContent || msg.params;
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      console.info("Host context changed:", msg.params);
 
-      if (msg.params?.theme) {
-        applyDocumentTheme(msg.params.theme);
-      }
-
-      if (msg.params?.styles?.css?.fonts) {
-        applyHostFonts(msg.params.styles.css.fonts);
-      }
-
-      if (msg.params?.styles?.variables) {
-        applyHostStyleVariables(msg.params.styles.variables);
-      }
-
-      if (msg.params?.displayMode === 'fullscreen') {
-        document.body.classList.add('fullscreen-mode');
-      } else {
-        document.body.classList.remove('fullscreen-mode');
-      }
-      break;
-
-    // Handle tool cancellation
-    case 'ui/notifications/tool-cancelled':
-      const reason = msg.params?.reason || "Unknown reason";
-      console.info("Tool cancelled:", reason);
-      showError(`Operation cancelled: ${reason}`);
-      break;
-
-    // Handle resource teardown (requires response)
-    case 'ui/resource-teardown':
-      console.info("Resource teardown requested");
-
-      if (msg.id !== undefined) {
-        window.parent.postMessage(
-          {
-            jsonrpc: "2.0",
-            id: msg.id,
-            result: {},
-          },
-          "*"
-        );
-      }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      break;
-      
-    case 'ui/notifications/initialized':
-      break;
-      
-    default:
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      }
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
   }
-});
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
+}
 
 /* ============================================
-   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
+   SDK APP INSTANCE (STANDALONE MODE)
    ============================================ */
 
-const app = new App({
-  name: APP_NAME,
-  version: APP_VERSION,
-});
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  console.info("Resource teardown requested");
+  // Add any cleanup logic specific to this app
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  console.info("Tool input received:", params.arguments);
+};
+
+app.ontoolresult = (params) => {
+  console.info("Tool result received");
+
+  // Check for tool execution errors
+  if (params.isError) {
+    console.error("Tool execution failed:", params.content);
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    console.warn("Tool result received but no data found:", params);
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  console.info("Tool cancelled:", reason);
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  console.error("App error:", error);
+};
+
+app.onhostcontextchanged = (ctx) => {
+  console.info("Host context changed:", ctx);
+  handleHostContextChanged(ctx);
+};
 
 /* ============================================
-   AUTO-RESIZE VIA SDK
+   CONNECT TO HOST
    ============================================ */
 
-const cleanupResize = app.setupSizeChangedNotifications();
-
-// Clean up on page unload
-window.addEventListener("beforeunload", () => {
-  cleanupResize();
-});
-
-console.info("MCP App initialized (proxy mode - SDK utilities only)");
+app
+  .connect()
+  .then(() => {
+    console.info("MCP App connected to host");
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    console.error("Failed to connect to MCP host:", error);
+  });
 
 // Export empty object to ensure this file is treated as an ES module
 export {};

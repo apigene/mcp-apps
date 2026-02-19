@@ -1,11 +1,9 @@
 /* ============================================
-   CURSOR LIST AGENTS MCP APP (SDK VERSION)
+   CURSOR LIST AGENTS MCP APP (STANDALONE MODE)
    ============================================
 
    This app uses the official @modelcontextprotocol/ext-apps SDK
-   for utilities only (theme helpers, types, auto-resize).
-
-   It does NOT call app.connect() because the proxy handles initialization.
+   in standalone mode with app.connect().
    ============================================ */
 
 /* ============================================
@@ -35,69 +33,48 @@ const APP_VERSION = "1.0.0";
    ============================================ */
 
 /**
- * Extract data from MCP protocol messages
- * Handles standard JSON-RPC 2.0 format from run-action.html
- */
-function extractData(msg: any) {
-  if (msg?.params?.structuredContent !== undefined) {
-    return msg.params.structuredContent;
-  }
-  if (msg?.params !== undefined) {
-    return msg.params;
-  }
-  return msg;
-}
-
-/**
  * Unwrap nested API response structures
  * Handles various wrapper formats from different MCP clients
  */
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  // Format 1: Direct response_content (common API wrapper format)
-  if (data.response_content) {
-    return data.response_content;
-  }
-  
-  // Format 2: Standard table format { columns: [], rows: [] }
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0)) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
-  // Format 3: Nested in message.template_data (3rd party MCP clients)
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
-  // Format 4: Nested in message.response_content (3rd party MCP clients)
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
-  // Format 5: Common nested patterns
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
-  // Format 6: Direct rows array
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  // Format 7: If data itself is an array
-  if (Array.isArray(data)) {
-    return { rows: data };
-  }
-  
-  // Format 8: If it's an object without message, return as-is (but only if it has meaningful content)
-  if (typeof data === 'object' && !data.message && !data.status_code) {
+
+  // Standard table format
+  if (data.columns) {
     return data;
   }
-  
+
   return data;
 }
 
@@ -136,7 +113,7 @@ function showEmpty(message: string = 'No data available.') {
 /* ============================================
    TEMPLATE-SPECIFIC FUNCTIONS
    ============================================
-   
+
    Cursor Agents Display - Utility Functions
    ============================================ */
 
@@ -152,16 +129,16 @@ function formatDate(dateString: string): string {
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
-    
+
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? 's' : ''} ago`;
     if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
     if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
-    
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined 
+
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
     });
   } catch {
     return dateString;
@@ -194,10 +171,10 @@ function formatSummary(summary: string): string {
 /* ============================================
    TEMPLATE-SPECIFIC RENDER FUNCTION
    ============================================
-   
+
    This is the main function you need to implement.
    It receives the data and renders it in the app.
-   
+
    Guidelines:
    1. Always validate data before rendering
    2. Use unwrapData() to handle nested structures
@@ -226,7 +203,7 @@ function viewAgentList() {
 function renderData(data: any) {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   if (!data) {
     showEmpty('No data received');
     return;
@@ -234,7 +211,7 @@ function renderData(data: any) {
 
   try {
     const unwrapped = unwrapData(data);
-    
+
     // Extract agents from the response structure
     let agents: any[] = [];
     if (unwrapped?.body?.agents && Array.isArray(unwrapped.body.agents)) {
@@ -244,14 +221,14 @@ function renderData(data: any) {
     } else if (Array.isArray(unwrapped)) {
       agents = unwrapped;
     }
-    
+
     agentsData = agents;
-    
+
     if (agents.length === 0) {
       showEmpty('No agents found');
       return;
     }
-    
+
     // Render list view or detail view
     if (selectedAgentId) {
       const agent = agents.find(a => a.id === selectedAgentId);
@@ -274,7 +251,7 @@ function renderData(data: any) {
 function renderAgentList(agents: any[]) {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   app.innerHTML = `
     <div class="cursor-container">
       <div class="cursor-header">
@@ -308,7 +285,7 @@ function renderAgentList(agents: any[]) {
       </div>
     </div>
   `;
-  
+
   // Add click handlers for cards
   const cards = app.querySelectorAll('.agent-card');
   cards.forEach(card => {
@@ -326,7 +303,7 @@ function renderAgentList(agents: any[]) {
 function renderAgentDetail(agent: any) {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   app.innerHTML = `
     <div class="cursor-container">
       <div class="cursor-header">
@@ -344,7 +321,7 @@ function renderAgentDetail(agent: any) {
           </div>
         </div>
       </div>
-      
+
       <div class="agent-detail">
         <div class="detail-section">
           <h2 class="detail-section-title">Summary</h2>
@@ -352,7 +329,7 @@ function renderAgentDetail(agent: any) {
             ${agent.summary ? `<div class="agent-summary">${formatSummary(agent.summary)}</div>` : '<p class="detail-empty">No summary available</p>'}
           </div>
         </div>
-        
+
         ${agent.source ? `
           <div class="detail-section">
             <h2 class="detail-section-title">Source</h2>
@@ -376,7 +353,7 @@ function renderAgentDetail(agent: any) {
             </div>
           </div>
         ` : ''}
-        
+
         ${agent.target ? `
           <div class="detail-section">
             <h2 class="detail-section-title">Target</h2>
@@ -402,7 +379,7 @@ function renderAgentDetail(agent: any) {
             </div>
           </div>
         ` : ''}
-        
+
         <div class="detail-section">
           <h2 class="detail-section-title">Details</h2>
           <div class="detail-content">
@@ -421,219 +398,108 @@ function renderAgentDetail(agent: any) {
   `;
 }
 
-
 /* ============================================
-   MESSAGE HANDLER (Standardized MCP Protocol)
-   ============================================
-   
-   This handles all incoming messages from the MCP host.
-   You typically don't need to modify this section.
+   HOST CONTEXT HANDLER
    ============================================ */
 
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    console.warn('Invalid message received 1:', msg);
-    return;
-  }
-  
-  // Handle requests that require responses (like ui/resource-teardown)
-  if (msg.id !== undefined && msg.method === 'ui/resource-teardown') {
-    const reason = msg.params?.reason || 'Resource teardown requested';
-    console.log('Resource teardown requested:', reason);
-    // Clean up resources
-    // - Cancel any pending requests (if you track them)
-    // - Destroy chart instances, etc. (template-specific cleanup)
-    
-    // Send response to host
-    window.parent.postMessage({
-      jsonrpc: "2.0",
-      id: msg.id,
-      result: {}
-    }, '*');
-    
-    return; // Don't process further
-  }
-  
-  if (msg.id !== undefined && !msg.method) {
-    console.warn('Invalid message received 2:', msg);
-    return;
-  }
-  
-  console.log('Message received:', msg);
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      const data = msg.params?.structuredContent || msg.params;
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      if (msg.params?.theme) {
-        applyDocumentTheme(msg.params.theme);
-      }
-      if (msg.params?.styles?.css?.fonts) {
-        applyHostFonts(msg.params.styles.css.fonts);
-      }
-      if (msg.params?.styles?.variables) {
-        applyHostStyleVariables(msg.params.styles.variables);
-      }
-      if (msg.params?.displayMode) {
-        handleDisplayModeChange(msg.params.displayMode);
-      }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      // Tool input notification - Host MUST send this with complete tool arguments
-      const toolArguments = msg.params?.arguments;
-      if (toolArguments) {
-        // Store tool arguments for reference (may be needed for context)
-        // Template-specific: You can use this for initial rendering or context
-        console.log('Tool input received:', toolArguments);
-        // Example: Show loading state with input parameters
-        // Example: Store for later use in renderData()
-      }
-      break;
-      
-    case 'ui/notifications/tool-cancelled':
-      // Tool cancellation notification - Host MUST send this if tool is cancelled
-      const reason = msg.params?.reason || 'Tool execution was cancelled';
-      showError(`Operation cancelled: ${reason}`);
-      // Clean up any ongoing operations
-      // - Stop timers
-      // - Cancel pending requests
-      // - Reset UI state
-      break;
-      
-    case 'ui/notifications/initialized':
-      // Initialization notification (optional - handle if needed)
-      break;
-      
-    default:
-      // Unknown method - try to extract data as fallback
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      }
-  }
-});
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
 
-/* ============================================
-   MCP COMMUNICATION
-   ============================================
-   
-   Functions for communicating with the MCP host.
-   You typically don't need to modify this section.
-   ============================================ */
-
-let requestIdCounter = 1;
-function sendRequest(method: string, params: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const id = requestIdCounter++;
-    window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, '*');
-    
-    const listener = (event: MessageEvent) => {
-      if (event.data?.id === id) {
-        window.removeEventListener('message', listener);
-        if (event.data?.result) {
-          resolve(event.data.result);
-        } else if (event.data?.error) {
-          reject(new Error(event.data.error.message || 'Unknown error'));
-        }
-      }
-    };
-    window.addEventListener('message', listener);
-    
-    // Timeout after 5 seconds
-    setTimeout(() => {
-      window.removeEventListener('message', listener);
-      reject(new Error('Request timeout'));
-    }, 5000);
-  });
-}
-
-function sendNotification(method: string, params: any) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, '*');
-}
-
-/* ============================================
-   DISPLAY MODE HANDLING
-   ============================================
-   
-   Handles switching between inline and fullscreen display modes.
-   You may want to customize handleDisplayModeChange() to adjust
-   your layout for fullscreen mode.
-   ============================================ */
-
-let currentDisplayMode = 'inline';
-
-function handleDisplayModeChange(mode: string) {
-  currentDisplayMode = mode;
-  if (mode === 'fullscreen') {
-    document.body.classList.add('fullscreen-mode');
-    // Adjust layout for fullscreen if needed
-    const container = document.querySelector('.container');
-    if (container) {
-      (container as HTMLElement).style.maxWidth = '100%';
-      (container as HTMLElement).style.padding = '20px';
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
     }
+  }
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
+  }
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
+  }
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
   } else {
-    document.body.classList.remove('fullscreen-mode');
-    // Restore normal layout
-    const container = document.querySelector('.container');
-    if (container) {
-      (container as HTMLElement).style.maxWidth = '';
-      (container as HTMLElement).style.padding = '';
-    }
+    document.body.classList.remove("fullscreen-mode");
   }
 }
 
-function requestDisplayMode(mode: string): Promise<any> {
-  return sendRequest('ui/request-display-mode', { mode: mode })
-    .then(result => {
-      if (result?.mode) {
-        handleDisplayModeChange(result.mode);
-      }
-      return result;
-    })
-    .catch(err => {
-      console.warn('Failed to request display mode:', err);
-      throw err;
-    });
-}
-
-// Make function globally accessible for testing/debugging
-(window as any).requestDisplayMode = requestDisplayMode;
-
 /* ============================================
-   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
+   SDK APP INSTANCE (STANDALONE MODE)
    ============================================ */
 
-const app = new App({
-  name: APP_NAME,
-  version: APP_VERSION,
-});
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  console.info("Resource teardown requested");
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  console.info("Tool input received:", params.arguments);
+};
+
+app.ontoolresult = (params) => {
+  console.info("Tool result received");
+
+  // Check for tool execution errors
+  if (params.isError) {
+    console.error("Tool execution failed:", params.content);
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    console.warn("Tool result received but no data found:", params);
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  console.info("Tool cancelled:", reason);
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  console.error("App error:", error);
+};
+
+app.onhostcontextchanged = (ctx) => {
+  console.info("Host context changed:", ctx);
+  handleHostContextChanged(ctx);
+};
 
 /* ============================================
-   AUTO-RESIZE VIA SDK
+   CONNECT TO HOST
    ============================================ */
 
-const cleanupResize = app.setupSizeChangedNotifications();
+app
+  .connect()
+  .then(() => {
+    console.info("MCP App connected to host");
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    console.error("Failed to connect to MCP host:", error);
+  });
 
-// Clean up on page unload
-window.addEventListener("beforeunload", () => {
-  cleanupResize();
-});
-
-console.info("MCP App initialized (proxy mode - SDK utilities only)");
-
-// Export empty object to ensure this file is treated as an ES module
 export {};

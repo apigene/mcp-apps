@@ -1,26 +1,16 @@
 /* ============================================
    SHOPIFY CATALOG BASIC MCP APP
    ============================================
-   
+
    Simple horizontal scrollable catalog layout
    ============================================ */
 
 /* ============================================
-   APP CONFIGURATION
-   ============================================ */
-
-const APP_NAME = "Shopify Catalog Basic";
-
-const PROTOCOL_VERSION = "2026-01-26";
-
-/* ============================================
-   SHOPIFY SEARCH GLOBAL PRODUCT V1 MCP APP (SDK VERSION)
+   SHOPIFY SEARCH GLOBAL PRODUCT V1 MCP APP (STANDALONE MODE)
    ============================================
 
    This app uses the official @modelcontextprotocol/ext-apps SDK
-   for utilities only (theme helpers, types, auto-resize).
-
-   It does NOT call app.connect() because the proxy handles initialization.
+   in standalone mode with app.connect() for initialization.
    ============================================ */
 
 /* ============================================
@@ -42,7 +32,7 @@ import "./mcp-app.css";
    APP CONFIGURATION
    ============================================ */
 
-
+const APP_NAME = "Shopify Catalog Basic";
 const APP_VERSION = "1.0.0";
 
 /* ============================================
@@ -61,42 +51,43 @@ function extractData(msg: any) {
 
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  if (data.body?.offers) {
-    return data.body.offers;
-  }
-  if (data.offers) {
-    return data.offers;
-  }
-  
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  if (Array.isArray(data)) {
+
+  // Standard table format
+  if (data.columns) {
     return data;
   }
-  
+
   return data;
 }
 
@@ -141,26 +132,26 @@ function formatPrice(amount: number, currency: string = 'USD'): string {
 
 function formatPriceRange(priceRange: any): string {
   if (!priceRange) return '';
-  
+
   const min = priceRange.min?.amount || 0;
   const max = priceRange.max?.amount || 0;
   const currency = priceRange.min?.currency || priceRange.max?.currency || 'USD';
-  
+
   if (min === max) {
     return formatPrice(min, currency);
   }
-  
+
   return `${formatPrice(min, currency)} - ${formatPrice(max, currency)}`;
 }
 
 function renderRating(rating: any): string {
   if (!rating || !rating.rating) return '';
-  
+
   const stars = Math.round(rating.rating * 2) / 2; // Round to nearest 0.5
   const fullStars = Math.floor(stars);
   const hasHalfStar = stars % 1 !== 0;
   const emptyStars = Math.max(0, 5 - Math.ceil(stars));
-  
+
   let starsHtml = '★'.repeat(fullStars);
   if (hasHalfStar) {
     starsHtml += '☆';
@@ -168,10 +159,10 @@ function renderRating(rating: any): string {
   } else {
     starsHtml += '☆'.repeat(emptyStars);
   }
-  
+
   const count = rating.count || 0;
   const countText = count >= 1000 ? `${(count / 1000).toFixed(1)}K` : count.toString();
-  
+
   return `
     <div class="product-rating">
       <span class="rating-stars">${starsHtml}</span>
@@ -182,10 +173,10 @@ function renderRating(rating: any): string {
 
 function getShopLogo(shopName: string): { initials: string; color: string } {
   if (!shopName || typeof shopName !== 'string') return { initials: '?', color: 'blue' };
-  
+
   const words = shopName.trim().split(' ').filter(w => w.length > 0);
   let initials: string;
-  
+
   if (words.length >= 2) {
     const first = words[0][0] || '';
     const second = words[1][0] || '';
@@ -195,34 +186,34 @@ function getShopLogo(shopName: string): { initials: string; color: string } {
   } else {
     initials = (shopName[0] || '?').toUpperCase() + '?';
   }
-  
+
   // Simple color assignment based on shop name
   const colors = ['yellow', 'green', 'red', 'blue'];
   const hash = shopName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const color = colors[hash % colors.length] || 'blue';
-  
+
   return { initials, color };
 }
 
 function renderProductCard(product: any, index: number): string {
-  const imageUrl = product.media && product.media.length > 0 
-    ? product.media[0].url 
+  const imageUrl = product.media && product.media.length > 0
+    ? product.media[0].url
     : 'https://via.placeholder.com/300x300?text=No+Image';
-  
-  const imageAlt = product.media && product.media.length > 0 
+
+  const imageAlt = product.media && product.media.length > 0
     ? (product.media[0].altText || product.title || 'Product image')
     : (product.title || 'Product image');
-  
+
   const productUrl = product.lookupUrl || '#';
   const priceDisplay = formatPriceRange(product.priceRange) || '';
   const ratingHtml = renderRating(product.rating) || '';
-  
-  const shopName = product.variants && product.variants.length > 0 
+
+  const shopName = product.variants && product.variants.length > 0
     ? (product.variants[0].shop?.name || '')
     : '';
-  
+
   const shopLogo = getShopLogo(shopName);
-  
+
   return `
     <div class="product-card" data-product-index="${index}">
       <div class="product-image-container">
@@ -238,7 +229,7 @@ function renderProductCard(product: any, index: number): string {
             <span class="shop-name">${escapeHtml(shopName)}</span>
           </div>
         ` : ''}
-        <a href="${escapeHtml(productUrl)}" target="_blank" rel="noopener noreferrer" 
+        <a href="${escapeHtml(productUrl)}" target="_blank" rel="noopener noreferrer"
            class="place-order-btn" onclick="event.stopPropagation()">
           Place Order
         </a>
@@ -256,13 +247,13 @@ let carouselWrapper: HTMLElement | null = null;
 
 function scrollCarousel(direction: 'left' | 'right') {
   if (!carouselWrapper) return;
-  
+
   const scrollAmount = 320; // Card width + gap
   const currentScroll = carouselWrapper.scrollLeft;
-  const newScroll = direction === 'left' 
-    ? currentScroll - scrollAmount 
+  const newScroll = direction === 'left'
+    ? currentScroll - scrollAmount
     : currentScroll + scrollAmount;
-  
+
   carouselWrapper.scrollTo({
     left: newScroll,
     behavior: 'smooth'
@@ -271,14 +262,14 @@ function scrollCarousel(direction: 'left' | 'right') {
 
 function updateNavButtons() {
   if (!carouselWrapper) return;
-  
+
   const leftBtn = document.querySelector('.nav-button.left') as HTMLButtonElement;
   const rightBtn = document.querySelector('.nav-button.right') as HTMLButtonElement;
-  
+
   if (leftBtn) {
     leftBtn.disabled = carouselWrapper.scrollLeft <= 0;
   }
-  
+
   if (rightBtn) {
     const maxScroll = carouselWrapper.scrollWidth - carouselWrapper.clientWidth;
     rightBtn.disabled = carouselWrapper.scrollLeft >= maxScroll - 10;
@@ -288,7 +279,7 @@ function updateNavButtons() {
 function renderData(data: any) {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   if (!data) {
     showEmpty('No data received');
     return;
@@ -296,7 +287,7 @@ function renderData(data: any) {
 
   try {
     const unwrapped = unwrapData(data);
-    
+
     let products: any[] = [];
     if (Array.isArray(unwrapped)) {
       products = unwrapped;
@@ -308,14 +299,14 @@ function renderData(data: any) {
       showEmpty('No products found in the catalog');
       return;
     }
-    
+
     if (products.length === 0) {
       showEmpty('No products available');
       return;
     }
-    
+
     allProducts = products;
-    
+
     app.innerHTML = `
       <div class="container">
         <div class="header">
@@ -340,7 +331,7 @@ function renderData(data: any) {
             </button>
           </div>
         </div>
-        
+
         <div class="carousel-container">
           <button class="nav-button left" onclick="scrollCarousel('left')" aria-label="Scroll left">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -358,16 +349,16 @@ function renderData(data: any) {
         </div>
       </div>
     `;
-    
+
     carouselWrapper = document.getElementById('carousel-wrapper');
-    
+
     if (carouselWrapper) {
       carouselWrapper.addEventListener('scroll', updateNavButtons);
       updateNavButtons();
     }
-    
+
     (window as any).scrollCarousel = scrollCarousel;
-    
+
   } catch (error: any) {
     console.error('Render error:', error);
     showError(`Error rendering catalog: ${error.message}`);
@@ -375,142 +366,110 @@ function renderData(data: any) {
 }
 
 /* ============================================
-   MESSAGE HANDLER
+   HOST CONTEXT HANDLER
    ============================================ */
 
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    return;
-  }
-  
-  if (msg.id !== undefined && msg.method === 'ui/resource-teardown') {
-    if (sizeChangeTimeout) {
-      clearTimeout(sizeChangeTimeout);
-      sizeChangeTimeout = null;
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
     }
-    
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-    
-    if (carouselWrapper) {
-      carouselWrapper.removeEventListener('scroll', updateNavButtons);
-    }
-    
-    window.parent.postMessage({
-      jsonrpc: "2.0",
-      id: msg.id,
-      result: {}
-    }, '*');
-    
-    return;
   }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
   }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      const data = msg.params?.structuredContent || msg.params;
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      console.info("Host context changed:", msg.params);
 
-      if (msg.params?.theme) {
-        applyDocumentTheme(msg.params.theme);
-      }
-
-      if (msg.params?.styles?.css?.fonts) {
-        applyHostFonts(msg.params.styles.css.fonts);
-      }
-
-      if (msg.params?.styles?.variables) {
-        applyHostStyleVariables(msg.params.styles.variables);
-      }
-
-      if (msg.params?.displayMode === 'fullscreen') {
-        document.body.classList.add('fullscreen-mode');
-      } else {
-        document.body.classList.remove('fullscreen-mode');
-      }
-      break;
-
-    // Handle tool cancellation
-    case 'ui/notifications/tool-cancelled':
-      const reason = msg.params?.reason || "Unknown reason";
-      console.info("Tool cancelled:", reason);
-      showError(`Operation cancelled: ${reason}`);
-      break;
-
-    // Handle resource teardown (requires response)
-    case 'ui/resource-teardown':
-      console.info("Resource teardown requested");
-
-      if (msg.id !== undefined) {
-        window.parent.postMessage(
-          {
-            jsonrpc: "2.0",
-            id: msg.id,
-            result: {},
-          },
-          "*"
-        );
-      }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      const toolArguments = msg.params?.arguments;
-      if (toolArguments) {
-        console.log('Tool input received:', toolArguments);
-      }
-      break;
-
-    case 'ui/notifications/initialized':
-      break;
-      
-    default:
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      }
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
   }
-});
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
+}
 
 /* ============================================
-   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
+   SDK APP INSTANCE (STANDALONE MODE)
    ============================================ */
 
-const app = new App({
-  name: APP_NAME,
-  version: APP_VERSION,
-});
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  console.info("Resource teardown requested");
+  if (carouselWrapper) {
+    carouselWrapper.removeEventListener('scroll', updateNavButtons);
+  }
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  console.info("Tool input received:", params.arguments);
+};
+
+app.ontoolresult = (params) => {
+  console.info("Tool result received");
+
+  // Check for tool execution errors
+  if (params.isError) {
+    console.error("Tool execution failed:", params.content);
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    console.warn("Tool result received but no data found:", params);
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  console.info("Tool cancelled:", reason);
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  console.error("App error:", error);
+};
+
+app.onhostcontextchanged = (ctx) => {
+  console.info("Host context changed:", ctx);
+  handleHostContextChanged(ctx);
+};
 
 /* ============================================
-   AUTO-RESIZE VIA SDK
+   CONNECT TO HOST
    ============================================ */
 
-const cleanupResize = app.setupSizeChangedNotifications();
+app
+  .connect()
+  .then(() => {
+    console.info("MCP App connected to host");
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    console.error("Failed to connect to MCP host:", error);
+  });
 
-// Clean up on page unload
-window.addEventListener("beforeunload", () => {
-  cleanupResize();
-});
-
-console.info("MCP App initialized (proxy mode - SDK utilities only)");
-
-// Export empty object to ensure this file is treated as an ES module
 export {};

@@ -1,11 +1,9 @@
 /* ============================================
-   GOOGLE SHEETV2 MCP APP (SDK VERSION)
+   GOOGLE SHEETV2 MCP APP (STANDALONE MODE)
    ============================================
 
    This app uses the official @modelcontextprotocol/ext-apps SDK
-   for utilities only (theme helpers, types, auto-resize).
-
-   It does NOT call app.connect() because the proxy handles initialization.
+   in standalone mode with app.connect() for full MCP integration.
    ============================================ */
 
 /* ============================================
@@ -46,43 +44,43 @@ function extractData(msg: any) {
 
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  // Keep the full data structure for spreadsheet ID extraction
-  // Don't unwrap if it contains message with input/request info
-  if (data.message && (data.message.input || data.message.request)) {
-    return data; // Keep full structure to access input/request
-  }
-  
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
-    // Return message object to preserve input/request fields
-    return data.message;
+    return data.message.template_data;
   }
-  
   if (data.message?.response_content) {
-    // Return message object to preserve input/request fields
-    return data.message;
+    return data.message.response_content;
   }
-  
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  if (Array.isArray(data)) {
-    return { rows: data };
+
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
-  
+
   return data;
 }
 
@@ -629,189 +627,167 @@ function renderData(data: any) {
 }
 
 /* ============================================
-   MESSAGE HANDLER (Standardized MCP Protocol)
+   HOST CONTEXT HANDLER
    ============================================ */
 
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  // Log all incoming messages for debugging
-  if (msg && msg.jsonrpc === '2.0' && msg.method) {
-    console.log('[Google Sheets App] Received message:', msg.method, msg);
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
   }
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    return;
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
   }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
   }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      console.log('[Google Sheets App] tool-result received:', JSON.stringify(msg, null, 2));
-      const data = msg.params?.structuredContent || msg.params;
-      
-      // Also check if tool-result contains request/input info with spreadsheet ID
-      const toolResultParams = msg.params;
-      const spreadsheetIdFromResult = toolResultParams?.arguments?.context?.spreadsheetId ||
-                                     toolResultParams?.input?.context?.spreadsheetId ||
-                                     toolResultParams?.request?.context?.spreadsheetId;
-      
-      if (spreadsheetIdFromResult) {
-        console.log('[Google Sheets App] Found spreadsheet ID in tool-result:', spreadsheetIdFromResult);
-        renderSheetFromId(spreadsheetIdFromResult);
-        break;
-      }
-      
-      if (data !== undefined) {
-        console.log('[Google Sheets App] Rendering data from tool-result');
-        renderData(data);
-      } else {
-        console.warn('[Google Sheets App] tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      console.info("Host context changed:", msg.params);
 
-      if (msg.params?.theme) {
-        applyDocumentTheme(msg.params.theme);
-      }
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
+}
 
-      if (msg.params?.styles?.css?.fonts) {
-        applyHostFonts(msg.params.styles.css.fonts);
-      }
+/* ============================================
+   SDK APP INSTANCE (STANDALONE MODE)
+   ============================================ */
 
-      if (msg.params?.styles?.variables) {
-        applyHostStyleVariables(msg.params.styles.variables);
-      }
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
 
-      if (msg.params?.displayMode === 'fullscreen') {
-        document.body.classList.add('fullscreen-mode');
-      } else {
-        document.body.classList.remove('fullscreen-mode');
-      }
-      break;
+app.onteardown = async () => {
+  console.info("Resource teardown requested");
+  return {};
+};
 
-    // Handle tool cancellation
-    case 'ui/notifications/tool-cancelled':
-      const reason = msg.params?.reason || "Unknown reason";
-      console.info("Tool cancelled:", reason);
-      showError(`Operation cancelled: ${reason}`);
-      break;
+app.ontoolinput = (params) => {
+  console.info("Tool input received:", params.arguments);
 
-    // Handle resource teardown (requires response)
-    case 'ui/resource-teardown':
-      console.info("Resource teardown requested");
+  // Extract spreadsheet ID from params.arguments.context.spreadsheetId
+  const toolArguments = params.arguments as any;
+  let spreadsheetId = toolArguments?.context?.spreadsheetId;
+  console.log('[Google Sheets App] Extracted spreadsheetId:', spreadsheetId);
 
-      if (msg.id !== undefined) {
-        window.parent.postMessage(
-          {
-            jsonrpc: "2.0",
-            id: msg.id,
-            result: {},
-          },
-          "*"
-        );
-      }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      // Extract spreadsheet ID from tool-input message
-      const params = msg.params;
-      
-      // Debug logging - log the entire message structure
-      console.log('[Google Sheets App] tool-input received:', JSON.stringify(msg, null, 2));
-      console.log('[Google Sheets App] params:', JSON.stringify(params, null, 2));
-      console.log('[Google Sheets App] params.arguments:', JSON.stringify(params?.arguments, null, 2));
-      console.log('[Google Sheets App] params.arguments.context:', JSON.stringify(params?.arguments?.context, null, 2));
-      
-      // Extract spreadsheet ID from params.arguments.context.spreadsheetId
-      let spreadsheetId = params?.arguments?.context?.spreadsheetId;
-      console.log('[Google Sheets App] Extracted spreadsheetId:', spreadsheetId);
-      
-      if (spreadsheetId) {
-        console.log('[Google Sheets App] Found spreadsheet ID in tool-input:', spreadsheetId);
-        renderSheetFromId(spreadsheetId);
-      } else {
-        console.warn('[Google Sheets App] No spreadsheet ID found in params.arguments.context.spreadsheetId');
-        // Fallback: try to extract from URL if present
-        const toolInput = params?.structuredContent || params?.content || params;
-        
-        if (toolInput) {
-          // Check for URL in various locations
-          let requestUrl = toolInput.url || 
-                          toolInput.request?.url || 
-                          toolInput.input?.url ||
-                          toolInput.message?.input?.url ||
-                          toolInput.message?.request?.url;
-          
-          if (requestUrl) {
-            console.log('[Google Sheets App] Found request URL:', requestUrl);
-            const extractedId = extractSpreadsheetId(requestUrl);
-            if (extractedId) {
-              console.log('[Google Sheets App] Extracted spreadsheet ID from URL:', extractedId);
-              renderSheetFromId(extractedId);
-            } else {
-              console.warn('[Google Sheets App] Could not extract spreadsheet ID from URL:', requestUrl);
-            }
-          } else {
-            // Try deep search as fallback
-            console.log('[Google Sheets App] Attempting deep search for spreadsheet ID...');
-            const deepId = getSpreadsheetId(toolInput);
-            if (deepId) {
-              console.log('[Google Sheets App] Found spreadsheet ID via deep search:', deepId);
-              renderSheetFromId(deepId);
-            } else {
-              console.warn('[Google Sheets App] No spreadsheet ID found in tool-input after all attempts');
-            }
-          }
+  if (spreadsheetId) {
+    console.log('[Google Sheets App] Found spreadsheet ID in tool-input:', spreadsheetId);
+    renderSheetFromId(spreadsheetId);
+  } else {
+    console.warn('[Google Sheets App] No spreadsheet ID found in params.arguments.context.spreadsheetId');
+    // Fallback: try to extract from URL if present
+    const toolInput = toolArguments;
+
+    if (toolInput) {
+      // Check for URL in various locations
+      let requestUrl = toolInput.url ||
+                      toolInput.request?.url ||
+                      toolInput.input?.url ||
+                      toolInput.message?.input?.url ||
+                      toolInput.message?.request?.url;
+
+      if (requestUrl) {
+        console.log('[Google Sheets App] Found request URL:', requestUrl);
+        const extractedId = extractSpreadsheetId(requestUrl);
+        if (extractedId) {
+          console.log('[Google Sheets App] Extracted spreadsheet ID from URL:', extractedId);
+          renderSheetFromId(extractedId);
         } else {
-          console.warn('[Google Sheets App] No tool-input data found in params');
+          console.warn('[Google Sheets App] Could not extract spreadsheet ID from URL:', requestUrl);
+        }
+      } else {
+        // Try deep search as fallback
+        console.log('[Google Sheets App] Attempting deep search for spreadsheet ID...');
+        const deepId = getSpreadsheetId(toolInput);
+        if (deepId) {
+          console.log('[Google Sheets App] Found spreadsheet ID via deep search:', deepId);
+          renderSheetFromId(deepId);
+        } else {
+          console.warn('[Google Sheets App] No spreadsheet ID found in tool-input after all attempts');
         }
       }
-      break;
-      
-    case 'ui/notifications/initialized':
-      console.log('[Google Sheets App] initialized received');
-      break;
-      
-    default:
-      console.log('[Google Sheets App] Unknown method received:', msg.method, msg);
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('[Google Sheets App] Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      }
+    } else {
+      console.warn('[Google Sheets App] No tool-input data found in params');
+    }
   }
-});
+};
+
+app.ontoolresult = (params) => {
+  console.info("Tool result received");
+
+  // Check for tool execution errors
+  if (params.isError) {
+    console.error("Tool execution failed:", params.content);
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+
+  // Also check if tool-result contains request/input info with spreadsheet ID
+  const toolResultParams = params as any;
+  const spreadsheetIdFromResult = toolResultParams?.arguments?.context?.spreadsheetId ||
+                                 toolResultParams?.input?.context?.spreadsheetId ||
+                                 toolResultParams?.request?.context?.spreadsheetId;
+
+  if (spreadsheetIdFromResult) {
+    console.log('[Google Sheets App] Found spreadsheet ID in tool-result:', spreadsheetIdFromResult);
+    renderSheetFromId(spreadsheetIdFromResult);
+    return;
+  }
+
+  if (data !== undefined) {
+    console.log('[Google Sheets App] Rendering data from tool-result');
+    renderData(data);
+  } else {
+    console.warn("Tool result received but no data found:", params);
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  console.info("Tool cancelled:", reason);
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  console.error("App error:", error);
+};
+
+app.onhostcontextchanged = (ctx) => {
+  console.info("Host context changed:", ctx);
+  handleHostContextChanged(ctx);
+};
 
 /* ============================================
-   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
+   CONNECT TO HOST
    ============================================ */
 
-const app = new App({
-  name: APP_NAME,
-  version: APP_VERSION,
-});
+app
+  .connect()
+  .then(() => {
+    console.info("MCP App connected to host");
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    console.error("Failed to connect to MCP host:", error);
+  });
 
-/* ============================================
-   AUTO-RESIZE VIA SDK
-   ============================================ */
-
-const cleanupResize = app.setupSizeChangedNotifications();
-
-// Clean up on page unload
-window.addEventListener("beforeunload", () => {
-  cleanupResize();
-});
-
-console.info("MCP App initialized (proxy mode - SDK utilities only)");
-
-// Export empty object to ensure this file is treated as an ES module
 export {};

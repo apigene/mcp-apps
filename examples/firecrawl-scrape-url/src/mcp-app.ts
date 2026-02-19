@@ -1,10 +1,10 @@
 /* ============================================
    BASE TEMPLATE FOR MCP APPS
    ============================================
-   
+
    This file contains all common logic shared across MCP apps.
    Customize the sections marked with "TEMPLATE-SPECIFIC" below.
-   
+
    Common Features:
    - MCP Protocol message handling (JSON-RPC 2.0)
    - Dark mode support
@@ -12,7 +12,7 @@
    - Size change notifications
    - Data extraction utilities
    - Error handling
-   
+
    See README.md for customization guidelines.
    ============================================ */
 
@@ -23,13 +23,11 @@
 declare const anime: any;
 
 /* ============================================
-   FIRECRAWL SCRAPE URL MCP APP (SDK VERSION)
+   FIRECRAWL SCRAPE URL MCP APP (STANDALONE MODE)
    ============================================
 
    This app uses the official @modelcontextprotocol/ext-apps SDK
-   for utilities only (theme helpers, types, auto-resize).
-
-   It does NOT call app.connect() because the proxy handles initialization.
+   with app.connect() for standalone initialization.
    ============================================ */
 
 /* ============================================
@@ -79,75 +77,43 @@ function extractData(msg: any) {
  */
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  console.log('[Firecrawl] Unwrapping data:', data);
-  
-  // Handle direct Firecrawl response format: {success: true, data: {...}}
-  if (data.success && data.data) {
-    console.log('[Firecrawl] Detected success/data format');
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
-  // Handle nested content structure from Firecrawl
-  if (data.content && Array.isArray(data.content)) {
-    // Extract from content array
-    const contentItem = data.content[0];
-    if (contentItem?.text?.message?.response_content) {
-      return contentItem.text.message.response_content;
-    }
-    if (contentItem?.text?.message) {
-      return contentItem.text.message;
-    }
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
   }
-  
-  // Handle structuredContent structure
-  if (data.structuredContent?.message?.response_content) {
-    return data.structuredContent.message.response_content;
-  }
-  
-  // Direct data structure (but keep the wrapper if it has success flag)
-  if (data.data && !data.success) {
-    return { data: data.data };
-  }
-  
-  if (data.data) {
-    return data;
-  }
-  
-  // Standard table format { columns: [], rows: [] }
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
-    return data;
-  }
-  
-  // Format 2: Nested in message.template_data (3rd party MCP clients)
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
-  // Format 3: Nested in message.response_content (3rd party MCP clients)
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
-  // Format 4: Common nested patterns
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
-  // Format 5: Direct rows array
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  // Format 6: If data itself is an array
-  if (Array.isArray(data)) {
-    return { rows: data };
+
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
-  
+
   return data;
 }
 
@@ -207,9 +173,9 @@ function formatMetadataValue(value: any): string {
  */
 function convertMarkdownToHTML(markdown: string): string {
   if (!markdown) return '';
-  
+
   let html = markdown;
-  
+
   // Headers (process in order from most specific to least)
   html = html.replace(/^###### (.*$)/gim, '<h6>$1</h6>');
   html = html.replace(/^##### (.*$)/gim, '<h5>$1</h5>');
@@ -217,27 +183,27 @@ function convertMarkdownToHTML(markdown: string): string {
   html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
   html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
   html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
-  
+
   // Bold and italic
   html = html.replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>');
   html = html.replace(/\*(.*?)\*/gim, '<em>$1</em>');
-  
+
   // Links
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/gim, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
-  
+
   // Code blocks
   html = html.replace(/```([\s\S]*?)```/gim, '<pre><code>$1</code></pre>');
   html = html.replace(/`([^`]+)`/gim, '<code>$1</code>');
-  
+
   // Lists
   const lines = html.split('\n');
   let inList = false;
   let result: string[] = [];
-  
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     const isListItem = /^[-*+]\s+(.+)$/.test(line);
-    
+
     if (isListItem) {
       if (!inList) {
         result.push('<ul>');
@@ -262,17 +228,17 @@ function convertMarkdownToHTML(markdown: string): string {
       }
     }
   }
-  
+
   if (inList) {
     result.push('</ul>');
   }
-  
+
   html = result.join('\n');
-  
+
   // Clean up empty paragraphs
   html = html.replace(/<p><\/p>/gim, '');
   html = html.replace(/<p>\s*<\/p>/gim, '');
-  
+
   return html;
 }
 
@@ -281,37 +247,37 @@ function convertMarkdownToHTML(markdown: string): string {
  */
 function prepareHtmlForIframe(html: string): string {
   if (!html) return '';
-  
+
   let preparedHtml = html;
-  
+
   // Aggressively remove ALL script tags (including malformed ones)
   // Use multiple passes to catch all variations
   preparedHtml = preparedHtml.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
   preparedHtml = preparedHtml.replace(/<script[^>]*>/gi, '');
   preparedHtml = preparedHtml.replace(/<\/script>/gi, '');
-  
+
   // Remove script tags with various attributes
   preparedHtml = preparedHtml.replace(/<script\s+[^>]*>/gi, '');
-  
+
   // Remove inline event handlers
   preparedHtml = preparedHtml.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '');
   preparedHtml = preparedHtml.replace(/\s*on\w+\s*=\s*[^>\s]*/gi, '');
-  
+
   // Remove javascript: URLs
   preparedHtml = preparedHtml.replace(/javascript\s*:/gi, '');
-  
+
   // Remove any remaining references to anime or window.anime
   preparedHtml = preparedHtml.replace(/\bwindow\s*\.\s*anime\b/gi, 'null');
   preparedHtml = preparedHtml.replace(/\banime\s*=/gi, 'var _anime_removed =');
   preparedHtml = preparedHtml.replace(/\banimejs\b/gi, 'null');
-  
+
   // Remove any eval or Function constructors
   preparedHtml = preparedHtml.replace(/\beval\s*\(/gi, '/* eval removed */ null(');
   preparedHtml = preparedHtml.replace(/\bFunction\s*\(/gi, '/* Function removed */ null(');
-  
+
   // Check if HTML already has a viewport meta tag
   const hasViewport = /<meta[^>]*name=["']viewport["'][^>]*>/i.test(preparedHtml);
-  
+
   if (!hasViewport) {
     // Inject viewport meta tag in the head
     if (/<head[^>]*>/i.test(preparedHtml)) {
@@ -336,7 +302,7 @@ function prepareHtmlForIframe(html: string): string {
       '<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">'
     );
   }
-  
+
   // Add CSS to ensure content fits within iframe
   if (/<head[^>]*>/i.test(preparedHtml)) {
     const fitCss = `
@@ -363,7 +329,7 @@ function prepareHtmlForIframe(html: string): string {
       '$1' + fitCss
     );
   }
-  
+
   return preparedHtml;
 }
 
@@ -382,12 +348,12 @@ function prepareHtmlForIframe(html: string): string {
   // Animate tab switch
   const activeContent = document.querySelector('.tab-content.active');
   const targetTab = document.getElementById(`${tabName}-tab`);
-  
+
   // Check if anime is available and we're in the main document (not iframe)
-  const isAnimeAvailable = typeof window !== 'undefined' && 
+  const isAnimeAvailable = typeof window !== 'undefined' &&
                           typeof (window as any).anime !== 'undefined' &&
                           window.self === window.top; // Not in iframe
-  
+
   if (activeContent && targetTab && isAnimeAvailable) {
     try {
       // Fade out current tab
@@ -400,7 +366,7 @@ function prepareHtmlForIframe(html: string): string {
         complete: () => {
           activeContent.classList.remove('active');
           targetTab.classList.add('active');
-          
+
           // Fade in new tab
           (window as any).anime({
             targets: targetTab,
@@ -438,7 +404,7 @@ function prepareHtmlForIframe(html: string): string {
 (window as any).adjustZoom = function(delta: number) {
   const iframe = document.getElementById('html-preview-iframe') as HTMLIFrameElement;
   const zoomValue = document.getElementById('zoom-value');
-  
+
   if (iframe && zoomValue) {
     currentZoom = Math.max(0.25, Math.min(2.0, currentZoom + delta));
     iframe.style.transform = `scale(${currentZoom})`;
@@ -446,7 +412,7 @@ function prepareHtmlForIframe(html: string): string {
     iframe.style.width = `${100 / currentZoom}%`;
     iframe.style.height = `${800 / currentZoom}px`;
     zoomValue.textContent = Math.round(currentZoom * 100) + '%';
-    
+
     // Notify size change
   }
 };
@@ -457,14 +423,14 @@ function prepareHtmlForIframe(html: string): string {
 (window as any).resetZoom = function() {
   const iframe = document.getElementById('html-preview-iframe') as HTMLIFrameElement;
   const zoomValue = document.getElementById('zoom-value');
-  
+
   if (iframe && zoomValue) {
     currentZoom = 1.0;
     iframe.style.transform = '';
     iframe.style.width = '100%';
     iframe.style.height = '800px';
     zoomValue.textContent = '100%';
-    
+
     // Notify size change
   }
 };
@@ -474,12 +440,12 @@ function prepareHtmlForIframe(html: string): string {
  */
 function renderData(data: any) {
   const app = document.getElementById('app');
-  
+
   if (!app) {
     console.error('App element not found!');
     return;
   }
-  
+
   if (!data) {
     showEmpty('No data received');
     return;
@@ -488,14 +454,14 @@ function renderData(data: any) {
   try {
     // Debug logging
     console.log('[Firecrawl] Received data:', data);
-    
+
     // Unwrap nested data structures
     const unwrapped = unwrapData(data);
     console.log('[Firecrawl] Unwrapped data:', unwrapped);
-    
+
     // Handle different data structures
     let scrapeData = null;
-    
+
     // Check if unwrapped has a data property (e.g., {success: true, data: {...}})
     if (unwrapped && typeof unwrapped === 'object') {
       if (unwrapped.data && typeof unwrapped.data === 'object') {
@@ -508,9 +474,9 @@ function renderData(data: any) {
     } else {
       scrapeData = unwrapped;
     }
-    
+
     console.log('[Firecrawl] Scrape data:', scrapeData);
-    
+
     if (!scrapeData || (typeof scrapeData === 'object' && Object.keys(scrapeData).length === 0)) {
       console.warn('[Firecrawl] No scrape data found after unwrapping');
       showEmpty('No scrape data found');
@@ -525,7 +491,7 @@ function renderData(data: any) {
     const contentType = scrapeData.contentType || scrapeData.content_type || 'text/html';
     const cachedAt = scrapeData.cachedAt || scrapeData.cached_at;
     const creditsUsed = scrapeData.creditsUsed || scrapeData.credits_used;
-    
+
     // Keep contentHtml for HTML content, markdown will be rendered separately
     let contentHtml = html;
 
@@ -689,10 +655,10 @@ function renderData(data: any) {
     app.innerHTML = htmlContent;
 
     // Animate elements on load (only in main document, not iframe)
-    const isAnimeAvailable = typeof window !== 'undefined' && 
+    const isAnimeAvailable = typeof window !== 'undefined' &&
                             typeof (window as any).anime !== 'undefined' &&
                             window.self === window.top; // Not in iframe
-    
+
     if (isAnimeAvailable) {
       try {
         (window as any).anime({
@@ -729,136 +695,107 @@ function renderData(data: any) {
 }
 
 /* ============================================
-   MESSAGE HANDLER (Standardized MCP Protocol)
+   HOST CONTEXT HANDLER
    ============================================ */
 
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  console.log('[Firecrawl] Received message event:', event);
-  console.log('[Firecrawl] Message data:', msg);
-  
-  // Handle direct data (not wrapped in JSON-RPC)
-  if (msg && typeof msg === 'object' && (msg.success || msg.data || msg.metadata)) {
-    console.log('[Firecrawl] Detected direct data format, rendering directly');
-    renderData(msg);
-    return;
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
   }
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    console.log('[Firecrawl] Message is not JSON-RPC format, skipping');
-    return;
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
   }
-  
-  if (msg.id !== undefined && !msg.method) {
-    console.log('[Firecrawl] Message has ID but no method, skipping');
-    return;
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
   }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      const data = msg.params?.structuredContent || msg.params || msg;
-      console.log('[Firecrawl] Received tool-result message:', msg);
-      console.log('[Firecrawl] Extracted data:', data);
-      if (data !== undefined && data !== null) {
-        renderData(data);
-      } else {
-        console.warn('[Firecrawl] ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      console.info("Host context changed:", msg.params);
 
-      if (msg.params?.theme) {
-        applyDocumentTheme(msg.params.theme);
-      }
-
-      if (msg.params?.styles?.css?.fonts) {
-        applyHostFonts(msg.params.styles.css.fonts);
-      }
-
-      if (msg.params?.styles?.variables) {
-        applyHostStyleVariables(msg.params.styles.variables);
-      }
-
-      if (msg.params?.displayMode === 'fullscreen') {
-        document.body.classList.add('fullscreen-mode');
-      } else {
-        document.body.classList.remove('fullscreen-mode');
-      }
-      break;
-
-    // Handle tool cancellation
-    case 'ui/notifications/tool-cancelled':
-      const reason = msg.params?.reason || "Unknown reason";
-      console.info("Tool cancelled:", reason);
-      showError(`Operation cancelled: ${reason}`);
-      break;
-
-    // Handle resource teardown (requires response)
-    case 'ui/resource-teardown':
-      console.info("Resource teardown requested");
-
-      if (msg.id !== undefined) {
-        window.parent.postMessage(
-          {
-            jsonrpc: "2.0",
-            id: msg.id,
-            result: {},
-          },
-          "*"
-        );
-      }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      // Tool input notification (optional - handle if needed)
-      break;
-      
-    case 'ui/notifications/initialized':
-      // Initialization notification (optional - handle if needed)
-      break;
-      
-    default:
-      // Unknown method - try to extract data as fallback
-      console.log('[Firecrawl] Unknown method:', msg.method, '- attempting to extract data');
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('[Firecrawl] Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      } else if (msg.data || msg.success) {
-        // Try direct data access
-        console.log('[Firecrawl] Attempting direct data access');
-        renderData(msg);
-      }
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
   }
-});
+}
 
 /* ============================================
-   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
+   SDK APP INSTANCE (STANDALONE MODE)
    ============================================ */
 
-const app = new App({
-  name: APP_NAME,
-  version: APP_VERSION,
-});
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  console.info("Resource teardown requested");
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  console.info("Tool input received:", params.arguments);
+};
+
+app.ontoolresult = (params) => {
+  console.info("Tool result received");
+
+  // Check for tool execution errors
+  if (params.isError) {
+    console.error("Tool execution failed:", params.content);
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    console.warn("Tool result received but no data found:", params);
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  console.info("Tool cancelled:", reason);
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  console.error("App error:", error);
+};
+
+app.onhostcontextchanged = (ctx) => {
+  console.info("Host context changed:", ctx);
+  handleHostContextChanged(ctx);
+};
 
 /* ============================================
-   AUTO-RESIZE VIA SDK
+   CONNECT TO HOST
    ============================================ */
 
-const cleanupResize = app.setupSizeChangedNotifications();
+app
+  .connect()
+  .then(() => {
+    console.info("MCP App connected to host");
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    console.error("Failed to connect to MCP host:", error);
+  });
 
-// Clean up on page unload
-window.addEventListener("beforeunload", () => {
-  cleanupResize();
-});
-
-console.info("MCP App initialized (proxy mode - SDK utilities only)");
-
-// Export empty object to ensure this file is treated as an ES module
 export {};

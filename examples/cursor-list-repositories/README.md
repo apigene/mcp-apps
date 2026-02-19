@@ -1,49 +1,18 @@
-# base-template-sdk
+# Cursor List Repositories MCP App
 
-Minimal skeleton for building MCP Apps with `@modelcontextprotocol/ext-apps` in proxy-compatible mode.
+This app displays Cursor IDE repositories in a clean interface.
 
-This is the canonical source template for creating new app templates in this repo.
-It is intentionally generic:
-- no `app.connect()`
-- no local mock host logic
-- no embedded MCP server
-- no app-specific parsing/rendering helpers beyond minimal examples
+## Template
 
-## What It Includes
-
-- Manual `postMessage` handling for MCP proxy notifications:
-  - `ui/notifications/tool-result`
-  - `ui/notifications/host-context-changed`
-  - `ui/notifications/tool-cancelled`
-  - `ui/resource-teardown` (with required JSON-RPC response)
-- SDK utilities only:
-  - `applyDocumentTheme`
-  - `applyHostFonts`
-  - `applyHostStyleVariables`
-  - `setupSizeChangedNotifications`
-- Starter utilities: `unwrapData`, `escapeHtml`, `showError`, `showEmpty`
-- Single-file build via Vite + `vite-plugin-singlefile`
+This app is built from `base-template` using the `@modelcontextprotocol/ext-apps` SDK with `app.connect()` for direct MCP host integration.
 
 ## Quick Start
 
 ```bash
-# 1) Copy template (exclude build artifacts)
-rsync -av \
-  --exclude='node_modules' \
-  --exclude='dist' \
-  --exclude='.DS_Store' \
-  templates/base-template-sdk/ templates/my-app-mcp/
-
-# 2) Install deps
-cd templates/my-app-mcp
+# Install dependencies
 npm install
 
-# 3) Customize
-# - mcp-app.html (title)
-# - src/mcp-app.ts (APP_NAME, APP_VERSION, renderData)
-# - src/mcp-app.css (your styles)
-
-# 4) Build
+# Build
 npm run build
 ```
 
@@ -52,47 +21,23 @@ Output: `dist/mcp-app.html`
 ## Scripts
 
 ```bash
-npm run build    # production single-file build
-npm run dev      # watch build (rebuilds dist on change)
-npm run preview  # preview built dist
+npm run build    # Production single-file build
+npm run dev      # Watch build (rebuilds dist on change)
 ```
 
-## Optional Preview Payload Contract
+## Creating a New App
 
-`response.json` is optional for runtime usage in real MCP hosts.
+To create a new MCP app based on this structure:
 
-It is recommended for local preview workflows (MCP Apps Playground and demo servers):
-- if `<template>/response.json` exists, preview tools use it
-- otherwise they fall back to a default mock payload
-
-## File Layout
-
-```text
-templates/base-template-sdk/
-├── src/
-│   ├── mcp-app.ts
-│   ├── mcp-app.css
-│   └── global.css
-├── mcp-app.html
-├── package.json
-├── package-lock.json
-├── tsconfig.json
-├── vite.config.ts
-├── CSP_GUIDE.md
-├── COPY-TEMPLATE.md
-├── AGENTS.md
-└── README.md
+```bash
+cp -r examples/base-template my-new-app
+cd my-new-app
+npm install
 ```
 
-## Customization Boundaries
+Then customize:
+- `src/mcp-app.ts` - Update APP_NAME, APP_VERSION, and `renderData()`
+- `src/mcp-app.css` - Your styles
+- `mcp-app.html` - Title/metadata
 
-Update these when creating a new template:
-- `src/mcp-app.ts`: app name/version and `renderData`
-- `src/mcp-app.css`: app-specific styles
-- `mcp-app.html`: title/metadata
-- `package.json`: package metadata
-
-Keep as-is unless you intentionally change architecture:
-- protocol message flow in `src/mcp-app.ts`
-- `src/global.css`
-- `vite.config.ts`
+See `examples/base-template/README.md` for full documentation.

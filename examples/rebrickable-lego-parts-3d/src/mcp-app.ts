@@ -1,8 +1,9 @@
 /* ============================================
-   REBRICKABLE TEMPLATE - LEGO STYLE
+   REBRICKABLE LEGO PARTS 3D MCP APP (STANDALONE MODE)
    ============================================
-   
-   This file handles Rebrickable API responses with LEGO-themed rendering.
+
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   in standalone mode with app.connect().
    Includes 3D rendering support with Three.js and LDrawLoader.
    ============================================ */
 
@@ -12,22 +13,11 @@
 
 const APP_NAME = "Rebrickable";
 const APP_VERSION = "2.0.0";
-const PROTOCOL_VERSION = "2026-01-26"; // MCP Apps protocol version
 
 // Three.js and LDrawLoader are loaded via script tags in HTML
 declare const THREE: any;
 declare const LDrawLoader: any;
 declare const OrbitControls: any;
-
-/* ============================================
-   REBRICKABLE LEGO PARTS 3D MCP APP (SDK VERSION)
-   ============================================
-
-   This app uses the official @modelcontextprotocol/ext-apps SDK
-   for utilities only (theme helpers, types, auto-resize).
-
-   It does NOT call app.connect() because the proxy handles initialization.
-   ============================================ */
 
 /* ============================================
    SDK IMPORTS
@@ -45,73 +35,53 @@ import "./global.css";
 import "./mcp-app.css";
 
 /* ============================================
-   APP CONFIGURATION
-   ============================================ */
-
-
-/* ============================================
    COMMON UTILITY FUNCTIONS
    ============================================ */
-
-/**
- * Extract data from MCP protocol messages
- */
-function extractData(msg: any) {
-  if (msg?.params?.structuredContent !== undefined) {
-    return msg.params.structuredContent;
-  }
-  if (msg?.params !== undefined) {
-    return msg.params;
-  }
-  return msg;
-}
 
 /**
  * Unwrap nested API response structures
  */
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  // If data has body property (Rebrickable API format)
-  if (data.body) {
-    return data.body;
-  }
-  
-  // Standard table format
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
-  // Nested patterns
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
+  if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
-  
+  if (data.records) return data.records;
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  if (Array.isArray(data)) {
-    return { rows: data };
+
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
-  
+
   return data;
 }
-
-/**
- * Initialize dark mode
- */
-
 
 /**
  * Escape HTML to prevent XSS attacks
@@ -154,7 +124,7 @@ function formatExternalIds(externalIds: any): string {
   if (!externalIds || typeof externalIds !== 'object') {
     return '';
   }
-  
+
   let badges = '';
   for (const [key, values] of Object.entries(externalIds)) {
     if (Array.isArray(values)) {
@@ -164,7 +134,7 @@ function formatExternalIds(externalIds: any): string {
       });
     }
   }
-  
+
   return badges;
 }
 
@@ -184,7 +154,7 @@ function init3DViewer(containerId: string, partNum: string) {
     // Create scene
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xf0f0f0);
-    
+
     // Create camera
     const camera = new THREE.PerspectiveCamera(
       45,
@@ -204,11 +174,11 @@ function init3DViewer(containerId: string, partNum: string) {
     // Add lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
-    
+
     const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
     directionalLight1.position.set(50, 50, 50);
     scene.add(directionalLight1);
-    
+
     const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
     directionalLight2.position.set(-50, -50, -50);
     scene.add(directionalLight2);
@@ -227,7 +197,7 @@ function init3DViewer(containerId: string, partNum: string) {
     // Note: This requires LDraw parts library to be available
     // For now, we'll create a simple placeholder geometry
     const geometry = new THREE.BoxGeometry(20, 8, 10);
-    const material = new THREE.MeshStandardMaterial({ 
+    const material = new THREE.MeshStandardMaterial({
       color: 0xff0000, // LEGO red
       roughness: 0.3,
       metalness: 0.1
@@ -242,14 +212,14 @@ function init3DViewer(containerId: string, partNum: string) {
     // Animation loop
     function animate() {
       requestAnimationFrame(animate);
-      
+
       if (controls) {
         controls.update();
       } else {
         // Simple rotation if no controls
         cube.rotation.y += 0.005;
       }
-      
+
       renderer.render(scene, camera);
     }
     animate();
@@ -281,10 +251,10 @@ function renderPartCard(part: any, index: number): string {
   const partUrl = part.part_url || '#';
   const externalIds = formatExternalIds(part.external_ids);
   const containerId = `part-viewer-${index}`;
-  
+
   // Check if we have LDraw ID for 3D rendering
   const hasLDraw = part.external_ids?.LDraw && Array.isArray(part.external_ids.LDraw) && part.external_ids.LDraw.length > 0;
-  
+
   let imageHtml = '';
   if (imageUrl) {
     imageHtml = `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(name)}" class="part-image" />`;
@@ -294,7 +264,7 @@ function renderPartCard(part: any, index: number): string {
   } else {
     imageHtml = `<div class="part-image-placeholder">🧱</div>`;
   }
-  
+
   return `
     <div class="part-card">
       <div class="part-image-container">
@@ -319,7 +289,7 @@ function renderPartCard(part: any, index: number): string {
 function renderData(data: any) {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   if (!data) {
     showEmpty('No data received');
     return;
@@ -328,7 +298,7 @@ function renderData(data: any) {
   try {
     // Unwrap data to get the body
     const unwrapped = unwrapData(data);
-    
+
     // Handle Rebrickable API response format
     let body = unwrapped;
     if (data.body) {
@@ -338,21 +308,21 @@ function renderData(data: any) {
     } else if (unwrapped.results) {
       body = unwrapped;
     }
-    
+
     // Extract parts/results
     const results = body.results || body.items || (Array.isArray(body) ? body : []);
     const count = body.count || results.length;
     const next = body.next;
     const previous = body.previous;
-    
+
     if (!results || results.length === 0) {
       showEmpty('No parts found.');
       return;
     }
-    
+
     // Build HTML
     let html = '<div class="container">';
-    
+
     // Header with stats
     html += `
       <div class="header">
@@ -369,14 +339,14 @@ function renderData(data: any) {
         </div>
       </div>
     `;
-    
+
     // Parts grid
     html += '<div class="parts-grid">';
     results.forEach((part: any, index: number) => {
       html += renderPartCard(part, index);
     });
     html += '</div>';
-    
+
     // Pagination (if available)
     if (next || previous) {
       html += '<div class="pagination">';
@@ -389,11 +359,11 @@ function renderData(data: any) {
       }
       html += '</div>';
     }
-    
+
     html += '</div>';
-    
+
     app.innerHTML = html;
-    
+
     // Initialize 3D viewers after DOM is ready
     setTimeout(() => {
       results.forEach((part: any, index: number) => {
@@ -403,10 +373,8 @@ function renderData(data: any) {
           init3DViewer(containerId, part.part_num);
         }
       });
-      
-      // Notify host of size change after rendering completes
     }, 100);
-    
+
   } catch (error: any) {
     console.error('Render error:', error);
     showError(`Error rendering data: ${error.message}`);
@@ -414,153 +382,107 @@ function renderData(data: any) {
 }
 
 /* ============================================
-   MESSAGE HANDLER
+   HOST CONTEXT HANDLER
    ============================================ */
 
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    return;
-  }
-  
-  // Handle requests that require responses (like ui/resource-teardown)
-  if (msg.id !== undefined && msg.method === 'ui/resource-teardown') {
-    const reason = msg.params?.reason || 'Resource teardown requested';
-    
-    // Clean up resources
-    // - Clear any timers
-    if (sizeChangeTimeout) {
-      clearTimeout(sizeChangeTimeout);
-      sizeChangeTimeout = null;
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
     }
-    
-    // - Disconnect observers
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-    
-    // - Clean up 3D viewers (Three.js scenes, renderers, etc.)
-    // Note: Three.js cleanup would require tracking all scene instances
-    // For now, the DOM removal will handle most cleanup
-    
-    // Send response to host
-    window.parent.postMessage({
-      jsonrpc: "2.0",
-      id: msg.id,
-      result: {}
-    }, '*');
-    
-    return; // Don't process further
   }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
   }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      const data = msg.params?.structuredContent || msg.params;
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      console.info("Host context changed:", msg.params);
 
-      if (msg.params?.theme) {
-        applyDocumentTheme(msg.params.theme);
-      }
-
-      if (msg.params?.styles?.css?.fonts) {
-        applyHostFonts(msg.params.styles.css.fonts);
-      }
-
-      if (msg.params?.styles?.variables) {
-        applyHostStyleVariables(msg.params.styles.variables);
-      }
-
-      if (msg.params?.displayMode === 'fullscreen') {
-        document.body.classList.add('fullscreen-mode');
-      } else {
-        document.body.classList.remove('fullscreen-mode');
-      }
-      break;
-
-    // Handle tool cancellation
-    case 'ui/notifications/tool-cancelled':
-      const reason = msg.params?.reason || "Unknown reason";
-      console.info("Tool cancelled:", reason);
-      showError(`Operation cancelled: ${reason}`);
-      break;
-
-    // Handle resource teardown (requires response)
-    case 'ui/resource-teardown':
-      console.info("Resource teardown requested");
-
-      if (msg.id !== undefined) {
-        window.parent.postMessage(
-          {
-            jsonrpc: "2.0",
-            id: msg.id,
-            result: {},
-          },
-          "*"
-        );
-      }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      // Tool input notification - Host MUST send this with complete tool arguments
-      const toolArguments = msg.params?.arguments;
-      if (toolArguments) {
-        // Store tool arguments for reference (may be needed for context)
-        console.log('Tool input received:', toolArguments);
-        // Example: Could show loading state with input parameters
-      }
-      break;
-
-    case 'ui/notifications/initialized':
-      // Initialization notification (optional - handle if needed)
-      break;
-      
-    default:
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      }
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
   }
-});
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
+}
 
 /* ============================================
-   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
+   SDK APP INSTANCE (STANDALONE MODE)
    ============================================ */
 
-const app = new App({
-  name: APP_NAME,
-  version: APP_VERSION,
-});
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  console.info("Resource teardown requested");
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  console.info("Tool input received:", params.arguments);
+};
+
+app.ontoolresult = (params) => {
+  console.info("Tool result received");
+
+  // Check for tool execution errors
+  if (params.isError) {
+    console.error("Tool execution failed:", params.content);
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    console.warn("Tool result received but no data found:", params);
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  console.info("Tool cancelled:", reason);
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  console.error("App error:", error);
+};
+
+app.onhostcontextchanged = (ctx) => {
+  console.info("Host context changed:", ctx);
+  handleHostContextChanged(ctx);
+};
 
 /* ============================================
-   AUTO-RESIZE VIA SDK
+   CONNECT TO HOST
    ============================================ */
 
-const cleanupResize = app.setupSizeChangedNotifications();
+app
+  .connect()
+  .then(() => {
+    console.info("MCP App connected to host");
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    console.error("Failed to connect to MCP host:", error);
+  });
 
-// Clean up on page unload
-window.addEventListener("beforeunload", () => {
-  cleanupResize();
-});
-
-console.info("MCP App initialized (proxy mode - SDK utilities only)");
-
-// Export empty object to ensure this file is treated as an ES module
 export {};

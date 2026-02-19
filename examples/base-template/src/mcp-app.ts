@@ -5,15 +5,11 @@
    This template uses the official @modelcontextprotocol/ext-apps SDK
    with full app.connect() pattern for direct MCP host integration.
 
-   Use this template when:
+   Use this template for:
    - Connecting directly to Claude Desktop, ChatGPT, or other MCP hosts
-   - Building standalone MCP Apps
-   - Need full SDK capabilities (callServerTool, sendMessage, openLink)
-
-   Do NOT use this template when:
-   - Running behind a proxy (use base-template-sdk instead)
    - Deploying to MCP Apps Playground
-   - Working with APIGINE
+   - Building standalone MCP Apps
+   - Full SDK capabilities (callServerTool, sendMessage, openLink)
 
    See README.md for customization guidelines.
    ============================================ */
@@ -214,9 +210,15 @@ function renderData(data: any) {
 function handleHostContextChanged(ctx: any) {
   if (!ctx) return;
 
-  // Apply theme
+  // Apply theme (sets data-theme attribute on <html>)
   if (ctx.theme) {
     applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
   }
 
   // Apply host fonts
@@ -234,23 +236,6 @@ function handleHostContextChanged(ctx: any) {
     document.body.classList.add("fullscreen-mode");
   } else {
     document.body.classList.remove("fullscreen-mode");
-  }
-
-  // Handle container dimensions if provided
-  if (ctx.containerDimensions) {
-    const dims = ctx.containerDimensions;
-    if (dims.width) {
-      document.body.style.width = dims.width + "px";
-    }
-    if (dims.height) {
-      document.body.style.height = dims.height + "px";
-    }
-    if (dims.maxWidth) {
-      document.body.style.maxWidth = dims.maxWidth + "px";
-    }
-    if (dims.maxHeight) {
-      document.body.style.maxHeight = dims.maxHeight + "px";
-    }
   }
 }
 
@@ -299,6 +284,17 @@ app.ontoolinput = (params) => {
  */
 app.ontoolresult = (params) => {
   console.info("Tool result received");
+
+  // Check for tool execution errors
+  if (params.isError) {
+    console.error("Tool execution failed:", params.content);
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
   const data = params.structuredContent || params.content;
   if (data !== undefined) {
     renderData(data);

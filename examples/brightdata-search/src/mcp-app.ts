@@ -1,11 +1,9 @@
 /* ============================================
-   BRIGHTDATA SEARCH MCP APP (SDK VERSION)
+   BRIGHTDATA SEARCH MCP APP (STANDALONE MODE)
    ============================================
 
    This app uses the official @modelcontextprotocol/ext-apps SDK
-   for utilities only (theme helpers, types, auto-resize).
-
-   It does NOT call app.connect() because the proxy handles initialization.
+   in standalone mode with app.connect() for full MCP integration.
    ============================================ */
 
 /* ============================================
@@ -50,7 +48,12 @@ function extractData(msg: any) {
 
 function unwrapData(data: any): any {
   if (!data) return null;
-  
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
+    return data;
+  }
+
   // Handle Claude format: {message: {status_code: 200, response_content: {...}}}
   if (data.message && typeof data.message === 'object') {
     const msg = data.message;
@@ -66,7 +69,7 @@ function unwrapData(data: any): any {
       }
     }
   }
-  
+
   // Handle direct BrightData response format: {status_code: 200, body: {...}} or {status_code: 200, response_content: {...}}
   if (data.status_code !== undefined) {
     const content = data.body || data.response_content;
@@ -78,33 +81,36 @@ function unwrapData(data: any): any {
       };
     }
   }
-  
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
-    return data;
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
   }
-  
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.results) return data.results;
   if (data.items) return data.items;
-  
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  if (Array.isArray(data)) {
-    return { rows: data };
+
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
-  
+
   return data;
 }
 
@@ -144,7 +150,7 @@ function extractResults(data: any): any[] {
   // Handle BrightData format: {status_code: 200, body: {organic: [...], current_page: 1}}
   // Support both body and response_content
   const content = unwrapped.body || unwrapped.response_content;
-  
+
   if (content && typeof content === 'object') {
     if (content.organic && Array.isArray(content.organic)) {
       return content.organic;
@@ -153,11 +159,11 @@ function extractResults(data: any): any[] {
       return content;
     }
   }
-  
+
   if (unwrapped.organic && Array.isArray(unwrapped.organic)) {
     return unwrapped.organic;
   }
-  
+
   if (Array.isArray(unwrapped)) {
     return unwrapped;
   }
@@ -176,7 +182,7 @@ function getCurrentPage(data: any): number | null {
   if (content && typeof content === 'object') {
     return content.current_page || null;
   }
-  
+
   return unwrapped.current_page || null;
 }
 
@@ -231,7 +237,7 @@ function renderResultCard(result: any, index: number): string {
   const url = result.link || result.url || '';
   const title = result.title || 'Untitled';
   const description = cleanDescription(result.description || '');
-  
+
   const domain = extractDomain(url);
   const favicon = domain ? getFavicon(domain) : null;
   const domainInitials = getDomainInitials(domain);
@@ -348,8 +354,8 @@ function filterResults(): any[] {
       const description = (result.description || '').toLowerCase();
       const url = (result.link || result.url || '').toLowerCase();
       const domain = extractDomain(result.link || result.url || '')?.toLowerCase() || '';
-      return title.includes(searchLower) || 
-             description.includes(searchLower) || 
+      return title.includes(searchLower) ||
+             description.includes(searchLower) ||
              url.includes(searchLower) ||
              domain.includes(searchLower);
     });
@@ -382,7 +388,7 @@ function renderFilteredResults() {
   const filtered = filterResults();
   const resultsEl = document.getElementById('results-list');
   const statsEl = document.getElementById('filter-stats');
-  
+
   if (!resultsEl) return;
 
   if (filtered.length === 0) {
@@ -419,7 +425,7 @@ function handleSearchInput(event: Event) {
  */
 function handleCategoryFilter(category: string) {
   currentFilter.category = category;
-  
+
   // Update active state
   document.querySelectorAll('.category-chip').forEach(chip => {
     chip.classList.remove('active');
@@ -428,7 +434,7 @@ function handleCategoryFilter(category: string) {
   if (activeChip) {
     activeChip.classList.add('active');
   }
-  
+
   renderFilteredResults();
 }
 
@@ -438,12 +444,12 @@ function handleCategoryFilter(category: string) {
 function resetFilters() {
   currentFilter.searchText = '';
   currentFilter.category = 'all';
-  
+
   const searchInput = document.getElementById('search-input') as HTMLInputElement;
   if (searchInput) {
     searchInput.value = '';
   }
-  
+
   document.querySelectorAll('.category-chip').forEach(chip => {
     chip.classList.remove('active');
   });
@@ -451,7 +457,7 @@ function resetFilters() {
   if (allChip) {
     allChip.classList.add('active');
   }
-  
+
   renderFilteredResults();
 }
 
@@ -465,7 +471,7 @@ function resetFilters() {
 function renderData(data: any) {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   if (!data) {
     showEmpty('No data received');
     return;
@@ -475,7 +481,7 @@ function renderData(data: any) {
     // Extract data
     const results = extractResults(data);
     const currentPage = getCurrentPage(data);
-    
+
     if (!results || results.length === 0) {
       showEmpty('No search results found');
       return;
@@ -491,7 +497,7 @@ function renderData(data: any) {
     // Create container
     const container = document.createElement('div');
     container.className = 'search-container';
-    
+
     // Header
     const header = document.createElement('div');
     header.className = 'header';
@@ -520,10 +526,10 @@ function renderData(data: any) {
     searchFilterSection.innerHTML = `
       <div class="search-input-wrapper">
         <span class="search-icon">🔍</span>
-        <input 
-          type="text" 
-          id="search-input" 
-          class="search-input" 
+        <input
+          type="text"
+          id="search-input"
+          class="search-input"
           placeholder="Search within results by title, description, URL, or domain..."
           autocomplete="off"
         />
@@ -555,7 +561,7 @@ function renderData(data: any) {
 
     // Render initial results
     renderFilteredResults();
-    
+
   } catch (error: any) {
     console.error('Render error:', error);
     showError(`Error rendering search results: ${error.message}`);
@@ -563,124 +569,107 @@ function renderData(data: any) {
 }
 
 /* ============================================
-   MESSAGE HANDLER (Standardized MCP Protocol)
+   HOST CONTEXT HANDLER
    ============================================ */
 
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  // Handle direct data (not wrapped in JSON-RPC)
-  // Check for Claude format: {message: {status_code, response_content}}
-  if (msg && typeof msg === 'object') {
-    if (msg.message && msg.message.status_code !== undefined) {
-      renderData(msg);
-      return;
-    }
-    if (msg.status_code !== undefined || msg.body !== undefined || msg.response_content !== undefined) {
-      renderData(msg);
-      return;
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
     }
   }
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    return;
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
   }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
   }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      const data = msg.params?.structuredContent || msg.params;
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      console.info("Host context changed:", msg.params);
 
-      if (msg.params?.theme) {
-        applyDocumentTheme(msg.params.theme);
-      }
-
-      if (msg.params?.styles?.css?.fonts) {
-        applyHostFonts(msg.params.styles.css.fonts);
-      }
-
-      if (msg.params?.styles?.variables) {
-        applyHostStyleVariables(msg.params.styles.variables);
-      }
-
-      if (msg.params?.displayMode === 'fullscreen') {
-        document.body.classList.add('fullscreen-mode');
-      } else {
-        document.body.classList.remove('fullscreen-mode');
-      }
-      break;
-
-    // Handle tool cancellation
-    case 'ui/notifications/tool-cancelled':
-      const reason = msg.params?.reason || "Unknown reason";
-      console.info("Tool cancelled:", reason);
-      showError(`Operation cancelled: ${reason}`);
-      break;
-
-    // Handle resource teardown (requires response)
-    case 'ui/resource-teardown':
-      console.info("Resource teardown requested");
-
-      if (msg.id !== undefined) {
-        window.parent.postMessage(
-          {
-            jsonrpc: "2.0",
-            id: msg.id,
-            result: {},
-          },
-          "*"
-        );
-      }
-      break;
-      
-    default:
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      } else if (msg.message || msg.status_code || msg.body || msg.response_content) {
-        // Try direct data access (including Claude format)
-        renderData(msg);
-      }
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
   }
-});
+}
 
 /* ============================================
-   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
+   SDK APP INSTANCE (STANDALONE MODE)
    ============================================ */
 
-const app = new App({
-  name: APP_NAME,
-  version: APP_VERSION,
-});
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  console.info("Resource teardown requested");
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  console.info("Tool input received:", params.arguments);
+};
+
+app.ontoolresult = (params) => {
+  console.info("Tool result received");
+
+  // Check for tool execution errors
+  if (params.isError) {
+    console.error("Tool execution failed:", params.content);
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    console.warn("Tool result received but no data found:", params);
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  console.info("Tool cancelled:", reason);
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  console.error("App error:", error);
+};
+
+app.onhostcontextchanged = (ctx) => {
+  console.info("Host context changed:", ctx);
+  handleHostContextChanged(ctx);
+};
 
 /* ============================================
-   AUTO-RESIZE VIA SDK
+   CONNECT TO HOST
    ============================================ */
 
-const cleanupResize = app.setupSizeChangedNotifications();
+app
+  .connect()
+  .then(() => {
+    console.info("MCP App connected to host");
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    console.error("Failed to connect to MCP host:", error);
+  });
 
-// Clean up on page unload
-window.addEventListener("beforeunload", () => {
-  cleanupResize();
-});
-
-console.info("MCP App initialized (proxy mode - SDK utilities only)");
-
-// Export empty object to ensure this file is treated as an ES module
 export {};

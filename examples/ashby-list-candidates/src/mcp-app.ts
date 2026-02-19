@@ -1,11 +1,9 @@
 /* ============================================
-   ASHBY LIST CANDIDATES MCP APP (SDK VERSION)
+   ASHBY LIST CANDIDATES MCP APP (STANDALONE MODE)
    ============================================
 
    This app uses the official @modelcontextprotocol/ext-apps SDK
-   for utilities only (theme helpers, types, auto-resize).
-
-   It does NOT call app.connect() because the proxy handles initialization.
+   in standalone mode with app.connect() for direct host communication.
    ============================================ */
 
 /* ============================================
@@ -35,60 +33,48 @@ const APP_VERSION = "1.0.0";
    ============================================ */
 
 /**
- * Extract data from MCP protocol messages
- * Handles standard JSON-RPC 2.0 format from run-action.html
- */
-function extractData(msg: any) {
-  if (msg?.params?.structuredContent !== undefined) {
-    return msg.params.structuredContent;
-  }
-  if (msg?.params !== undefined) {
-    return msg.params;
-  }
-  return msg;
-}
-
-/**
  * Unwrap nested API response structures
  * Handles various wrapper formats from different MCP clients
  */
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  // Format 1: Standard table format { columns: [], rows: [] }
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
-  // Format 2: Nested in message.template_data (3rd party MCP clients)
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
-  // Format 3: Nested in message.response_content (3rd party MCP clients)
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
-  // Format 4: Common nested patterns
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
-  // Format 5: Direct rows array
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  // Format 6: If data itself is an array
-  if (Array.isArray(data)) {
-    return { rows: data };
+
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
-  
+
   return data;
 }
 
@@ -266,8 +252,8 @@ function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '-';
   try {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
       day: 'numeric',
       year: 'numeric'
     });
@@ -460,7 +446,7 @@ function renderTable(candidates: any[]): string {
           ${willingToRelocate === true ? '<span class="badge badge-success" title="Willing to relocate">Relocate</span>' : ''}
         </td>
         <td>
-          ${preferredTeams && Array.isArray(preferredTeams) && preferredTeams.length > 0 
+          ${preferredTeams && Array.isArray(preferredTeams) && preferredTeams.length > 0
             ? `<div class="teams-list">${preferredTeams.slice(0, 2).map((t: any) => `<span class="team-badge">${escapeHtml(String(t))}</span>`).join('')}${preferredTeams.length > 2 ? `<span class="team-badge">+${preferredTeams.length - 2}</span>` : ''}</div>`
             : '-'}
         </td>
@@ -491,13 +477,13 @@ function applyFiltersAndRender() {
 
   let filtered = searchCandidates(allCandidates, searchQuery);
   filtered = filterCandidates(filtered, filters);
-  
+
   if (sortColumn) {
     filtered = sortCandidates(filtered, sortColumn, sortDirection);
   }
 
   filteredCandidates = filtered;
-  
+
   // Update results count
   const countEl = document.getElementById('results-count');
   if (countEl) {
@@ -508,7 +494,7 @@ function applyFiltersAndRender() {
   const tbody = tableContainer?.querySelector('tbody');
   if (tbody) {
     tbody.innerHTML = renderTable(filtered);
-    
+
     // Update checkboxes based on selection
     filtered.forEach((candidate, index) => {
       const candidateId = candidate.id || `candidate-${index}`;
@@ -526,7 +512,7 @@ function applyFiltersAndRender() {
       }
     });
   }
-  
+
   // Update select all checkbox
   const selectAllCheckbox = document.getElementById('select-all') as HTMLInputElement;
   const headerCheckbox = document.getElementById('header-checkbox') as HTMLInputElement;
@@ -550,7 +536,7 @@ function applyFiltersAndRender() {
 function renderData(data: any) {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   if (!data) {
     showEmpty('No data received');
     return;
@@ -559,7 +545,7 @@ function renderData(data: any) {
   try {
     // Extract candidates
     const candidates = extractCandidates(data);
-    
+
     if (!candidates || candidates.length === 0) {
       showEmpty('No candidates found');
       return;
@@ -571,7 +557,7 @@ function renderData(data: any) {
     // Create container
     const container = document.createElement('div');
     container.className = 'candidates-container';
-    
+
     // Ashby Header
     const ashbyHeader = document.createElement('div');
     ashbyHeader.className = 'ashby-header';
@@ -594,7 +580,7 @@ function renderData(data: any) {
       </div>
     `;
     container.appendChild(ashbyHeader);
-    
+
     // Header
     const header = document.createElement('div');
     header.className = 'header';
@@ -618,10 +604,10 @@ function renderData(data: any) {
     // Toolbar
     const toolbar = document.createElement('div');
     toolbar.className = 'toolbar';
-    
+
     const toolbarLeft = document.createElement('div');
     toolbarLeft.className = 'toolbar-left';
-    
+
     // Search box
     const searchBox = document.createElement('div');
     searchBox.className = 'search-box';
@@ -630,12 +616,12 @@ function renderData(data: any) {
       <input type="text" class="search-input" id="search-input" placeholder="Search by name, email, position, company...">
     `;
     toolbarLeft.appendChild(searchBox);
-    
+
     toolbar.appendChild(toolbarLeft);
-    
+
     const toolbarRight = document.createElement('div');
     toolbarRight.className = 'toolbar-right';
-    
+
     // Select All checkbox
     const selectAllContainer = document.createElement('div');
     selectAllContainer.style.display = 'flex';
@@ -646,7 +632,7 @@ function renderData(data: any) {
       <label for="select-all" style="font-size: 14px; color: var(--ashby-text-secondary); cursor: pointer;">Select All</label>
     `;
     toolbarRight.appendChild(selectAllContainer);
-    
+
     toolbar.appendChild(toolbarRight);
     container.appendChild(toolbar);
 
@@ -703,7 +689,7 @@ function renderData(data: any) {
       th.addEventListener('click', () => {
         const column = th.getAttribute('data-sort');
         if (!column) return;
-        
+
         // Update sort state
         if (sortColumn === column) {
           sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
@@ -718,7 +704,7 @@ function renderData(data: any) {
           const icon = h.querySelector('.sort-icon');
           if (icon) icon.textContent = '⇅';
         });
-        
+
         th.classList.add('sorted');
         const icon = th.querySelector('.sort-icon');
         if (icon) {
@@ -731,7 +717,7 @@ function renderData(data: any) {
 
     // Setup event listeners
     setupEventListeners();
-    
+
     // Initial render
     applyFiltersAndRender();
 
@@ -745,103 +731,12 @@ function renderData(data: any) {
 
     // Initial render
     applyFiltersAndRender();
-    
+
   } catch (error: any) {
     console.error('Render error:', error);
     showError(`Error rendering candidates: ${error.message}`);
   }
 }
-
-/* ============================================
-   MESSAGE HANDLER (Standardized MCP Protocol)
-   ============================================ */
-
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    return;
-  }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
-  }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      const data = msg.params?.structuredContent || msg.params;
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      console.info("Host context changed:", msg.params);
-
-      if (msg.params?.theme) {
-        applyDocumentTheme(msg.params.theme);
-      }
-
-      if (msg.params?.styles?.css?.fonts) {
-        applyHostFonts(msg.params.styles.css.fonts);
-      }
-
-      if (msg.params?.styles?.variables) {
-        applyHostStyleVariables(msg.params.styles.variables);
-      }
-
-      if (msg.params?.displayMode === 'fullscreen') {
-        document.body.classList.add('fullscreen-mode');
-      } else {
-        document.body.classList.remove('fullscreen-mode');
-      }
-      break;
-
-    // Handle tool cancellation
-    case 'ui/notifications/tool-cancelled':
-      const reason = msg.params?.reason || "Unknown reason";
-      console.info("Tool cancelled:", reason);
-      showError(`Operation cancelled: ${reason}`);
-      break;
-
-    // Handle resource teardown (requires response)
-    case 'ui/resource-teardown':
-      console.info("Resource teardown requested");
-
-      if (msg.id !== undefined) {
-        window.parent.postMessage(
-          {
-            jsonrpc: "2.0",
-            id: msg.id,
-            result: {},
-          },
-          "*"
-        );
-      }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      // Tool input notification (optional - handle if needed)
-      break;
-      
-    case 'ui/notifications/initialized':
-      // Initialization notification (optional - handle if needed)
-      break;
-      
-    default:
-      // Unknown method - try to extract data as fallback
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      }
-  }
-});
 
 /* ============================================
    ADVANCED INTERACTIVE FEATURES
@@ -860,7 +755,7 @@ function setupEventListeners() {
       searchTimeout = setTimeout(applyFiltersAndRender, 300);
     });
   }
-  
+
   // Filter handlers
   ['filter-experience', 'filter-visa', 'filter-relocate', 'filter-tag'].forEach(id => {
     const filter = document.getElementById(id) as HTMLSelectElement;
@@ -905,12 +800,12 @@ function setupEventListeners() {
       selectedCandidates.delete(candidateId);
     }
   });
-  
+
   // Update all checkboxes
   document.querySelectorAll('.candidate-checkbox').forEach((checkbox: any) => {
     checkbox.checked = checked;
   });
-  
+
   // Update row styles
   document.querySelectorAll('tbody tr').forEach((row: any) => {
     const candidateId = row.getAttribute('data-candidate-id');
@@ -922,7 +817,7 @@ function setupEventListeners() {
       }
     }
   });
-  
+
   updateSelectionUI();
 };
 
@@ -948,7 +843,7 @@ function setupEventListeners() {
 function updateSelectionUI() {
   const bulkActions = document.getElementById('bulk-actions');
   const selectedCount = document.getElementById('selected-count');
-  
+
   if (bulkActions && selectedCount) {
     if (selectedCandidates.size > 0) {
       bulkActions.classList.add('active');
@@ -957,7 +852,7 @@ function updateSelectionUI() {
       bulkActions.classList.remove('active');
     }
   }
-  
+
   }
 
 /**
@@ -968,14 +863,14 @@ function updateSelectionUI() {
     const id = c.id || `candidate-${i}`;
     return id === candidateId;
   });
-  
+
   if (!candidate) return;
-  
+
   const modal = document.getElementById('candidate-modal');
   const modalContent = document.getElementById('modal-content');
-  
+
   if (!modal || !modalContent) return;
-  
+
   const experience = getCustomFieldLabel(candidate, 'Experience level') || '-';
   const needsVisa = getCustomField(candidate, 'Needs visa');
   const willingToRelocate = getCustomField(candidate, 'Willing to relocate');
@@ -988,7 +883,7 @@ function updateSelectionUI() {
   const linkedin = candidate.linkedInProfileUrl || '-';
   const github = candidate.githubProfileUrl || '-';
   const portfolio = candidate.portfolioUrl || '-';
-  
+
   modalContent.innerHTML = `
     <div class="modal-header">
       <div>
@@ -1001,7 +896,7 @@ function updateSelectionUI() {
         <span class="icon-inline">${iconX()}</span>
       </button>
     </div>
-    
+
     <div class="modal-section">
       <div class="modal-section-title">Contact Information</div>
       <div class="modal-field">
@@ -1023,7 +918,7 @@ function updateSelectionUI() {
       </div>
       ` : ''}
     </div>
-    
+
     <div class="modal-section">
       <div class="modal-section-title">Professional Information</div>
       <div class="modal-field">
@@ -1049,7 +944,7 @@ function updateSelectionUI() {
       </div>
       ` : ''}
     </div>
-    
+
     <div class="modal-section">
       <div class="modal-section-title">Additional Details</div>
       ${needsVisa === true ? `
@@ -1071,7 +966,7 @@ function updateSelectionUI() {
       </div>
       ` : ''}
     </div>
-    
+
     ${(linkedin !== '-' || github !== '-' || portfolio !== '-') ? `
     <div class="modal-section">
       <div class="modal-section-title">Online Profiles</div>
@@ -1095,7 +990,7 @@ function updateSelectionUI() {
       ` : ''}
     </div>
     ` : ''}
-    
+
     <div class="modal-section">
       <div class="modal-section-title">Last Updated</div>
       <div class="modal-field">
@@ -1103,10 +998,10 @@ function updateSelectionUI() {
       </div>
     </div>
   `;
-  
+
   modal.classList.add('active');
   document.body.style.overflow = 'hidden';
-  
+
   };
 
 /**
@@ -1146,7 +1041,7 @@ if (modalEl) {
     alert('No candidates available to export');
     return;
   }
-  
+
   if (format === 'csv') {
     exportToCSV(candidates);
   } else {
@@ -1162,12 +1057,12 @@ if (modalEl) {
     alert('No candidates selected');
     return;
   }
-  
+
   const candidates = filteredCandidates.filter((candidate, index) => {
     const candidateId = candidate.id || `candidate-${index}`;
     return selectedCandidates.has(candidateId);
   });
-  
+
   exportToCSV(candidates, 'ashby-candidates-selected.csv');
 };
 
@@ -1176,7 +1071,7 @@ if (modalEl) {
  */
 function exportToCSV(candidates: any[], filename: string = 'ashby-candidates.csv') {
   if (!candidates || candidates.length === 0) return;
-  
+
   const headers = ['Name', 'Position', 'Company', 'Email', 'Location', 'Experience', 'Tags', 'Updated'];
   const rows = candidates.map(candidate => {
     const tags = (candidate.tags || []).map((t: any) => t.title).join('; ');
@@ -1192,17 +1087,17 @@ function exportToCSV(candidates: any[], filename: string = 'ashby-candidates.csv
       formatDate(candidate.updatedAt)
     ];
   });
-  
+
   const csv = [
     headers.join(','),
     ...rows.map(row => row.map(cell => {
       const str = String(cell || '');
-      return str.includes(',') || str.includes('"') || str.includes('\n') 
-        ? `"${str.replace(/"/g, '""')}"` 
+      return str.includes(',') || str.includes('"') || str.includes('\n')
+        ? `"${str.replace(/"/g, '""')}"`
         : str;
     }).join(','))
   ].join('\n');
-  
+
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
@@ -1223,26 +1118,107 @@ function exportToJSON(candidates: any[], filename: string = 'ashby-candidates.js
 }
 
 /* ============================================
-   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
+   HOST CONTEXT HANDLER
    ============================================ */
 
-const app = new App({
-  name: APP_NAME,
-  version: APP_VERSION,
-});
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
+  }
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
+  }
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
+  }
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
+}
 
 /* ============================================
-   AUTO-RESIZE VIA SDK
+   SDK APP INSTANCE (STANDALONE MODE)
    ============================================ */
 
-const cleanupResize = app.setupSizeChangedNotifications();
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
 
-// Clean up on page unload
-window.addEventListener("beforeunload", () => {
-  cleanupResize();
-});
+app.onteardown = async () => {
+  console.info("Resource teardown requested");
+  return {};
+};
 
-console.info("MCP App initialized (proxy mode - SDK utilities only)");
+app.ontoolinput = (params) => {
+  console.info("Tool input received:", params.arguments);
+};
 
-// Export empty object to ensure this file is treated as an ES module
+app.ontoolresult = (params) => {
+  console.info("Tool result received");
+
+  // Check for tool execution errors
+  if (params.isError) {
+    console.error("Tool execution failed:", params.content);
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    console.warn("Tool result received but no data found:", params);
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  console.info("Tool cancelled:", reason);
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  console.error("App error:", error);
+};
+
+app.onhostcontextchanged = (ctx) => {
+  console.info("Host context changed:", ctx);
+  handleHostContextChanged(ctx);
+};
+
+/* ============================================
+   CONNECT TO HOST
+   ============================================ */
+
+app
+  .connect()
+  .then(() => {
+    console.info("MCP App connected to host");
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    console.error("Failed to connect to MCP host:", error);
+  });
+
 export {};

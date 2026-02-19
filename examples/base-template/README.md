@@ -4,15 +4,12 @@ This template uses the official `@modelcontextprotocol/ext-apps` SDK with full `
 
 ## When to Use
 
+This is the **universal template** for all MCP Apps:
+
 - Connecting directly to Claude Desktop, ChatGPT, or other MCP hosts
-- Building standalone MCP Apps
-- Need full SDK capabilities (`callServerTool`, `sendMessage`, `openLink`)
-
-## When NOT to Use
-
-- Running behind a proxy (use `base-template-sdk` instead)
 - Deploying to MCP Apps Playground
-- Working with APIGINE
+- Building standalone MCP Apps
+- Full SDK capabilities (`callServerTool`, `sendMessage`, `openLink`)
 
 ## Quick Start
 
@@ -232,7 +229,7 @@ declare const Chart: any;
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    MCP Host                             │
-│  (Claude Desktop, ChatGPT, etc.)                        │
+│  (Claude Desktop, ChatGPT, Playground, etc.)            │
 └─────────────────────┬───────────────────────────────────┘
                       │ postMessage (JSON-RPC 2.0)
                       ▼
@@ -284,5 +281,4 @@ declare const Chart: any;
 
 ## See Also
 
-- **base-template-sdk** - For proxy-compatible apps (MCP Apps Playground, APIGINE)
 - **CSP_GUIDE.md** - Content Security Policy configuration

@@ -1,7 +1,7 @@
 /* ============================================
    TESLA CONTROLS MCP APP
    ============================================
-   
+
    Interactive Tesla vehicle control interface
    ============================================ */
 
@@ -9,13 +9,11 @@
 const PROTOCOL_VERSION = "2026-01-26";
 
 /* ============================================
-   TESLA CONTROLS MCP APP (SDK VERSION)
+   TESLA CONTROLS MCP APP (STANDALONE MODE)
    ============================================
 
    This app uses the official @modelcontextprotocol/ext-apps SDK
-   for utilities only (theme helpers, types, auto-resize).
-
-   It does NOT call app.connect() because the proxy handles initialization.
+   with app.connect() for standalone initialization.
    ============================================ */
 
 /* ============================================
@@ -56,35 +54,43 @@ function extractData(msg: any) {
 
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
-  if (data.records) return data.data.records;
-  
+  if (data.records) return data.records;
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  if (Array.isArray(data)) {
-    return { rows: data };
+
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
-  
+
   return data;
 }
 
@@ -135,19 +141,17 @@ let teslaState: TeslaState = {
  */
 async function sendControlAction(action: string, params?: any) {
   try {
-    const result = await sendRequest('ui/request-data', {
-      type: 'tesla-control-action',
-      action: action,
-      params: params || {}
-    });
-    
-    // Update state based on action
-    updateStateFromAction(action, result);
-    
+    // Note: In standalone mode, control actions would need to be handled differently
+    // This is a placeholder - the host would need to provide this capability
+    console.info(`Control action requested: ${action}`, params);
+
+    // Update state based on action (simulated)
+    updateStateFromAction(action, null);
+
     // Show feedback
     showActionFeedback(action, true);
-    
-    return result;
+
+    return {};
   } catch (error: any) {
     console.error(`Failed to execute ${action}:`, error);
     showActionFeedback(action, false);
@@ -191,7 +195,7 @@ function updateStateFromAction(action: string, result: any) {
       teslaState.charging = false;
       break;
   }
-  
+
   // Re-render to update UI
   renderTeslaControls();
 }
@@ -239,8 +243,8 @@ function renderTeslaControls() {
       <div class="tesla-car-container">
         <div class="tesla-car">
           <!-- Front Trunk (Frunk) -->
-          <button 
-            class="car-control frunk-control ${teslaState.frunkOpen ? 'open' : ''}" 
+          <button
+            class="car-control frunk-control ${teslaState.frunkOpen ? 'open' : ''}"
             data-action="${teslaState.frunkOpen ? 'close-frunk' : 'open-frunk'}"
             aria-label="${teslaState.frunkOpen ? 'Close' : 'Open'} front trunk"
           >
@@ -248,21 +252,21 @@ function renderTeslaControls() {
           </button>
 
           <!-- Lock/Unlock -->
-          <button 
-            class="car-control lock-control ${teslaState.locked ? 'locked' : 'unlocked'}" 
+          <button
+            class="car-control lock-control ${teslaState.locked ? 'locked' : 'unlocked'}"
             data-action="${teslaState.locked ? 'unlock' : 'lock'}"
             aria-label="${teslaState.locked ? 'Unlock' : 'Lock'} vehicle"
           >
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              ${teslaState.locked 
+              ${teslaState.locked
                 ? '<path d="M6 10V8a6 6 0 0 1 12 0v2M4 10h16v10H4V10z"/><rect x="11" y="14" width="2" height="4" rx="1"/>'
                 : '<path d="M6 10V8a6 6 0 0 1 12 0v2M4 10h16v10H4V10z"/><path d="M8 10V8a4 4 0 0 1 8 0v2"/><line x1="12" y1="14" x2="12" y2="18"/>'}
             </svg>
           </button>
 
           <!-- Rear Trunk -->
-          <button 
-            class="car-control trunk-control ${teslaState.trunkOpen ? 'open' : ''}" 
+          <button
+            class="car-control trunk-control ${teslaState.trunkOpen ? 'open' : ''}"
             data-action="${teslaState.trunkOpen ? 'close-trunk' : 'open-trunk'}"
             aria-label="${teslaState.trunkOpen ? 'Close' : 'Open'} rear trunk"
           >
@@ -270,8 +274,8 @@ function renderTeslaControls() {
           </button>
 
           <!-- Charging Port -->
-          <button 
-            class="car-control charge-control ${teslaState.chargingPortOpen ? 'open' : ''} ${teslaState.charging ? 'charging' : ''}" 
+          <button
+            class="car-control charge-control ${teslaState.chargingPortOpen ? 'open' : ''} ${teslaState.charging ? 'charging' : ''}"
             data-action="${teslaState.chargingPortOpen ? 'close-charge-port' : 'open-charge-port'}"
             aria-label="${teslaState.chargingPortOpen ? 'Close' : 'Open'} charge port"
           >
@@ -284,8 +288,8 @@ function renderTeslaControls() {
 
       <!-- Bottom Control Bar -->
       <div class="tesla-controls-bar">
-        <button 
-          class="control-button" 
+        <button
+          class="control-button"
           data-action="flash"
           aria-label="Flash headlights"
         >
@@ -296,8 +300,8 @@ function renderTeslaControls() {
           <span>Flash</span>
         </button>
 
-        <button 
-          class="control-button" 
+        <button
+          class="control-button"
           data-action="honk"
           aria-label="Honk horn"
         >
@@ -308,8 +312,8 @@ function renderTeslaControls() {
           <span>Honk</span>
         </button>
 
-        <button 
-          class="control-button" 
+        <button
+          class="control-button"
           data-action="start"
           aria-label="Start vehicle"
         >
@@ -320,8 +324,8 @@ function renderTeslaControls() {
           <span>Start</span>
         </button>
 
-        <button 
-          class="control-button" 
+        <button
+          class="control-button"
           data-action="vent"
           aria-label="Vent windows"
         >
@@ -337,7 +341,7 @@ function renderTeslaControls() {
 
   // Attach event listeners
   attachEventListeners();
-  
+
   // Notify size change
 }
 
@@ -368,7 +372,7 @@ function attachEventListeners() {
 function renderData(data: any) {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   if (!data) {
     // If no data, render default Tesla controls
     renderTeslaControls();
@@ -377,7 +381,7 @@ function renderData(data: any) {
 
   try {
     const unwrapped = unwrapData(data);
-    
+
     // Update state from data if provided
     if (unwrapped && typeof unwrapped === 'object') {
       if ('locked' in unwrapped) teslaState.locked = unwrapped.locked;
@@ -386,9 +390,9 @@ function renderData(data: any) {
       if ('charging' in unwrapped) teslaState.charging = unwrapped.charging;
       if ('chargingPortOpen' in unwrapped) teslaState.chargingPortOpen = unwrapped.chargingPortOpen;
     }
-    
+
     renderTeslaControls();
-    
+
   } catch (error: any) {
     console.error('Render error:', error);
     showError(`Error rendering data: ${error.message}`);
@@ -396,142 +400,106 @@ function renderData(data: any) {
 }
 
 /* ============================================
-   MESSAGE HANDLER
+   HOST CONTEXT HANDLER
    ============================================ */
 
-let sizeChangeTimeout: NodeJS.Timeout | null = null;
-let resizeObserver: ResizeObserver | null = null;
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
 
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    return;
-  }
-  
-  if (msg.id !== undefined && msg.method === 'ui/resource-teardown') {
-    const reason = msg.params?.reason || 'Resource teardown requested';
-    
-    if (sizeChangeTimeout) {
-      clearTimeout(sizeChangeTimeout);
-      sizeChangeTimeout = null;
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
     }
-    
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-    
-    window.parent.postMessage({
-      jsonrpc: "2.0",
-      id: msg.id,
-      result: {}
-    }, '*');
-    
-    return;
   }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
   }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      const data = msg.params?.structuredContent || msg.params;
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        renderTeslaControls();
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      console.info("Host context changed:", msg.params);
 
-      if (msg.params?.theme) {
-        applyDocumentTheme(msg.params.theme);
-      }
-
-      if (msg.params?.styles?.css?.fonts) {
-        applyHostFonts(msg.params.styles.css.fonts);
-      }
-
-      if (msg.params?.styles?.variables) {
-        applyHostStyleVariables(msg.params.styles.variables);
-      }
-
-      if (msg.params?.displayMode === 'fullscreen') {
-        document.body.classList.add('fullscreen-mode');
-      } else {
-        document.body.classList.remove('fullscreen-mode');
-      }
-      break;
-
-    // Handle tool cancellation
-    case 'ui/notifications/tool-cancelled':
-      const reason = msg.params?.reason || "Unknown reason";
-      console.info("Tool cancelled:", reason);
-      showError(`Operation cancelled: ${reason}`);
-      break;
-
-    // Handle resource teardown (requires response)
-    case 'ui/resource-teardown':
-      console.info("Resource teardown requested");
-
-      if (msg.id !== undefined) {
-        window.parent.postMessage(
-          {
-            jsonrpc: "2.0",
-            id: msg.id,
-            result: {},
-          },
-          "*"
-        );
-      }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      const toolArguments = msg.params?.arguments;
-      if (toolArguments) {
-        console.log('Tool input received:', toolArguments);
-      }
-      break;
-
-    case 'ui/notifications/initialized':
-      break;
-      
-    default:
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      }
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
   }
-});
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
+}
 
 /* ============================================
-   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
+   SDK APP INSTANCE (STANDALONE MODE)
    ============================================ */
 
-const app = new App({
-  name: APP_NAME,
-  version: APP_VERSION,
-});
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  console.info("Resource teardown requested");
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  console.info("Tool input received:", params.arguments);
+};
+
+app.ontoolresult = (params) => {
+  console.info("Tool result received");
+
+  // Check for tool execution errors
+  if (params.isError) {
+    console.error("Tool execution failed:", params.content);
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    renderTeslaControls();
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  console.info("Tool cancelled:", reason);
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  console.error("App error:", error);
+};
+
+app.onhostcontextchanged = (ctx) => {
+  console.info("Host context changed:", ctx);
+  handleHostContextChanged(ctx);
+};
 
 /* ============================================
-   AUTO-RESIZE VIA SDK
+   CONNECT TO HOST
    ============================================ */
 
-const cleanupResize = app.setupSizeChangedNotifications();
+app
+  .connect()
+  .then(() => {
+    console.info("MCP App connected to host");
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    console.error("Failed to connect to MCP host:", error);
+  });
 
-// Clean up on page unload
-window.addEventListener("beforeunload", () => {
-  cleanupResize();
-});
-
-console.info("MCP App initialized (proxy mode - SDK utilities only)");
-
-// Export empty object to ensure this file is treated as an ES module
 export {};

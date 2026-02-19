@@ -1,11 +1,9 @@
 /* ============================================
-   NOTION SEARCH MCP APP (SDK VERSION)
+   NOTION SEARCH MCP APP (STANDALONE MODE)
    ============================================
 
    This app uses the official @modelcontextprotocol/ext-apps SDK
-   for utilities only (theme helpers, types, auto-resize).
-
-   It does NOT call app.connect() because the proxy handles initialization.
+   in standalone mode with app.connect() for initialization.
    ============================================ */
 
 /* ============================================
@@ -27,6 +25,8 @@ import "./mcp-app.css";
    APP CONFIGURATION
    ============================================ */
 
+const APP_NAME = "Notion Search";
+const APP_VERSION = "1.0.0";
 
 /* ============================================
    Notion Search MCP App
@@ -34,10 +34,6 @@ import "./mcp-app.css";
    Renders Notion search API results (body.results) with
    Notion-style layout and typography.
    ============================================ */
-
-const APP_NAME = "Notion Search";
-const APP_VERSION = "1.0.0";
-const PROTOCOL_VERSION = "2026-01-26";
 
 function unwrapData(data: any): any {
   if (!data) return null;
@@ -76,7 +72,7 @@ function truncate(str: string, maxLen: number): string {
   if (!str || typeof str !== "string") return "";
   const t = str.trim();
   if (t.length <= maxLen) return t;
-  return t.slice(0, maxLen).trim() + "…";
+  return t.slice(0, maxLen).trim() + "...";
 }
 
 /** Notion-style page/document icon */
@@ -156,45 +152,6 @@ function renderData(data: any) {
       }
 }
 
-window.addEventListener("message", function (event: MessageEvent) {
-  const msg = event.data;
-  if (!msg || msg.jsonrpc !== "2.0") return;
-  if (msg.id !== undefined && msg.method === "ui/resource-teardown") {
-    if (sizeChangeTimeout) {
-      clearTimeout(sizeChangeTimeout);
-      sizeChangeTimeout = null;
-    }
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-    window.parent.postMessage({ jsonrpc: "2.0", id: msg.id, result: {} }, "*");
-    return;
-  }
-  if (msg.id !== undefined && !msg.method) return;
-  switch (msg.method) {
-    case "ui/notifications/tool-result":
-      const data = msg.params?.structuredContent ?? msg.params;
-      if (data !== undefined) renderData(data);
-      else showEmpty("No data received.");
-      break;
-    case "ui/notifications/host-context-changed":
-      if (msg.params?.theme === "dark") document.body.classList.add("dark");
-      else if (msg.params?.theme === "light") document.body.classList.remove("dark");
-      if (msg.params?.displayMode) handleDisplayModeChange(msg.params.displayMode);
-      break;
-    case "ui/notifications/tool-cancelled":
-      showError("Cancelled: " + (msg.params?.reason || "Tool cancelled"));
-      break;
-    default:
-      if (msg.params) {
-        const fallback = msg.params.structuredContent ?? msg.params;
-        if (fallback && fallback !== msg) renderData(fallback);
-      }
-  }
-});
-
-
 let currentDisplayMode = "inline";
 function handleDisplayModeChange(mode: string) {
   currentDisplayMode = mode;
@@ -207,53 +164,110 @@ function handleDisplayModeChange(mode: string) {
     const el = document.querySelector(".notion-widget");
     if (el) (el as HTMLElement).style.maxWidth = "";
   }
+}
+
+/* ============================================
+   HOST CONTEXT HANDLER
+   ============================================ */
+
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
   }
 
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
+  }
 
-sendRequest("ui/initialize", {
-  appCapabilities: { availableDisplayModes: ["inline", "fullscreen"] },
-  appInfo: { name: APP_NAME, version: APP_VERSION },
-  protocolVersion: PROTOCOL_VERSION,
-})
-  .then((result: any) => {
-    const ctx = result.hostContext ?? result;
-    sendNotification("ui/notifications/initialized", {});
-    if (ctx?.theme === "dark") document.body.classList.add("dark");
-    else if (ctx?.theme === "light") document.body.classList.remove("dark");
-    if (ctx?.displayMode) handleDisplayModeChange(ctx.displayMode);
-    if (ctx?.containerDimensions) {
-      const d = ctx.containerDimensions;
-      if (d.width) document.body.style.width = d.width + "px";
-      if (d.height) document.body.style.height = d.height + "px";
-      if (d.maxWidth) document.body.style.maxWidth = d.maxWidth + "px";
-      if (d.maxHeight) document.body.style.maxHeight = d.maxHeight + "px";
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
+  }
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
+}
+
+/* ============================================
+   SDK APP INSTANCE (STANDALONE MODE)
+   ============================================ */
+
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  console.info("Resource teardown requested");
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  console.info("Tool input received:", params.arguments);
+};
+
+app.ontoolresult = (params) => {
+  console.info("Tool result received");
+
+  // Check for tool execution errors
+  if (params.isError) {
+    console.error("Tool execution failed:", params.content);
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    console.warn("Tool result received but no data found:", params);
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  console.info("Tool cancelled:", reason);
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  console.error("App error:", error);
+};
+
+app.onhostcontextchanged = (ctx) => {
+  console.info("Host context changed:", ctx);
+  handleHostContextChanged(ctx);
+};
+
+/* ============================================
+   CONNECT TO HOST
+   ============================================ */
+
+app
+  .connect()
+  .then(() => {
+    console.info("MCP App connected to host");
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
     }
   })
-  .catch(() => {});
+  .catch((error) => {
+    console.error("Failed to connect to MCP host:", error);
+  });
 
-export {};
-
-/* ============================================
-   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
-   ============================================ */
-
-const app = new App({
-  name: APP_NAME,
-  version: APP_VERSION,
-});
-
-/* ============================================
-   AUTO-RESIZE VIA SDK
-   ============================================ */
-
-const cleanupResize = app.setupSizeChangedNotifications();
-
-// Clean up on page unload
-window.addEventListener("beforeunload", () => {
-  cleanupResize();
-});
-
-console.info("MCP App initialized (proxy mode - SDK utilities only)");
-
-// Export empty object to ensure this file is treated as an ES module
 export {};

@@ -1,11 +1,10 @@
 /* ============================================
-   GOOGLE MAPS SEARCH MCP APP (SDK VERSION)
+   GOOGLE MAPS SEARCH MCP APP (STANDALONE MODE)
    ============================================
 
    This app uses the official @modelcontextprotocol/ext-apps SDK
-   for utilities only (theme helpers, types, auto-resize).
+   in standalone mode with app.connect().
 
-   It does NOT call app.connect() because the proxy handles initialization.
    ============================================ */
 
 /* ============================================
@@ -54,41 +53,43 @@ function extractData(msg: any) {
  */
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  // Format 1: Standard table format { columns: [], rows: [] }
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
-  // Format 2: Nested in message.template_data (3rd party MCP clients)
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
-  // Format 3: Nested in message.response_content (3rd party MCP clients)
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
-  // Format 4: Common nested patterns
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
-  // Format 5: Direct rows array
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  // Format 6: If data itself is an array
-  if (Array.isArray(data)) {
-    return { rows: data };
+
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
-  
+
   return data;
 }
 
@@ -127,7 +128,7 @@ function showEmpty(message: string = 'No data available.') {
 /* ============================================
    TEMPLATE-SPECIFIC FUNCTIONS
    ============================================
-   
+
    Add your template-specific utility functions here.
    Examples:
    - Data normalization functions
@@ -138,7 +139,7 @@ function showEmpty(message: string = 'No data available.') {
 
 /**
  * Google Maps API Key for constructing photo URLs
- * 
+ *
  * SECURITY NOTE: This API key is visible in the client-side code.
  * To secure it properly:
  * 1. Go to Google Cloud Console → APIs & Services → Credentials
@@ -146,7 +147,7 @@ function showEmpty(message: string = 'No data available.') {
  * 3. Under "Application restrictions", select "HTTP referrers (web sites)"
  * 4. Add your domain(s) (e.g., https://yourdomain.com/*)
  * 5. Under "API restrictions", restrict to: Places API, Maps JavaScript API
- * 
+ *
  * Alternatively, move this to the backend and have the backend add photo URLs to responses.
  */
 const GOOGLE_MAPS_API_KEY = process.env.GOOGLE_MAPS_API_KEY;
@@ -160,12 +161,12 @@ function getPhotoUrl(photo: any, maxWidth: number = 400): string | null {
   if (photo.url) {
     return photo.url;
   }
-  
+
   // If photo has a photo_reference, construct URL with API key
   if (photo.photo_reference && GOOGLE_MAPS_API_KEY) {
     return `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${maxWidth}&photo_reference=${photo.photo_reference}&key=${GOOGLE_MAPS_API_KEY}`;
   }
-  
+
   return null;
 }
 
@@ -191,7 +192,7 @@ function formatRating(rating: number | undefined): string {
 function getPlaceTypeDisplay(types: string[] | undefined): string {
   if (!types || types.length === 0) return 'Place';
   // Filter out generic types
-  const filtered = types.filter(t => 
+  const filtered = types.filter(t =>
     !['point_of_interest', 'establishment'].includes(t)
   );
   if (filtered.length === 0) return types[0] || 'Place';
@@ -243,22 +244,21 @@ function openInGoogleMaps(placeId: string, lat?: number, lng?: number) {
 /* ============================================
    TEMPLATE-SPECIFIC RENDER FUNCTION
    ============================================
-   
+
    This is the main function you need to implement.
    It receives the data and renders it in the app.
-   
+
    Guidelines:
    1. Always validate data before rendering
    2. Use unwrapData() to handle nested structures
    3. Use escapeHtml() when inserting user content
-   4. Call notifySizeChanged() after rendering completes
-   5. Handle errors gracefully with try/catch
+   4. Handle errors gracefully with try/catch
    ============================================ */
 
 function renderData(data: any) {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   if (!data) {
     showEmpty('No data received');
     return;
@@ -267,11 +267,11 @@ function renderData(data: any) {
   try {
     // Unwrap data to handle nested structures
     const unwrapped = unwrapData(data);
-    
+
     // Handle Google Maps Places API response format
     // Data can be: { body: { results: [...] } } or { results: [...] } or directly results array
     let places: any[] = [];
-    
+
     if (unwrapped.body?.results) {
       places = unwrapped.body.results;
     } else if (unwrapped.results) {
@@ -279,15 +279,15 @@ function renderData(data: any) {
     } else if (Array.isArray(unwrapped)) {
       places = unwrapped;
     }
-    
+
     // Store places data for detail view navigation
     app.dataset.placesData = JSON.stringify(data);
-    
+
     if (!places || places.length === 0) {
       showEmpty('No places found');
       return;
     }
-    
+
     // If a place is selected, show detail view
     if (selectedPlaceId) {
       const place = places.find(p => p.place_id === selectedPlaceId);
@@ -296,10 +296,10 @@ function renderData(data: any) {
         return;
       }
     }
-    
+
     // Render list view
     renderPlacesList(places);
-    
+
   } catch (error: any) {
     console.error('Render error:', error);
     showError(`Error rendering data: ${error.message}`);
@@ -309,7 +309,7 @@ function renderData(data: any) {
 function renderPlacesList(places: any[]) {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   app.innerHTML = `
     <div class="maps-container">
       <div class="maps-header">
@@ -323,13 +323,13 @@ function renderPlacesList(places: any[]) {
           <p class="maps-subtitle">${places.length} ${places.length === 1 ? 'place' : 'places'}</p>
         </div>
       </div>
-      
+
       <div class="places-grid">
         ${places.map(place => renderPlaceCard(place)).join('')}
       </div>
     </div>
   `;
-  
+
   // Add click handlers
   const cards = app.querySelectorAll('.place-card');
   cards.forEach(card => {
@@ -349,7 +349,7 @@ function renderPlaceCard(place: any): string {
   const priceLevel = formatPriceLevel(place.price_level);
   const isOpen = place.opening_hours?.open_now;
   const placeType = getPlaceTypeDisplay(place.types);
-  
+
   return `
     <div class="place-card" data-place-id="${escapeHtml(place.place_id)}">
       ${photoUrl ? `
@@ -363,7 +363,7 @@ function renderPlaceCard(place: any): string {
           </svg>
         </div>
       `}
-      
+
       <div class="place-info">
         <div class="place-header">
           <h3 class="place-name" title="${escapeHtml(place.name)}">${escapeHtml(place.name)}</h3>
@@ -373,9 +373,9 @@ function renderPlaceCard(place: any): string {
             </span>
           ` : ''}
         </div>
-        
+
         <p class="place-type">${escapeHtml(placeType)}</p>
-        
+
         <div class="place-rating">
           <span class="rating-stars">${'★'.repeat(Math.floor(rating))}${rating % 1 >= 0.5 ? '½' : ''}</span>
           <span class="rating-value">${formatRating(rating)}</span>
@@ -383,11 +383,11 @@ function renderPlaceCard(place: any): string {
             <span class="rating-count">(${place.user_ratings_total.toLocaleString()})</span>
           ` : ''}
         </div>
-        
+
         ${priceLevel ? `
           <div class="place-price">${priceLevel}</div>
         ` : ''}
-        
+
         <p class="place-address" title="${escapeHtml(place.formatted_address)}">
           ${escapeHtml(place.formatted_address)}
         </p>
@@ -399,7 +399,7 @@ function renderPlaceCard(place: any): string {
 function renderPlaceDetail(place: any) {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   const photo = place.photos && place.photos.length > 0 ? place.photos[0] : null;
   const photoUrl = photo ? getPhotoUrl(photo, 800) : null;
   const rating = place.rating || 0;
@@ -408,7 +408,7 @@ function renderPlaceDetail(place: any) {
   const placeType = getPlaceTypeDisplay(place.types);
   const lat = place.geometry?.location?.lat;
   const lng = place.geometry?.location?.lng;
-  
+
   app.innerHTML = `
     <div class="maps-container">
       <div class="place-detail">
@@ -417,7 +417,7 @@ function renderPlaceDetail(place: any) {
             <path d="M19 12H5M12 19l-7-7 7-7"/>
           </svg>
         </button>
-        
+
         <div class="place-detail-main">
           ${photoUrl ? `
             <div class="place-detail-image">
@@ -430,14 +430,14 @@ function renderPlaceDetail(place: any) {
               </svg>
             </div>
           `}
-          
+
           <div class="place-detail-info">
             <div class="detail-badge">
               <span>${escapeHtml(placeType)}</span>
             </div>
-            
+
             <h1 class="detail-place-name">${escapeHtml(place.name)}</h1>
-            
+
             <div class="place-rating">
               <span class="rating-stars">${'★'.repeat(Math.floor(rating))}${rating % 1 >= 0.5 ? '½' : ''}</span>
               <span class="rating-value">${formatRating(rating)}</span>
@@ -445,19 +445,19 @@ function renderPlaceDetail(place: any) {
                 <span class="rating-count">(${place.user_ratings_total.toLocaleString()} reviews)</span>
               ` : ''}
             </div>
-            
+
             ${priceLevel ? `
               <div class="place-price">${priceLevel}</div>
             ` : ''}
-            
+
             ${isOpen !== undefined ? `
               <div class="place-status ${isOpen ? 'open' : 'closed'}">
                 ${isOpen ? '● Open now' : '● Closed'}
               </div>
             ` : ''}
-            
+
             <p class="detail-address">${escapeHtml(place.formatted_address)}</p>
-            
+
             <div class="detail-actions">
               <button class="maps-link-button" onclick="window.openInGoogleMaps('${escapeHtml(place.place_id)}', ${lat}, ${lng})">
                 <svg viewBox="0 0 24 24" fill="currentColor">
@@ -468,14 +468,14 @@ function renderPlaceDetail(place: any) {
             </div>
           </div>
         </div>
-        
+
         ${place.business_status ? `
           <div class="detail-section">
             <h3 class="detail-section-title">Business Status</h3>
             <p>${escapeHtml(place.business_status)}</p>
           </div>
         ` : ''}
-        
+
         ${place.types && place.types.length > 0 ? `
           <div class="detail-section">
             <h3 class="detail-section-title">Types</h3>
@@ -489,203 +489,116 @@ function renderPlaceDetail(place: any) {
       </div>
     </div>
   `;
-  
+
   // Make functions available globally for onclick handlers
   (window as any).goBackToList = goBackToList;
   (window as any).openInGoogleMaps = openInGoogleMaps;
 }
 
 /* ============================================
-   MESSAGE HANDLER (Standardized MCP Protocol)
-   ============================================
-   
-   This handles all incoming messages from the MCP host.
-   You typically don't need to modify this section.
+   HOST CONTEXT HANDLER
    ============================================ */
 
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    return;
-  }
-  
-  // Handle requests that require responses (like ui/resource-teardown)
-  if (msg.id !== undefined && msg.method === 'ui/resource-teardown') {
-    const reason = msg.params?.reason || 'Resource teardown requested';
-    
-    // Clean up resources
-    // - Clear any timers
-    if (sizeChangeTimeout) {
-      clearTimeout(sizeChangeTimeout);
-      sizeChangeTimeout = null;
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
     }
-    
-    // - Disconnect observers
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-    
-    // Send response to host
-    window.parent.postMessage({
-      jsonrpc: "2.0",
-      id: msg.id,
-      result: {}
-    }, '*');
-    
-    return; // Don't process further
   }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
   }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      const data = msg.params?.structuredContent || msg.params;
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      console.info("Host context changed:", msg.params);
 
-      if (msg.params?.theme) {
-        applyDocumentTheme(msg.params.theme);
-      }
-
-      if (msg.params?.styles?.css?.fonts) {
-        applyHostFonts(msg.params.styles.css.fonts);
-      }
-
-      if (msg.params?.styles?.variables) {
-        applyHostStyleVariables(msg.params.styles.variables);
-      }
-
-      if (msg.params?.displayMode === 'fullscreen') {
-        document.body.classList.add('fullscreen-mode');
-      } else {
-        document.body.classList.remove('fullscreen-mode');
-      }
-      break;
-
-    // Handle tool cancellation
-    case 'ui/notifications/tool-cancelled':
-      const reason = msg.params?.reason || "Unknown reason";
-      console.info("Tool cancelled:", reason);
-      showError(`Operation cancelled: ${reason}`);
-      break;
-
-    // Handle resource teardown (requires response)
-    case 'ui/resource-teardown':
-      console.info("Resource teardown requested");
-
-      if (msg.id !== undefined) {
-        window.parent.postMessage(
-          {
-            jsonrpc: "2.0",
-            id: msg.id,
-            result: {},
-          },
-          "*"
-        );
-      }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      const toolArguments = msg.params?.arguments;
-      if (toolArguments) {
-        console.log('Tool input received:', toolArguments);
-      }
-      break;
-
-    case 'ui/notifications/initialized':
-      break;
-      
-    default:
-      // Unknown method - try to extract data as fallback
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      }
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
   }
-});
 
-/* ============================================
-   MCP COMMUNICATION
-   ============================================
-   
-   Functions for communicating with the MCP host.
-   You typically don't need to modify this section.
-   ============================================ */
-
-let requestIdCounter = 1;
-function sendRequest(method: string, params: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const id = requestIdCounter++;
-    window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, '*');
-    
-    const listener = (event: MessageEvent) => {
-      if (event.data?.id === id) {
-        window.removeEventListener('message', listener);
-        if (event.data?.result) {
-          resolve(event.data.result);
-        } else if (event.data?.error) {
-          reject(new Error(event.data.error.message || 'Unknown error'));
-        }
-      }
-    };
-    window.addEventListener('message', listener);
-    
-    // Timeout after 30 seconds
-    setTimeout(() => {
-      window.removeEventListener('message', listener);
-      reject(new Error('Request timeout'));
-    }, 30000);
-  });
-}
-
-/* ============================================
-   DISPLAY MODE HANDLING
-   ============================================ */
-
-function handleDisplayModeChange(mode: string) {
-  if (mode === 'fullscreen') {
-    document.body.classList.add('fullscreen-mode');
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
   } else {
-    document.body.classList.remove('fullscreen-mode');
+    document.body.classList.remove("fullscreen-mode");
   }
 }
 
 /* ============================================
-   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
+   SDK APP INSTANCE (STANDALONE MODE)
    ============================================ */
 
-const app = new App({
-  name: APP_NAME,
-  version: APP_VERSION,
-});
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  console.info("Resource teardown requested");
+  // Add any cleanup logic specific to this app
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  console.info("Tool input received:", params.arguments);
+};
+
+app.ontoolresult = (params) => {
+  console.info("Tool result received");
+
+  // Check for tool execution errors
+  if (params.isError) {
+    console.error("Tool execution failed:", params.content);
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    console.warn("Tool result received but no data found:", params);
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  console.info("Tool cancelled:", reason);
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  console.error("App error:", error);
+};
+
+app.onhostcontextchanged = (ctx) => {
+  console.info("Host context changed:", ctx);
+  handleHostContextChanged(ctx);
+};
 
 /* ============================================
-   AUTO-RESIZE VIA SDK
+   CONNECT TO HOST
    ============================================ */
 
-const cleanupResize = app.setupSizeChangedNotifications();
-
-// Clean up on page unload
-window.addEventListener("beforeunload", () => {
-  cleanupResize();
-});
-
-console.info("MCP App initialized (proxy mode - SDK utilities only)");
+app
+  .connect()
+  .then(() => {
+    console.info("MCP App connected to host");
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    console.error("Failed to connect to MCP host:", error);
+  });
 
 // Export empty object to ensure this file is treated as an ES module
 export {};

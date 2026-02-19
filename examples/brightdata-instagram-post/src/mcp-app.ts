@@ -1,11 +1,11 @@
 /* ============================================
-   BRIGHTDATA INSTAGRAM POST MCP APP (SDK VERSION)
+   BRIGHTDATA INSTAGRAM POST MCP APP (STANDALONE MODE)
    ============================================
 
-   This app uses the official @modelcontextprotocol/ext-apps SDK
-   for utilities only (theme helpers, types, auto-resize).
+   Displays a single Instagram post with media, engagement stats,
+   comments, and tagged users.
 
-   It does NOT call app.connect() because the proxy handles initialization.
+   Uses app.connect() for standalone MCP Apps protocol communication.
    ============================================ */
 
 /* ============================================
@@ -35,52 +35,47 @@ const APP_VERSION = "1.0.0";
    ============================================ */
 
 /**
- * Extract data from MCP protocol messages
- */
-function extractData(msg: any) {
-  if (msg?.params?.structuredContent !== undefined) {
-    return msg.params.structuredContent;
-  }
-  if (msg?.params !== undefined) {
-    return msg.params;
-  }
-  return msg;
-}
-
-/**
  * Unwrap nested API response structures
  */
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  if (Array.isArray(data)) {
-    return { rows: data };
+
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
-  
+
   return data;
 }
 
@@ -142,12 +137,12 @@ function formatRelativeTime(dateString: string): string {
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
-  
+
   if (diffMins < 1) return 'Just now';
   if (diffMins < 60) return `${diffMins}m`;
   if (diffHours < 24) return `${diffHours}h`;
   if (diffDays < 7) return `${diffDays}d`;
-  
+
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return `${months[date.getMonth()]} ${date.getDate()}`;
 }
@@ -157,22 +152,22 @@ function formatRelativeTime(dateString: string): string {
  */
 function extractPostData(data: any): any {
   const unwrapped = unwrapData(data);
-  
+
   // Handle API response format: { status_code: 200, body: [...] }
   if (unwrapped?.body && Array.isArray(unwrapped.body) && unwrapped.body.length > 0) {
     return unwrapped.body[0];
   }
-  
+
   // Handle direct post object
   if (unwrapped?.user_posted || unwrapped?.post_id) {
     return unwrapped;
   }
-  
+
   // Handle array of posts
   if (Array.isArray(unwrapped) && unwrapped.length > 0) {
     return unwrapped[0];
   }
-  
+
   return unwrapped;
 }
 
@@ -183,11 +178,11 @@ function renderMedia(post: any): string {
   const photos = post.photos || [];
   const videos = post.videos || [];
   const allMedia = [...photos, ...videos];
-  
+
   if (allMedia.length === 0) {
     return '<div class="no-media">No media available</div>';
   }
-  
+
   if (allMedia.length === 1) {
     const isVideo = videos.length > 0 && allMedia[0] === videos[0];
     return `
@@ -203,7 +198,7 @@ function renderMedia(post: any): string {
       </div>
     `;
   }
-  
+
   // Multiple media - show carousel
   return `
     <div class="media-container carousel">
@@ -244,7 +239,7 @@ function renderComments(comments: any[]): string {
   if (!comments || comments.length === 0) {
     return '';
   }
-  
+
   return `
     <div class="comments-section">
       ${comments.slice(0, 5).map((comment: any) => `
@@ -275,7 +270,7 @@ function renderComments(comments: any[]): string {
 function renderData(data: any) {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   if (!data) {
     showEmpty('No post data received');
     return;
@@ -283,12 +278,12 @@ function renderData(data: any) {
 
   try {
     const post = extractPostData(data);
-    
+
     if (!post || !post.user_posted) {
       showEmpty('Invalid post data format');
       return;
     }
-    
+
     const {
       user_posted,
       description,
@@ -307,7 +302,7 @@ function renderData(data: any) {
       content_type,
       url
     } = post;
-    
+
     app.innerHTML = `
       <div class="container">
         <div class="instagram-post">
@@ -338,10 +333,10 @@ function renderData(data: any) {
               </a>
             ` : ''}
           </div>
-          
+
           <!-- Media -->
           ${renderMedia(post)}
-          
+
           <!-- Engagement Bar -->
           <div class="engagement-bar">
             <div class="engagement-icons">
@@ -353,7 +348,7 @@ function renderData(data: any) {
               ${likes ? `<span class="likes-count">${formatNumber(likes)} likes</span>` : ''}
             </div>
           </div>
-          
+
           <!-- Caption -->
           ${description ? `
             <div class="post-caption">
@@ -361,17 +356,17 @@ function renderData(data: any) {
               <span>${escapeHtml(description)}</span>
             </div>
           ` : ''}
-          
+
           <!-- View Comments Link -->
           ${num_comments > 0 ? `
             <div class="view-comments">
               View all ${formatNumber(num_comments)} comments
             </div>
           ` : ''}
-          
+
           <!-- Comments -->
           ${renderComments(latest_comments)}
-          
+
           <!-- Tagged Users -->
           ${tagged_users && tagged_users.length > 0 ? `
             <div class="tagged-users">
@@ -384,7 +379,7 @@ function renderData(data: any) {
               `).join(', ')}
             </div>
           ` : ''}
-          
+
           <!-- Post Meta -->
           <div class="post-meta">
             ${date_posted ? `
@@ -397,16 +392,16 @@ function renderData(data: any) {
         </div>
       </div>
     `;
-    
+
     // Setup carousel navigation
     const carouselItems = app.querySelectorAll('.carousel-item');
     const carouselDots = app.querySelectorAll('.carousel-dots .dot');
     const prevBtn = app.querySelector('#carouselPrev');
     const nextBtn = app.querySelector('#carouselNext');
-    
+
     if (carouselItems.length > 1) {
       let currentIndex = 0;
-      
+
       const showSlide = (index: number) => {
         carouselItems.forEach((item, idx) => {
           item.classList.toggle('active', idx === index);
@@ -416,28 +411,26 @@ function renderData(data: any) {
         });
         currentIndex = index;
       };
-      
+
       if (prevBtn) {
         prevBtn.addEventListener('click', () => {
           showSlide((currentIndex - 1 + carouselItems.length) % carouselItems.length);
         });
       }
-      
+
       if (nextBtn) {
         nextBtn.addEventListener('click', () => {
           showSlide((currentIndex + 1) % carouselItems.length);
         });
       }
-      
+
       carouselDots.forEach((dot, idx) => {
         dot.addEventListener('click', () => {
           showSlide(idx);
         });
       });
     }
-    
-    // Notify host of size change after rendering completes
-    
+
   } catch (error: any) {
     console.error('Render error:', error);
     showError(`Error rendering post data: ${error.message}`);
@@ -445,114 +438,107 @@ function renderData(data: any) {
 }
 
 /* ============================================
-   MESSAGE HANDLER (Standardized MCP Protocol)
+   HOST CONTEXT HANDLER
    ============================================ */
 
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    return;
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
   }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
   }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      const data = msg.params?.structuredContent || msg.params;
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      console.info("Host context changed:", msg.params);
 
-      if (msg.params?.theme) {
-        applyDocumentTheme(msg.params.theme);
-      }
-
-      if (msg.params?.styles?.css?.fonts) {
-        applyHostFonts(msg.params.styles.css.fonts);
-      }
-
-      if (msg.params?.styles?.variables) {
-        applyHostStyleVariables(msg.params.styles.variables);
-      }
-
-      if (msg.params?.displayMode === 'fullscreen') {
-        document.body.classList.add('fullscreen-mode');
-      } else {
-        document.body.classList.remove('fullscreen-mode');
-      }
-      break;
-
-    // Handle tool cancellation
-    case 'ui/notifications/tool-cancelled':
-      const reason = msg.params?.reason || "Unknown reason";
-      console.info("Tool cancelled:", reason);
-      showError(`Operation cancelled: ${reason}`);
-      break;
-
-    // Handle resource teardown (requires response)
-    case 'ui/resource-teardown':
-      console.info("Resource teardown requested");
-
-      if (msg.id !== undefined) {
-        window.parent.postMessage(
-          {
-            jsonrpc: "2.0",
-            id: msg.id,
-            result: {},
-          },
-          "*"
-        );
-      }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      break;
-      
-    case 'ui/notifications/initialized':
-      break;
-      
-    default:
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      }
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
   }
-});
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
+}
 
 /* ============================================
-   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
+   SDK APP INSTANCE (STANDALONE MODE)
    ============================================ */
 
-const app = new App({
-  name: APP_NAME,
-  version: APP_VERSION,
-});
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  console.info("Resource teardown requested");
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  console.info("Tool input received:", params.arguments);
+};
+
+app.ontoolresult = (params) => {
+  console.info("Tool result received");
+
+  // Check for tool execution errors
+  if (params.isError) {
+    console.error("Tool execution failed:", params.content);
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    console.warn("Tool result received but no data found:", params);
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  console.info("Tool cancelled:", reason);
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  console.error("App error:", error);
+};
+
+app.onhostcontextchanged = (ctx) => {
+  console.info("Host context changed:", ctx);
+  handleHostContextChanged(ctx);
+};
 
 /* ============================================
-   AUTO-RESIZE VIA SDK
+   CONNECT TO HOST
    ============================================ */
 
-const cleanupResize = app.setupSizeChangedNotifications();
+app
+  .connect()
+  .then(() => {
+    console.info("MCP App connected to host");
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    console.error("Failed to connect to MCP host:", error);
+  });
 
-// Clean up on page unload
-window.addEventListener("beforeunload", () => {
-  cleanupResize();
-});
-
-console.info("MCP App initialized (proxy mode - SDK utilities only)");
-
-// Export empty object to ensure this file is treated as an ES module
 export {};

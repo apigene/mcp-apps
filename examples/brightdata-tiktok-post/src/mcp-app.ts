@@ -1,11 +1,9 @@
 /* ============================================
-   BRIGHTDATA TIKTOK POST MCP APP (SDK VERSION)
+   BRIGHTDATA TIKTOK POST MCP APP (STANDALONE MODE)
    ============================================
 
    This app uses the official @modelcontextprotocol/ext-apps SDK
-   for utilities only (theme helpers, types, auto-resize).
-
-   It does NOT call app.connect() because the proxy handles initialization.
+   in standalone mode with app.connect() for full MCP integration.
    ============================================ */
 
 /* ============================================
@@ -54,41 +52,43 @@ function extractData(msg: any) {
  */
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  // Format 1: Standard table format { columns: [], rows: [] }
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
-  // Format 2: Nested in message.template_data (3rd party MCP clients)
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
-  // Format 3: Nested in message.response_content (3rd party MCP clients)
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
-  // Format 4: Common nested patterns
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
-  // Format 5: Direct rows array
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  // Format 6: If data itself is an array
-  if (Array.isArray(data)) {
-    return { rows: data };
+
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
-  
+
   return data;
 }
 
@@ -127,7 +127,7 @@ function showEmpty(message: string = 'No data available.') {
 /* ============================================
    TEMPLATE-SPECIFIC FUNCTIONS
    ============================================
-   
+
    TikTok Post specific utility functions
    ============================================ */
 
@@ -158,12 +158,12 @@ function formatRelativeTime(dateString: string | undefined): string {
   const diffMins = Math.floor(diffSecs / 60);
   const diffHours = Math.floor(diffMins / 60);
   const diffDays = Math.floor(diffHours / 24);
-  
+
   if (diffSecs < 60) return 'Just now';
   if (diffMins < 60) return `${diffMins}m ago`;
   if (diffHours < 24) return `${diffHours}h ago`;
   if (diffDays < 7) return `${diffDays}d ago`;
-  
+
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
 }
 
@@ -192,10 +192,10 @@ function getInitials(username: string | undefined): string {
 /* ============================================
    TEMPLATE-SPECIFIC RENDER FUNCTION
    ============================================
-   
+
    This is the main function you need to implement.
    It receives the data and renders it in the app.
-   
+
    Guidelines:
    1. Always validate data before rendering
    2. Use unwrapData() to handle nested structures
@@ -206,7 +206,7 @@ function getInitials(username: string | undefined): string {
 function renderData(data: any) {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   if (!data) {
     showEmpty('No TikTok post data received');
     return;
@@ -215,7 +215,7 @@ function renderData(data: any) {
   try {
     // Unwrap nested structures
     const unwrapped = unwrapData(data);
-    
+
     // Handle array response (body is an array)
     let post: any;
     if (Array.isArray(unwrapped)) {
@@ -227,12 +227,12 @@ function renderData(data: any) {
     } else {
       post = unwrapped;
     }
-    
+
     if (!post) {
       showEmpty('No post data found');
       return;
     }
-    
+
     const url = post.url || '';
     const postId = post.post_id || '';
     const description = post.description || '';
@@ -246,7 +246,7 @@ function renderData(data: any) {
     const videoUrl = post.video_url || post.cdn_link || '';
     const previewImage = post.preview_image || '';
     const postType = post.post_type || 'video';
-    
+
     // Profile info
     const profileUsername = post.profile_username || post.account_id || '';
     const profileUrl = post.profile_url || '';
@@ -254,28 +254,28 @@ function renderData(data: any) {
     const profileBiography = post.profile_biography || '';
     const profileFollowers = post.profile_followers || 0;
     const isVerified = post.is_verified || false;
-    
+
     // Music info
     const music = post.music || {};
     const musicTitle = music.title || '';
     const musicAuthor = music.authorname || '';
     const musicCover = music.covermedium || '';
-    
+
     app.innerHTML = `
       <div class="tiktok-container">
         <!-- Post Card -->
         <div class="post-card">
           <!-- Video/Image Preview -->
           <div class="post-media">
-            ${previewImage 
+            ${previewImage
               ? `<img src="${escapeHtml(previewImage)}" alt="Post preview" class="post-preview" onerror="this.style.display='none';" />`
               : ''
             }
-            ${videoDuration > 0 
+            ${videoDuration > 0
               ? `<div class="video-duration">${formatDuration(videoDuration)}</div>`
               : ''
             }
-            ${videoUrl 
+            ${videoUrl
               ? `<a href="${escapeHtml(videoUrl)}" target="_blank" rel="noopener noreferrer" class="play-button">
                   <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <circle cx="24" cy="24" r="24" fill="rgba(0, 0, 0, 0.5)"/>
@@ -285,13 +285,13 @@ function renderData(data: any) {
               : ''
             }
           </div>
-          
+
           <!-- Post Content -->
           <div class="post-content">
             <!-- Profile Header -->
             <div class="profile-header">
               <div class="profile-avatar-wrapper">
-                ${profileAvatar 
+                ${profileAvatar
                   ? `<img src="${escapeHtml(profileAvatar)}" alt="${escapeHtml(profileUsername)}" class="profile-avatar" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />`
                   : ''
                 }
@@ -304,43 +304,43 @@ function renderData(data: any) {
                   <a href="${escapeHtml(profileUrl)}" target="_blank" rel="noopener noreferrer" class="profile-username">
                     @${escapeHtml(profileUsername)}
                   </a>
-                  ${isVerified 
+                  ${isVerified
                     ? `<span class="verified-badge" title="Verified">✓</span>`
                     : ''
                   }
                 </div>
-                ${profileBiography 
+                ${profileBiography
                   ? `<div class="profile-bio">${escapeHtml(profileBiography)}</div>`
                   : ''
                 }
-                ${profileFollowers > 0 
+                ${profileFollowers > 0
                   ? `<div class="profile-followers">${formatNumber(profileFollowers)} followers</div>`
                   : ''
                 }
               </div>
             </div>
-            
+
             <!-- Description -->
-            ${description 
+            ${description
               ? `<div class="post-description">${escapeHtml(description)}</div>`
               : ''
             }
-            
+
             <!-- Music Info -->
-            ${musicTitle || musicAuthor 
+            ${musicTitle || musicAuthor
               ? `<div class="music-info">
-                  ${musicCover 
+                  ${musicCover
                     ? `<img src="${escapeHtml(musicCover)}" alt="Music cover" class="music-cover" onerror="this.style.display='none';" />`
                     : ''
                   }
                   <div class="music-details">
                     <div class="music-icon">🎵</div>
                     <div class="music-text">
-                      ${musicTitle 
+                      ${musicTitle
                         ? `<div class="music-title">${escapeHtml(musicTitle)}</div>`
                         : ''
                       }
-                      ${musicAuthor 
+                      ${musicAuthor
                         ? `<div class="music-author">${escapeHtml(musicAuthor)}</div>`
                         : ''
                       }
@@ -349,7 +349,7 @@ function renderData(data: any) {
                 </div>`
               : ''
             }
-            
+
             <!-- Engagement Stats -->
             <div class="engagement-stats">
               <div class="stat-item">
@@ -373,18 +373,18 @@ function renderData(data: any) {
                 <span class="stat-value">${formatNumber(playCount)}</span>
               </div>
             </div>
-            
+
             <!-- Post Meta -->
             <div class="post-meta">
-              ${createTime 
+              ${createTime
                 ? `<span class="post-time">${formatRelativeTime(createTime)}</span>`
                 : ''
               }
-              ${postType 
+              ${postType
                 ? `<span class="post-type">${escapeHtml(postType)}</span>`
                 : ''
               }
-              ${url 
+              ${url
                 ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="post-link">View on TikTok →</a>`
                 : ''
               }
@@ -401,126 +401,9 @@ function renderData(data: any) {
 }
 
 /* ============================================
-   MESSAGE HANDLER (Standardized MCP Protocol)
-   ============================================
-   
-   This handles all incoming messages from the MCP host.
-   You typically don't need to modify this section.
-   ============================================ */
-
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    return;
-  }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
-  }
-  
-  // Handle requests that require responses (like ui/resource-teardown)
-  if (msg.id !== undefined && msg.method === 'ui/resource-teardown') {
-    console.info("Resource teardown requested");
-
-    // Send response to host (required for teardown)
-    window.parent.postMessage({
-      jsonrpc: "2.0",
-      id: msg.id,
-      result: {}
-    }, '*');
-
-    return;
-  }
-
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      const data = msg.params?.structuredContent || msg.params;
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      if (msg.params?.theme) {
-        applyDocumentTheme(msg.params.theme);
-      }
-      if (msg.params?.styles?.css?.fonts) {
-        applyHostFonts(msg.params.styles.css.fonts);
-      }
-      if (msg.params?.styles?.variables) {
-        applyHostStyleVariables(msg.params.styles.variables);
-      }
-      if (msg.params?.displayMode) {
-        handleDisplayModeChange(msg.params.displayMode);
-      }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      // Tool input notification (optional - handle if needed)
-      break;
-      
-    case 'ui/notifications/initialized':
-      // Initialization notification (optional - handle if needed)
-      break;
-      
-    default:
-      // Unknown method - try to extract data as fallback
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      }
-  }
-});
-
-/* ============================================
-   MCP COMMUNICATION
-   ============================================
-   
-   Functions for communicating with the MCP host.
-   You typically don't need to modify this section.
-   ============================================ */
-
-let requestIdCounter = 1;
-function sendRequest(method: string, params: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const id = requestIdCounter++;
-    window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, '*');
-    
-    const listener = (event: MessageEvent) => {
-      if (event.data?.id === id) {
-        window.removeEventListener('message', listener);
-        if (event.data?.result) {
-          resolve(event.data.result);
-        } else if (event.data?.error) {
-          reject(new Error(event.data.error.message || 'Unknown error'));
-        }
-      }
-    };
-    window.addEventListener('message', listener);
-    
-    // Timeout after 5 seconds
-    setTimeout(() => {
-      window.removeEventListener('message', listener);
-      reject(new Error('Request timeout'));
-    }, 5000);
-  });
-}
-
-function sendNotification(method: string, params: any) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, '*');
-}
-
-/* ============================================
    DISPLAY MODE HANDLING
    ============================================
-   
+
    Handles switching between inline and fullscreen display modes.
    You may want to customize handleDisplayModeChange() to adjust
    your layout for fullscreen mode.
@@ -547,44 +430,108 @@ function handleDisplayModeChange(mode: string) {
   }
 }
 
-function requestDisplayMode(mode: string): Promise<any> {
-  return sendRequest('ui/request-display-mode', { mode: mode })
-    .then(result => {
-      if (result?.mode) {
-        handleDisplayModeChange(result.mode);
-      }
-      return result;
-    })
-    .catch(err => {
-      console.warn('Failed to request display mode:', err);
-      throw err;
-    });
+/* ============================================
+   HOST CONTEXT HANDLER
+   ============================================ */
+
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
+  }
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
+  }
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
+  }
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
 }
 
-// Make function globally accessible for testing/debugging
-(window as any).requestDisplayMode = requestDisplayMode;
-
 /* ============================================
-   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
+   SDK APP INSTANCE (STANDALONE MODE)
    ============================================ */
 
-const app = new App({
-  name: APP_NAME,
-  version: APP_VERSION,
-});
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  console.info("Resource teardown requested");
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  console.info("Tool input received:", params.arguments);
+};
+
+app.ontoolresult = (params) => {
+  console.info("Tool result received");
+
+  // Check for tool execution errors
+  if (params.isError) {
+    console.error("Tool execution failed:", params.content);
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    console.warn("Tool result received but no data found:", params);
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  console.info("Tool cancelled:", reason);
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  console.error("App error:", error);
+};
+
+app.onhostcontextchanged = (ctx) => {
+  console.info("Host context changed:", ctx);
+  handleHostContextChanged(ctx);
+};
 
 /* ============================================
-   AUTO-RESIZE VIA SDK
+   CONNECT TO HOST
    ============================================ */
 
-const cleanupResize = app.setupSizeChangedNotifications();
+app
+  .connect()
+  .then(() => {
+    console.info("MCP App connected to host");
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    console.error("Failed to connect to MCP host:", error);
+  });
 
-// Clean up on page unload
-window.addEventListener("beforeunload", () => {
-  cleanupResize();
-});
-
-console.info("MCP App initialized (proxy mode - SDK utilities only)");
-
-// Export empty object to ensure this file is treated as an ES module
 export {};
