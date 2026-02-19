@@ -1,29 +1,39 @@
 /* ============================================
-   AMAZON PRODUCT DETAILS MCP APP
+   AMAZON PRODUCT DETAILS MCP APP (STANDALONE MODE)
    ============================================
-   
+
    Displays a single Amazon product with full details: title, description,
    images, pricing, variations, features, product details, delivery, etc.
    Expects API response format: { status_code: 200, body: [product] }
+
+   Uses app.connect() for standalone MCP Apps protocol communication.
+   ============================================ */
+
+/* ============================================
+   SDK IMPORTS
+   ============================================ */
+
+import {
+  App,
+  applyDocumentTheme,
+  applyHostFonts,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
+
+// Import styles (will be bundled by Vite)
+import "./global.css";
+import "./mcp-app.css";
+
+/* ============================================
+   APP CONFIGURATION
    ============================================ */
 
 const APP_NAME = "Amazon Product Details";
 const APP_VERSION = "1.0.0";
-const PROTOCOL_VERSION = "2026-01-26";
 
 /* ============================================
    COMMON UTILITY FUNCTIONS
    ============================================ */
-
-function extractData(msg: any) {
-  if (msg?.params?.structuredContent !== undefined) {
-    return msg.params.structuredContent;
-  }
-  if (msg?.params !== undefined) {
-    return msg.params;
-  }
-  return msg;
-}
 
 function unwrapData(data: any): any {
   if (!data) return null;
@@ -53,14 +63,6 @@ function unwrapData(data: any): any {
   return data;
 }
 
-function initializeDarkMode() {
-  if (window.matchMedia?.("(prefers-color-scheme: dark)").matches) {
-    document.body.classList.add("dark");
-  }
-  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e: MediaQueryListEvent) => {
-    document.body.classList.toggle("dark", e.matches);
-  });
-}
 
 function escapeHtml(str: any): string {
   if (typeof str !== "string") return str ? String(str) : "";
@@ -130,7 +132,6 @@ function renderData(data: any) {
     const product = extractProduct(data);
     if (!product) {
       showEmpty("No product found in response.");
-      setTimeout(notifySizeChanged, 50);
       return;
     }
 
@@ -287,101 +288,18 @@ function renderData(data: any) {
     `;
 
     app.innerHTML = html;
-    setTimeout(notifySizeChanged, 50);
   } catch (err: any) {
-    console.error("Render error:", err);
+    app.sendLog({ level: "error", data: `Render error: ${JSON.stringify(err)}`, logger: APP_NAME });
     showError(`Error rendering product: ${err?.message ?? "Unknown error"}`);
-    setTimeout(notifySizeChanged, 50);
   }
 }
 
 /* ============================================
-   MESSAGE HANDLER
-   ============================================ */
-
-window.addEventListener("message", function (event: MessageEvent) {
-  const msg = event.data;
-  if (!msg || msg.jsonrpc !== "2.0") {
-    if (msg && typeof msg === "object" && (msg.status_code !== undefined || msg.body !== undefined || msg.message?.status_code !== undefined)) {
-      renderData(msg);
-    }
-    return;
-  }
-  if (msg.id !== undefined && msg.method === "ui/resource-teardown") {
-    if (sizeChangeTimeout) {
-      clearTimeout(sizeChangeTimeout);
-      sizeChangeTimeout = null;
-    }
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-    window.parent.postMessage({ jsonrpc: "2.0", id: msg.id, result: {} }, "*");
-    return;
-  }
-  if (msg.id !== undefined && !msg.method) return;
-
-  switch (msg.method) {
-    case "ui/notifications/tool-result":
-      const data = msg.params?.structuredContent ?? msg.params;
-      if (data !== undefined) renderData(data);
-      else showEmpty("No data received");
-      break;
-    case "ui/notifications/host-context-changed":
-      if (msg.params?.theme === "dark") document.body.classList.add("dark");
-      else if (msg.params?.theme === "light") document.body.classList.remove("dark");
-      if (msg.params?.displayMode) handleDisplayModeChange(msg.params.displayMode);
-      break;
-    case "ui/notifications/tool-input":
-      if (msg.params?.arguments) console.log("Tool input:", msg.params.arguments);
-      break;
-    case "ui/notifications/tool-cancelled":
-      showError(`Cancelled: ${msg.params?.reason ?? "Tool cancelled"}`);
-      break;
-    case "ui/notifications/initialized":
-      break;
-    default:
-      if (msg.params) {
-        const fallback = msg.params.structuredContent ?? msg.params;
-        if (fallback && fallback !== msg) renderData(fallback);
-      } else if (msg.message ?? msg.status_code ?? msg.body) {
-        renderData(msg);
-      }
-  }
-});
-
-/* ============================================
-   MCP COMMUNICATION
-   ============================================ */
-
-let requestIdCounter = 1;
-function sendRequest(method: string, params: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const id = requestIdCounter++;
-    window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, "*");
-    const listener = (e: MessageEvent) => {
-      if (e.data?.id !== id) return;
-      window.removeEventListener("message", listener);
-      if (e.data?.result) resolve(e.data.result);
-      else if (e.data?.error) reject(new Error(e.data.error?.message ?? "Unknown error"));
-    };
-    window.addEventListener("message", listener);
-    setTimeout(() => {
-      window.removeEventListener("message", listener);
-      reject(new Error("Request timeout"));
-    }, 5000);
-  });
-}
-
-function sendNotification(method: string, params: any) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, "*");
-}
-
-/* ============================================
-   DISPLAY MODE & SIZE
+   DISPLAY MODE HANDLER
    ============================================ */
 
 let currentDisplayMode = "inline";
+
 function handleDisplayModeChange(mode: string) {
   currentDisplayMode = mode;
   document.body.classList.toggle("fullscreen-mode", mode === "fullscreen");
@@ -390,68 +308,112 @@ function handleDisplayModeChange(mode: string) {
     (container as HTMLElement).style.maxWidth = mode === "fullscreen" ? "100%" : "";
     (container as HTMLElement).style.padding = mode === "fullscreen" ? "20px" : "";
   }
-  setTimeout(notifySizeChanged, 100);
-}
-
-function requestDisplayMode(mode: string): Promise<any> {
-  return sendRequest("ui/request-display-mode", { mode }).then((r) => {
-    if (r?.mode) handleDisplayModeChange(r.mode);
-    return r;
-  });
-}
-(window as any).requestDisplayMode = requestDisplayMode;
-
-function notifySizeChanged() {
-  const w = document.body.scrollWidth || document.documentElement.scrollWidth;
-  const h = document.body.scrollHeight || document.documentElement.scrollHeight;
-  sendNotification("ui/notifications/size-changed", { width: w, height: h });
-}
-
-let sizeChangeTimeout: ReturnType<typeof setTimeout> | null = null;
-function debouncedNotifySizeChanged() {
-  if (sizeChangeTimeout) clearTimeout(sizeChangeTimeout);
-  sizeChangeTimeout = setTimeout(notifySizeChanged, 100);
-}
-
-let resizeObserver: ResizeObserver | null = null;
-function setupSizeObserver() {
-  if (typeof ResizeObserver !== "undefined") {
-    resizeObserver = new ResizeObserver(debouncedNotifySizeChanged);
-    resizeObserver.observe(document.body);
-  } else {
-    window.addEventListener("resize", debouncedNotifySizeChanged);
-    const mo = new MutationObserver(debouncedNotifySizeChanged);
-    mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["style", "class"] });
-  }
-  setTimeout(notifySizeChanged, 100);
 }
 
 /* ============================================
-   INITIALIZATION
+   HOST CONTEXT HANDLER
    ============================================ */
 
-sendRequest("ui/initialize", {
-  appCapabilities: { availableDisplayModes: ["inline", "fullscreen"] },
-  appInfo: { name: APP_NAME, version: APP_VERSION },
-  protocolVersion: PROTOCOL_VERSION,
-})
-  .then((result: any) => {
-    const ctx = result?.hostContext ?? result;
-    sendNotification("ui/notifications/initialized", {});
-    if (ctx?.theme === "dark") document.body.classList.add("dark");
-    else if (ctx?.theme === "light") document.body.classList.remove("dark");
-    if (ctx?.displayMode) handleDisplayModeChange(ctx.displayMode);
-    const dims = ctx?.containerDimensions;
-    if (dims) {
-      if (dims.width) document.body.style.width = dims.width + "px";
-      if (dims.height) document.body.style.height = dims.height + "px";
-      if (dims.maxWidth) document.body.style.maxWidth = dims.maxWidth + "px";
-      if (dims.maxHeight) document.body.style.maxHeight = dims.maxHeight + "px";
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
+  }
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
+  }
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
+  }
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+    handleDisplayModeChange("fullscreen");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+    handleDisplayModeChange("inline");
+  }
+}
+
+/* ============================================
+   SDK APP INSTANCE (STANDALONE MODE)
+   ============================================ */
+
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  app.sendLog({ level: "info", data: "Resource teardown requested", logger: APP_NAME });
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  app.sendLog({ level: "info", data: `Tool input received: ${JSON.stringify(params.arguments)}`, logger: APP_NAME });
+};
+
+app.ontoolresult = (params) => {
+  app.sendLog({ level: "info", data: "Tool result received", logger: APP_NAME });
+
+  // Check for tool execution errors
+  if (params.isError) {
+    app.sendLog({ level: "error", data: `Tool execution failed: ${JSON.stringify(params.content)}`, logger: APP_NAME });
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    app.sendLog({ level: "warning", data: `Tool result received but no data found: ${JSON.stringify(params)}`, logger: APP_NAME });
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  app.sendLog({ level: "info", data: `Tool cancelled: ${reason}`, logger: APP_NAME });
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  app.sendLog({ level: "error", data: `App error: ${JSON.stringify(error)}`, logger: APP_NAME });
+};
+
+app.onhostcontextchanged = (ctx) => {
+  app.sendLog({ level: "info", data: `Host context changed: ${JSON.stringify(ctx)}`, logger: APP_NAME });
+  handleHostContextChanged(ctx);
+};
+
+/* ============================================
+   CONNECT TO HOST
+   ============================================ */
+
+app
+  .connect()
+  .then(() => {
+    app.sendLog({ level: "info", data: "MCP App connected to host", logger: APP_NAME });
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
     }
   })
-  .catch((err) => console.warn("MCP init failed:", err));
-
-initializeDarkMode();
-setupSizeObserver();
+  .catch((error) => {
+    app.sendLog({ level: "error", data: `Failed to connect to MCP host: ${JSON.stringify(error)}`, logger: APP_NAME });
+  });
 
 export {};

@@ -1,13 +1,35 @@
 /* ============================================
-   Gmail Inbox MCP App
+   GMAIL THREAD LIST MCP APP (STANDALONE MODE)
    ============================================
+
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   in standalone mode with app.connect().
+
    Renders Gmail API threads list (users.me.threads) as a
    Gmail-style inbox widget with follow-up actions.
    ============================================ */
 
-const APP_NAME = "Gmail Inbox";
+/* ============================================
+   SDK IMPORTS
+   ============================================ */
+
+import {
+  App,
+  applyDocumentTheme,
+  applyHostFonts,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
+
+// Import styles (will be bundled by Vite)
+import "./global.css";
+import "./mcp-app.css";
+
+/* ============================================
+   APP CONFIGURATION
+   ============================================ */
+
+const APP_NAME = "Gmail Thread List";
 const APP_VERSION = "1.0.0";
-const PROTOCOL_VERSION = "2026-01-26";
 
 const GMAIL_INBOX_URL = "https://mail.google.com/mail/u/0/#inbox/";
 
@@ -34,17 +56,9 @@ function unwrapData(data: any): any {
   return data;
 }
 
-function initializeDarkMode() {
-  if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-    document.body.classList.add("dark");
-  }
-  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e: MediaQueryListEvent) => {
-    document.body.classList.toggle("dark", e.matches);
-  });
-}
 
 function escapeHtml(str: any): string {
-  if (typeof str !== "string") return str;
+  if (typeof str !== "string") return String(str);
   const div = document.createElement("div");
   div.textContent = str;
   return div.innerHTML;
@@ -131,6 +145,9 @@ function iconMail(): string {
   return `<svg class="gmail-icon gmail-icon-thread" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>`;
 }
 
+// Store threads for reply button handler
+let currentThreads: any[] = [];
+
 function renderThreadRow(thread: any, index: number): string {
   const id = thread.id || "";
   const snippet = truncateSnippet(thread.snippet || "");
@@ -144,7 +161,7 @@ function renderThreadRow(thread: any, index: number): string {
       </div>
       <div class="gmail-thread-actions">
         <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="gmail-action-icon gmail-open" title="Open in Gmail">${iconOpenInNew()}</a>
-        <button type="button" class="gmail-action-icon gmail-reply-prompt" data-thread-id="${escapeHtml(id)}" title="Reply">${iconReply()}</button>
+        <button type="button" class="gmail-action-icon gmail-reply-prompt" data-thread-id="${escapeHtml(id)}" data-thread-index="${index}" title="Reply">${iconReply()}</button>
       </div>
     </div>
   `;
@@ -166,6 +183,9 @@ function renderData(data: any) {
       showEmpty("No threads in this date range.");
       return;
     }
+
+    // Store threads for reply handler
+    currentThreads = threads;
 
     let html = '<div class="gmail-widget">';
     html += '<header class="gmail-header">';
@@ -201,178 +221,131 @@ function renderData(data: any) {
     app.innerHTML = html;
 
     // Reply buttons: suggest a follow-up to the host
-    app.querySelectorAll(".gmail-reply-prompt").forEach((btn, i) => {
+    app.querySelectorAll(".gmail-reply-prompt").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         e.preventDefault();
         const threadId = (btn as HTMLElement).getAttribute("data-thread-id");
-        const thread = threads[i];
+        const threadIndex = parseInt((btn as HTMLElement).getAttribute("data-thread-index") || "0", 10);
+        const thread = currentThreads[threadIndex];
         const snippet = thread ? truncateSnippet(thread.snippet || "", 80) : "";
         const msg = `Reply to Gmail thread ${threadId}${snippet ? `: "${snippet}"` : ""}`;
-        sendNotification("ui/notifications/follow-up-suggestion", { message: msg, threadId });
+        // Copy to clipboard as fallback action
         if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
           navigator.clipboard.writeText(msg).catch(() => {});
         }
       });
     });
 
-    setTimeout(() => notifySizeChanged(), 50);
   } catch (err: any) {
-    console.error("Render error:", err);
+    app.sendLog({ level: "error", data: `Render error: ${JSON.stringify(err)}`, logger: APP_NAME });
     showError(`Error rendering inbox: ${err.message}`);
-    setTimeout(() => notifySizeChanged(), 50);
   }
 }
 
-window.addEventListener("message", function (event: MessageEvent) {
-  const msg = event.data;
-  if (!msg || msg.jsonrpc !== "2.0") return;
+/* ============================================
+   HOST CONTEXT HANDLER
+   ============================================ */
 
-  if (msg.id !== undefined && msg.method === "ui/resource-teardown") {
-    if (sizeChangeTimeout) {
-      clearTimeout(sizeChangeTimeout);
-      sizeChangeTimeout = null;
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
     }
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-    window.parent.postMessage({ jsonrpc: "2.0", id: msg.id, result: {} }, "*");
+  }
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
+  }
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
+  }
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
+}
+
+/* ============================================
+   SDK APP INSTANCE (STANDALONE MODE)
+   ============================================ */
+
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  app.sendLog({ level: "info", data: "Resource teardown requested", logger: APP_NAME });
+  // Add any cleanup logic specific to this app
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  app.sendLog({ level: "info", data: `Tool input received: ${JSON.stringify(params.arguments)}`, logger: APP_NAME });
+};
+
+app.ontoolresult = (params) => {
+  app.sendLog({ level: "info", data: "Tool result received", logger: APP_NAME });
+
+  // Check for tool execution errors
+  if (params.isError) {
+    app.sendLog({ level: "error", data: `Tool execution failed: ${JSON.stringify(params.content)}`, logger: APP_NAME });
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
     return;
   }
 
-  if (msg.id !== undefined && !msg.method) return;
-
-  switch (msg.method) {
-    case "ui/notifications/tool-result":
-      const data = msg.params?.structuredContent ?? msg.params;
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        showEmpty("No data received.");
-      }
-      break;
-    case "ui/notifications/host-context-changed":
-      if (msg.params?.theme === "dark") document.body.classList.add("dark");
-      else if (msg.params?.theme === "light") document.body.classList.remove("dark");
-      if (msg.params?.displayMode) handleDisplayModeChange(msg.params.displayMode);
-      break;
-    case "ui/notifications/tool-input":
-      break;
-    case "ui/notifications/tool-cancelled":
-      showError(`Cancelled: ${msg.params?.reason || "Tool cancelled"}`);
-      break;
-    case "ui/notifications/initialized":
-      break;
-    default:
-      if (msg.params) {
-        const fallback = msg.params.structuredContent ?? msg.params;
-        if (fallback && fallback !== msg) renderData(fallback);
-      }
-  }
-});
-
-let requestIdCounter = 1;
-function sendRequest(method: string, params: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const id = requestIdCounter++;
-    window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, "*");
-    const listener = (event: MessageEvent) => {
-      if (event.data?.id === id) {
-        window.removeEventListener("message", listener);
-        if (event.data?.result) resolve(event.data.result);
-        else if (event.data?.error) reject(new Error(event.data.error.message || "Unknown error"));
-      }
-    };
-    window.addEventListener("message", listener);
-    setTimeout(() => {
-      window.removeEventListener("message", listener);
-      reject(new Error("Request timeout"));
-    }, 5000);
-  });
-}
-
-function sendNotification(method: string, params: any) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, "*");
-}
-
-let currentDisplayMode = "inline";
-function handleDisplayModeChange(mode: string) {
-  currentDisplayMode = mode;
-  if (mode === "fullscreen") {
-    document.body.classList.add("fullscreen-mode");
-    const container = document.querySelector(".gmail-widget");
-    if (container) (container as HTMLElement).style.maxWidth = "100%";
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
   } else {
-    document.body.classList.remove("fullscreen-mode");
-    const container = document.querySelector(".gmail-widget");
-    if (container) (container as HTMLElement).style.maxWidth = "";
+    app.sendLog({ level: "warning", data: `Tool result received but no data found: ${JSON.stringify(params)}`, logger: APP_NAME });
+    showEmpty("No data received");
   }
-  setTimeout(() => notifySizeChanged(), 100);
-}
+};
 
-function requestDisplayMode(mode: string): Promise<any> {
-  return sendRequest("ui/request-display-mode", { mode })
-    .then((result) => {
-      if (result?.mode) handleDisplayModeChange(result.mode);
-      return result;
-    })
-    .catch((err) => {
-      console.warn("Failed to request display mode:", err);
-      throw err;
-    });
-}
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  app.sendLog({ level: "info", data: `Tool cancelled: ${reason}`, logger: APP_NAME });
+  showError(`Operation cancelled: ${reason}`);
+};
 
-function notifySizeChanged() {
-  const width = document.body.scrollWidth || document.documentElement.scrollWidth;
-  const height = document.body.scrollHeight || document.documentElement.scrollHeight;
-  sendNotification("ui/notifications/size-changed", { width, height });
-}
+app.onerror = (error) => {
+  app.sendLog({ level: "error", data: `App error: ${JSON.stringify(error)}`, logger: APP_NAME });
+};
 
-let sizeChangeTimeout: ReturnType<typeof setTimeout> | null = null;
-function debouncedNotifySizeChanged() {
-  if (sizeChangeTimeout) clearTimeout(sizeChangeTimeout);
-  sizeChangeTimeout = setTimeout(() => notifySizeChanged(), 100);
-}
+app.onhostcontextchanged = (ctx) => {
+  app.sendLog({ level: "info", data: `Host context changed: ${JSON.stringify(ctx)}`, logger: APP_NAME });
+  handleHostContextChanged(ctx);
+};
 
-let resizeObserver: ResizeObserver | null = null;
-function setupSizeObserver() {
-  if (typeof ResizeObserver !== "undefined") {
-    resizeObserver = new ResizeObserver(() => debouncedNotifySizeChanged());
-    resizeObserver.observe(document.body);
-  } else {
-    window.addEventListener("resize", debouncedNotifySizeChanged);
-    const mutationObserver = new MutationObserver(debouncedNotifySizeChanged);
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ["style", "class"],
-    });
-  }
-  setTimeout(() => notifySizeChanged(), 100);
-}
+/* ============================================
+   CONNECT TO HOST
+   ============================================ */
 
-sendRequest("ui/initialize", {
-  appCapabilities: { availableDisplayModes: ["inline", "fullscreen"] },
-  appInfo: { name: APP_NAME, version: APP_VERSION },
-  protocolVersion: PROTOCOL_VERSION,
-})
-  .then((result: any) => {
-    const ctx = result.hostContext ?? result;
-    sendNotification("ui/notifications/initialized", {});
-    if (ctx?.theme === "dark") document.body.classList.add("dark");
-    else if (ctx?.theme === "light") document.body.classList.remove("dark");
-    if (ctx?.displayMode) handleDisplayModeChange(ctx.displayMode);
-    if (ctx?.containerDimensions) {
-      const d = ctx.containerDimensions;
-      if (d.width) document.body.style.width = d.width + "px";
-      if (d.height) document.body.style.height = d.height + "px";
-      if (d.maxWidth) document.body.style.maxWidth = d.maxWidth + "px";
-      if (d.maxHeight) document.body.style.maxHeight = d.maxHeight + "px";
+app
+  .connect()
+  .then(() => {
+    app.sendLog({ level: "info", data: "MCP App connected to host", logger: APP_NAME });
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
     }
   })
-  .catch(() => {});
+  .catch((error) => {
+    app.sendLog({ level: "error", data: `Failed to connect to MCP host: ${JSON.stringify(error)}`, logger: APP_NAME });
+  });
 
-initializeDarkMode();
-setupSizeObserver();
+// Export empty object to ensure this file is treated as an ES module
 export {};

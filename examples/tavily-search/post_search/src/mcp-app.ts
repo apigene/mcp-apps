@@ -1,9 +1,37 @@
 /* ============================================
-   MCP PROTOCOL MESSAGE FORMAT
+   TAVILY SEARCH MCP APP (SDK VERSION)
+   ============================================
+
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   for utilities only (theme helpers, types, auto-resize).
+
+   It does NOT call app.connect() because the proxy handles initialization.
    ============================================ */
 
 /* ============================================
-   COMMON UTILITY FUNCTIONS (From base template)
+   SDK IMPORTS
+   ============================================ */
+
+import {
+  App,
+  applyDocumentTheme,
+  applyHostFonts,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
+
+// Import styles (will be bundled by Vite)
+import "./global.css";
+import "./mcp-app.css";
+
+/* ============================================
+   APP CONFIGURATION
+   ============================================ */
+
+const APP_NAME = "Tavily Search";
+const APP_VERSION = "1.0.0";
+
+/* ============================================
+   COMMON UTILITY FUNCTIONS
    ============================================ */
 
 function extractData(msg: any) {
@@ -18,48 +46,48 @@ function extractData(msg: any) {
 
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
+  if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
-  
+  if (data.records) return data.records;
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  if (Array.isArray(data)) {
-    return { rows: data };
+
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
-  
+
   return data;
 }
 
-function initializeDarkMode() {
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.body.classList.add('dark');
-  }
-  
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e: MediaQueryListEvent) => {
-    document.body.classList.toggle('dark', e.matches);
-  });
-}
-
 function escapeHtml(str: any): string {
-  if (typeof str !== "string") return str;
+  if (typeof str !== "string") return String(str);
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
@@ -670,20 +698,9 @@ function renderData(data: any) {
 
     // Render initial results
     renderFilteredResults();
-    
-    // Notify host of size change after rendering completes
-    // Use setTimeout to ensure DOM is fully updated
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
-    
   } catch (error: any) {
-    console.error('Render error:', error);
+    app.sendLog({ level: "error", data: `Render error: ${JSON.stringify(error)}`, logger: APP_NAME });
     showError(`Error rendering search results: ${error.message}`);
-    // Notify size even on error
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
   }
 }
 
@@ -693,43 +710,80 @@ function renderData(data: any) {
 
 window.addEventListener('message', function(event: MessageEvent) {
   const msg = event.data;
-  
+
   if (!msg || msg.jsonrpc !== '2.0') {
     return;
   }
-  
+
+  // Handle requests that require responses (like ui/resource-teardown)
+  if (msg.id !== undefined && msg.method === 'ui/resource-teardown') {
+    app.sendLog({ level: "info", data: "Resource teardown requested", logger: APP_NAME });
+
+    // Send response to host (required for teardown)
+    window.parent.postMessage({
+      jsonrpc: "2.0",
+      id: msg.id,
+      result: {}
+    }, '*');
+
+    return;
+  }
+
   if (msg.id !== undefined && !msg.method) {
     return;
   }
-  
+
   switch (msg.method) {
+    // Handle tool result notifications (main data)
     case 'ui/notifications/tool-result':
+      app.sendLog({ level: "info", data: "Tool result received", logger: APP_NAME });
       const data = msg.params?.structuredContent || msg.params;
       if (data !== undefined) {
         renderData(data);
       } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
+        app.sendLog({ level: "warning", data: `Tool result received but no data found: ${JSON.stringify(msg)}`, logger: APP_NAME });
         showEmpty('No data received');
       }
       break;
-      
+
+    // Handle tool input notifications (optional - for loading states)
+    case 'ui/notifications/tool-input':
+      app.sendLog({ level: "info", data: `Tool input received: ${JSON.stringify(msg.params?.arguments)}`, logger: APP_NAME });
+      break;
+
+    // Handle host context changes (theme, display mode, fonts)
     case 'ui/notifications/host-context-changed':
-      if (msg.params?.theme === 'dark') {
-        document.body.classList.add('dark');
-      } else if (msg.params?.theme === 'light') {
-        document.body.classList.remove('dark');
+      app.sendLog({ level: "info", data: `Host context changed: ${JSON.stringify(msg.params)}`, logger: APP_NAME });
+      if (msg.params?.theme) {
+        applyDocumentTheme(msg.params.theme);
       }
-      // Handle display mode changes
+      if (msg.params?.styles?.css?.fonts) {
+        applyHostFonts(msg.params.styles.css.fonts);
+      }
+      if (msg.params?.styles?.variables) {
+        applyHostStyleVariables(msg.params.styles.variables);
+      }
       if (msg.params?.displayMode) {
         handleDisplayModeChange(msg.params.displayMode);
       }
       break;
-      
+
+    // Handle tool cancellation
+    case 'ui/notifications/tool-cancelled':
+      const reason = msg.params?.reason || "Unknown reason";
+      app.sendLog({ level: "info", data: `Tool cancelled: ${reason}`, logger: APP_NAME });
+      showError(`Operation cancelled: ${reason}`);
+      break;
+
+    // Handle initialization notification (optional)
+    case 'ui/notifications/initialized':
+      break;
+
     default:
       if (msg.params) {
         const fallbackData = msg.params.structuredContent || msg.params;
         if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
+          app.sendLog({ level: "warning", data: `Unknown method: ${msg.method} - attempting to render data`, logger: APP_NAME });
           renderData(fallbackData);
         }
       }
@@ -776,7 +830,6 @@ function handleDisplayModeChange(mode: string) {
   currentDisplayMode = mode;
   if (mode === 'fullscreen') {
     document.body.classList.add('fullscreen-mode');
-    // Adjust layout for fullscreen if needed
     const container = document.querySelector('.container');
     if (container) {
       (container as HTMLElement).style.maxWidth = '100%';
@@ -784,17 +837,12 @@ function handleDisplayModeChange(mode: string) {
     }
   } else {
     document.body.classList.remove('fullscreen-mode');
-    // Restore normal layout
     const container = document.querySelector('.container');
     if (container) {
       (container as HTMLElement).style.maxWidth = '';
       (container as HTMLElement).style.padding = '';
     }
   }
-  // Notify host of size change after mode change
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
 }
 
 function requestDisplayMode(mode: string): Promise<any> {
@@ -806,113 +854,34 @@ function requestDisplayMode(mode: string): Promise<any> {
       return result;
     })
     .catch(err => {
-      console.warn('Failed to request display mode:', err);
+      app.sendLog({ level: "warning", data: `Failed to request display mode: ${JSON.stringify(err)}`, logger: APP_NAME });
       throw err;
     });
 }
 
-// Make function globally accessible for testing/debugging
-// You can call: requestDisplayMode('fullscreen') or requestDisplayMode('inline') from browser console
 (window as any).requestDisplayMode = requestDisplayMode;
 
 /* ============================================
-   SIZE CHANGE NOTIFICATIONS
+   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
    ============================================ */
 
-function sendNotification(method: string, params: any) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, '*');
-}
-
-function notifySizeChanged() {
-  const width = document.body.scrollWidth || document.documentElement.scrollWidth;
-  const height = document.body.scrollHeight || document.documentElement.scrollHeight;
-  
-  sendNotification('ui/notifications/size-changed', {
-    width: width,
-    height: height
-  });
-}
-
-// Debounce function to avoid too many notifications
-let sizeChangeTimeout: NodeJS.Timeout | null = null;
-function debouncedNotifySizeChanged() {
-  if (sizeChangeTimeout) {
-    clearTimeout(sizeChangeTimeout);
-  }
-  sizeChangeTimeout = setTimeout(() => {
-    notifySizeChanged();
-  }, 100); // Wait 100ms after last change
-}
-
-// Use ResizeObserver to detect size changes
-let resizeObserver: ResizeObserver | null = null;
-function setupSizeObserver() {
-  if (typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => {
-      debouncedNotifySizeChanged();
-    });
-    resizeObserver.observe(document.body);
-  } else {
-    // Fallback: use window resize and mutation observer
-    window.addEventListener('resize', debouncedNotifySizeChanged);
-    const mutationObserver = new MutationObserver(debouncedNotifySizeChanged);
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['style', 'class']
-    });
-  }
-  
-  // Send initial size after a short delay to ensure content is rendered
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
-
-/* ============================================
-   INITIALIZATION
-   ============================================ */
-
-// Initialize MCP App - REQUIRED for MCP Apps protocol
-sendRequest('ui/initialize', {
-  appCapabilities: {
-    availableDisplayModes: ["inline", "fullscreen"]
-  }
-}).then((ctx: any) => {
-  // Apply theme from host context
-  if (ctx?.theme === 'dark') {
-    document.body.classList.add('dark');
-  } else if (ctx?.theme === 'light') {
-    document.body.classList.remove('dark');
-  }
-  // Handle display mode from host context
-  if (ctx?.displayMode) {
-    handleDisplayModeChange(ctx.displayMode);
-  }
-  // Handle container dimensions if provided
-  if (ctx?.containerDimensions) {
-    const dims = ctx.containerDimensions;
-    if (dims.width) {
-      document.body.style.width = dims.width + 'px';
-    }
-    if (dims.height) {
-      document.body.style.height = dims.height + 'px';
-    }
-    if (dims.maxWidth) {
-      document.body.style.maxWidth = dims.maxWidth + 'px';
-    }
-    if (dims.maxHeight) {
-      document.body.style.maxHeight = dims.maxHeight + 'px';
-    }
-  }
-}).catch(err => {
-  console.warn('Failed to initialize MCP App:', err);
-  // Fallback to system preference if initialization fails
+const app = new App({
+  name: APP_NAME,
+  version: APP_VERSION,
 });
 
-initializeDarkMode();
+/* ============================================
+   AUTO-RESIZE VIA SDK
+   ============================================ */
 
-// Setup size observer to notify host of content size changes
-// This is critical for the host to properly size the iframe
-setupSizeObserver();
+const cleanupResize = app.setupSizeChangedNotifications();
+
+// Clean up on page unload
+window.addEventListener("beforeunload", () => {
+  cleanupResize();
+});
+
+app.sendLog({ level: "info", data: "MCP App initialized (proxy mode - SDK utilities only)", logger: APP_NAME });
+
+// Export empty object to ensure this file is treated as an ES module
+export {};

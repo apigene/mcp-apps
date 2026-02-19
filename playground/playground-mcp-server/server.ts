@@ -30,6 +30,291 @@ type TemplateInfo = {
   resourceUri: string;
 };
 
+// CSP configuration per template
+// Maps template names to their required external domains
+type CSPConfig = {
+  connectDomains?: string[];
+  resourceDomains?: string[];
+  frameDomains?: string[];
+  baseUriDomains?: string[];
+};
+
+const TEMPLATE_CSP_CONFIGS: Record<string, CSPConfig> = {
+  // Spotify - music streaming API
+  "spotify-search": {
+    connectDomains: ["https://api.spotify.com"],
+    resourceDomains: ["https://i.scdn.co", "https://*.spotifycdn.com"],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  // GitHub - repository and user data
+  "github-contributors": {
+    connectDomains: ["https://api.github.com"],
+    resourceDomains: ["https://avatars.githubusercontent.com", "https://ui-avatars.com"],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  "github-list-commits": {
+    connectDomains: ["https://api.github.com"],
+    resourceDomains: ["https://avatars.githubusercontent.com"],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  "github-commit-diff": {
+    connectDomains: ["https://api.github.com"],
+    resourceDomains: ["https://avatars.githubusercontent.com"],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  // Ahrefs - SEO and backlinks
+  "ahrefs-backlinks": {
+    connectDomains: ["https://api.ahrefs.com"],
+    resourceDomains: [],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  // Apollo - sales intelligence
+  "apollo-companies-search": {
+    connectDomains: ["https://api.apollo.io"],
+    resourceDomains: ["https://www.google.com"],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  "apollo-people-search": {
+    connectDomains: ["https://api.apollo.io"],
+    resourceDomains: [],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  // Google APIs
+  "google-calendar-events": {
+    connectDomains: ["https://www.googleapis.com"],
+    resourceDomains: [],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  "google-drive-files-list": {
+    connectDomains: ["https://www.googleapis.com"],
+    resourceDomains: ["https://drive-thirdparty.googleusercontent.com"],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  "google-maps-search": {
+    connectDomains: ["https://maps.googleapis.com", "https://places.googleapis.com"],
+    resourceDomains: ["https://maps.gstatic.com", "https://lh3.googleusercontent.com"],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  "google-analytics-run-report": {
+    connectDomains: ["https://analyticsdata.googleapis.com"],
+    resourceDomains: [],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  "google-sheet": {
+    connectDomains: ["https://sheets.googleapis.com"],
+    resourceDomains: [],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  "google-sheetv2": {
+    connectDomains: ["https://sheets.googleapis.com"],
+    resourceDomains: [],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  "google-search-console-query": {
+    connectDomains: ["https://www.googleapis.com"],
+    resourceDomains: [],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  "google-search-console-query-v2": {
+    connectDomains: ["https://www.googleapis.com"],
+    resourceDomains: [],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  "google-search-console-guery-v2": {
+    connectDomains: ["https://www.googleapis.com"],
+    resourceDomains: [],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  "gmail-thread-list": {
+    connectDomains: ["https://gmail.googleapis.com", "https://www.googleapis.com"],
+    resourceDomains: [],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  // Slack
+  "slack-search-messages": {
+    connectDomains: ["https://slack.com"],
+    resourceDomains: ["https://*.slack-edge.com", "https://avatars.slack-edge.com"],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  // BrightData web scraping
+  "brightdata-amazon-product-details": {
+    connectDomains: ["https://api.brightdata.com"],
+    resourceDomains: ["https://m.media-amazon.com", "https://images-na.ssl-images-amazon.com"],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  "brightdata-amazon-products-search": {
+    connectDomains: ["https://api.brightdata.com"],
+    resourceDomains: ["https://m.media-amazon.com", "https://images-na.ssl-images-amazon.com"],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  "brightdata-batch-scrape": {
+    connectDomains: ["https://api.brightdata.com"],
+    resourceDomains: [],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  "brightdata-instagram-post": {
+    connectDomains: ["https://api.brightdata.com"],
+    resourceDomains: ["https://*.cdninstagram.com", "https://scontent.cdninstagram.com"],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  "brightdata-instagram-profile": {
+    connectDomains: ["https://api.brightdata.com"],
+    resourceDomains: ["https://*.cdninstagram.com", "https://scontent.cdninstagram.com"],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  "brightdata-linkedin-post": {
+    connectDomains: ["https://api.brightdata.com"],
+    resourceDomains: ["https://media.licdn.com", "https://*.licdn.com"],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  "brightdata-linkedin-profile": {
+    connectDomains: ["https://api.brightdata.com"],
+    resourceDomains: ["https://media.licdn.com", "https://*.licdn.com"],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  "brightdata-search": {
+    connectDomains: ["https://api.brightdata.com"],
+    resourceDomains: [],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  "brightdata-tiktok-post": {
+    connectDomains: ["https://api.brightdata.com"],
+    resourceDomains: ["https://*.tiktokcdn.com", "https://p16-sign.tiktokcdn-us.com"],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  "brightdata-zara-product": {
+    connectDomains: ["https://api.brightdata.com"],
+    resourceDomains: ["https://static.zara.net"],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  // Shopify
+  "shopify-get-product-details": {
+    connectDomains: ["https://*.myshopify.com"],
+    resourceDomains: ["https://cdn.shopify.com"],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  "shopify-search-global-product-v1": {
+    connectDomains: ["https://*.myshopify.com"],
+    resourceDomains: ["https://cdn.shopify.com"],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  "shopify-search-global-product-v2": {
+    connectDomains: ["https://*.myshopify.com"],
+    resourceDomains: ["https://cdn.shopify.com"],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  // Notion
+  "notion-search": {
+    connectDomains: ["https://api.notion.com"],
+    resourceDomains: ["https://www.notion.so"],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  // Firecrawl
+  "firecrawl-scrape-url": {
+    connectDomains: ["https://api.firecrawl.dev"],
+    resourceDomains: [],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  // Cursor
+  "cursor-list-agents": {
+    connectDomains: [],
+    resourceDomains: [],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  "cursor-list-repositories": {
+    connectDomains: [],
+    resourceDomains: [],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  // Datadog
+  "datadog-listlogs": {
+    connectDomains: ["https://api.datadoghq.com", "https://api.us5.datadoghq.com"],
+    resourceDomains: [],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  // Vercel
+  "vercel-get-deployments": {
+    connectDomains: ["https://api.vercel.com"],
+    resourceDomains: ["https://vercel.com"],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  // Ashby
+  "ashby-list-candidates": {
+    connectDomains: ["https://api.ashbyhq.com"],
+    resourceDomains: [],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  // Rebrickable (LEGO)
+  "rebrickable-lego-parts-3d": {
+    connectDomains: ["https://rebrickable.com"],
+    resourceDomains: ["https://cdn.rebrickable.com", "https://www.bricklink.com"],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  // Tavily search
+  "tavily-search": {
+    connectDomains: ["https://api.tavily.com"],
+    resourceDomains: [],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  // Fakestore (demo API)
+  "fakestore-list-products": {
+    connectDomains: ["https://fakestoreapi.com"],
+    resourceDomains: ["https://fakestoreapi.com"],
+    frameDomains: [],
+    baseUriDomains: [],
+  },
+  // Default CSP for templates with no external dependencies
+};
+
+function getTemplateCSP(templateName: string): CSPConfig {
+  return TEMPLATE_CSP_CONFIGS[templateName] ?? {
+    connectDomains: [],
+    resourceDomains: [],
+    frameDomains: [],
+    baseUriDomains: [],
+  };
+}
+
 const buildInFlight = new Map<string, Promise<void>>();
 
 function normalizeTemplateName(input: string): string {
@@ -203,7 +488,9 @@ export function createServer(): McpServer {
       description:
         "List all MCP app templates available to demo. Returns template names and the tool to open each one.",
       inputSchema: {},
-      _meta: {},
+      _meta: {
+        visibility: ["model", "app"],
+      },
     },
     async () => {
       const currentTemplates = listTemplates();
@@ -245,7 +532,9 @@ export function createServer(): McpServer {
           .optional()
           .describe("Template folder name, e.g. xyz-users"),
       },
-      _meta: {},
+      _meta: {
+        visibility: ["model", "app"],
+      },
     },
     async (args) => {
       const currentTemplates = listTemplates();
@@ -309,6 +598,7 @@ export function createServer(): McpServer {
         try {
           await ensureTemplateBuilt(template.name);
           const html = readTemplateHtmlSync(template.name);
+          const csp = getTemplateCSP(template.name);
 
           return {
             contents: [
@@ -316,11 +606,19 @@ export function createServer(): McpServer {
                 uri: template.resourceUri,
                 mimeType: RESOURCE_MIME_TYPE,
                 text: html,
+                _meta: {
+                  ui: {
+                    csp,
+                    prefersBorder: true,
+                  },
+                },
               },
             ],
           };
         } catch (error) {
           const message = error instanceof Error ? error.message : "Unknown build error";
+          const errorCode = "BUILD_FAILED";
+          // Minimal error HTML for visual feedback in the UI
           const html = `<!doctype html><html><body style="font-family:sans-serif;padding:16px;"><h3>Template build failed</h3><pre style="white-space:pre-wrap;">${escapeHtml(message)}</pre></body></html>`;
 
           return {
@@ -329,6 +627,23 @@ export function createServer(): McpServer {
                 uri: template.resourceUri,
                 mimeType: RESOURCE_MIME_TYPE,
                 text: html,
+                _meta: {
+                  ui: {
+                    csp: {
+                      connectDomains: [],
+                      resourceDomains: [],
+                      frameDomains: [],
+                      baseUriDomains: [],
+                    },
+                    prefersBorder: true,
+                    // Structured error metadata for programmatic handling
+                    error: {
+                      code: errorCode,
+                      message: message,
+                      template: template.name,
+                    },
+                  },
+                },
               },
             ],
           };
@@ -346,6 +661,7 @@ export function createServer(): McpServer {
           _: z.string().optional().describe("Optional placeholder; tool needs no arguments."),
         },
         _meta: {
+          visibility: ["model", "app"],
           ui: { resourceUri: template.resourceUri },
         },
       },

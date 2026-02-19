@@ -23,7 +23,7 @@
    ============================================ */
 
 const APP_NAME = "Google Search Console";
-const APP_VERSION = "1.0.0";
+
 const PROTOCOL_VERSION = "2026-01-26"; // MCP Apps protocol version
 
 /** App and operation for run_action_ui (trigger new LLM/tool call with filters) */
@@ -43,6 +43,55 @@ let lastRequestContext: Record<string, unknown> | null = null;
 import Chart from "chart.js/auto";
 import "./global.css";
 import "./mcp-app.css";
+
+/* ============================================
+   GOOGLE SEARCH CONSOLE QUERY MCP APP (STANDALONE MODE)
+   ============================================
+
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   in standalone mode with app.connect() for full MCP integration.
+   ============================================ */
+
+/* ============================================
+   SDK IMPORTS
+   ============================================ */
+
+import {
+  App,
+  applyDocumentTheme,
+  applyHostFonts,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
+
+// Import styles (will be bundled by Vite)
+import "./global.css";
+import "./mcp-app.css";
+
+/* ============================================
+   APP CONFIGURATION
+   ============================================ */
+
+
+const APP_VERSION = "1.0.0";
+
+/* ============================================
+   TYPE DEFINITIONS
+   ============================================ */
+
+/** Google Search Console row from API response */
+interface GSCRow {
+  keys: string[];
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+}
+
+/** Normalized table data for rendering */
+interface TableData {
+  columns: string[];
+  rows: (string | number)[][];
+}
 
 /* ============================================
    COMMON UTILITY FUNCTIONS
@@ -68,67 +117,59 @@ function extractData(msg: any) {
  */
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  // Format 0: API response wrapper { status_code, body: { rows, responseAggregationType } } (e.g. Search Console)
-  if (data.body && Array.isArray(data.body.rows)) {
-    return data.body;
-  }
-  
-  // Format 1: Standard table format { columns: [], rows: [] }
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
-  // Format 2: Nested in message.template_data (3rd party MCP clients)
+
+  // Handle API response format with body wrapper
+  if (data.body) {
+    // body is array (e.g. GitHub API)
+    if (Array.isArray(data.body)) {
+      return data.body;
+    }
+    // body is object with rows (e.g. Google Search Console)
+    if (data.body.rows && Array.isArray(data.body.rows)) {
+      return data.body;
+    }
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
-  // Format 3: Nested in message.response_content (3rd party MCP clients)
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
-  // Format 4: Common nested patterns
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
-  // Format 5: Direct rows array
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  // Format 6: If data itself is an array
-  if (Array.isArray(data)) {
-    return { rows: data };
+
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
-  
+
   return data;
 }
 
-/**
- * Initialize dark mode based on system preference
- */
-function initializeDarkMode() {
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.body.classList.add('dark');
-  }
-  
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e: MediaQueryListEvent) => {
-    document.body.classList.toggle('dark', e.matches);
-  });
-}
 
 /**
  * Escape HTML to prevent XSS attacks
  */
 function escapeHtml(str: any): string {
-  if (typeof str !== "string") return str;
+  if (typeof str !== "string") return String(str);
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
@@ -188,7 +229,7 @@ function showSendNotification(message: string) {
  */
 function showChartError(container: Element | null | undefined, message: string) {
   if (!container) {
-    console.warn('[mcp-app]', 'Cannot show chart error - container not found');
+    app.sendLog({ level: "warning", data: `[mcp-app] Cannot show chart error - container not found`, logger: APP_NAME });
     return;
   }
   
@@ -206,7 +247,7 @@ function showChartError(container: Element | null | undefined, message: string) 
       </div>
     `;
   } else {
-    console.warn('[mcp-app]', 'Chart wrapper not found in container');
+    app.sendLog({ level: "warning", data: `[mcp-app] Chart wrapper not found in container`, logger: APP_NAME });
   }
 }
 
@@ -483,19 +524,36 @@ function normalizeTableData(data: any) {
       const rows: any[] = [];
       
       // Handle keys array (like Google Search Console)
+      // keys can contain multiple dimensions: e.g. ["date", "page"] or ["date", "query", "country"]
       if (firstRow.keys && Array.isArray(firstRow.keys)) {
-        columns.push('Date');
+        const keyCount = firstRow.keys.length;
+        // Try to get dimension names from lastRequestContext, otherwise use generic names
+        const requestedDimensions = (lastRequestContext?.dimensions && Array.isArray(lastRequestContext.dimensions))
+          ? (lastRequestContext.dimensions as string[]).filter((d): d is string => typeof d === 'string')
+          : [];
+        for (let i = 0; i < keyCount; i++) {
+          if (requestedDimensions[i]) {
+            // Capitalize first letter of dimension name
+            columns.push(requestedDimensions[i].charAt(0).toUpperCase() + requestedDimensions[i].slice(1));
+          } else {
+            columns.push(`Dimension ${i + 1}`);
+          }
+        }
         Object.keys(firstRow).forEach(key => {
           if (key !== 'keys') {
             columns.push(key.charAt(0).toUpperCase() + key.slice(1));
           }
         });
-        
-        unwrapped.rows.forEach((row: any) => {
-          const rowArray = [row.keys?.[0] || ''];
+
+        unwrapped.rows.forEach((row: GSCRow) => {
+          const rowArray: (string | number)[] = [];
+          // Add all keys to the row
+          if (row.keys && Array.isArray(row.keys)) {
+            row.keys.forEach((k: string) => rowArray.push(k ?? ''));
+          }
           Object.keys(row).forEach(key => {
             if (key !== 'keys') {
-              rowArray.push(row[key]);
+              rowArray.push(row[key as keyof Omit<GSCRow, 'keys'>]);
             }
           });
           rows.push(rowArray);
@@ -660,7 +718,7 @@ function createGradient(ctx: CanvasRenderingContext2D, color: string, height: nu
 function renderLineChart(canvas: HTMLCanvasElement, chartData: any, visibleSeries: Set<number> | null = null) {
   // Check if Chart.js is available
   if (typeof Chart === 'undefined') {
-    console.error('[mcp-app]', 'Chart.js is not loaded.');
+    app.sendLog({ level: "error", data: `[mcp-app] Chart.js is not loaded.`, logger: APP_NAME });
     showChartError(canvas.parentElement?.parentElement, 'Chart.js library not available');
     return;
   }
@@ -673,13 +731,13 @@ function renderLineChart(canvas: HTMLCanvasElement, chartData: any, visibleSerie
 
   const { labels, series } = chartData;
   if (!labels || labels.length === 0 || !series || series.length === 0) {
-    console.warn('[mcp-app]', 'Invalid chart data:', { labels, series });
+    app.sendLog({ level: "warning", data: `[mcp-app] Invalid chart data: ${JSON.stringify({ labels, series })}`, logger: APP_NAME });
     return;
   }
   
   const ctx = canvas?.getContext('2d');
   if (!canvas || !ctx) {
-    console.warn('[mcp-app]', 'Invalid canvas element or 2d context not available');
+    app.sendLog({ level: "warning", data: `[mcp-app] Invalid canvas element or 2d context not available`, logger: APP_NAME });
     return;
   }
 
@@ -864,7 +922,7 @@ function renderLineChart(canvas: HTMLCanvasElement, chartData: any, visibleSerie
 function renderPieChart(canvas: HTMLCanvasElement, values: number[], colors: string[], labels: string[] | null = null) {
   // Check if Chart.js is available
   if (typeof Chart === 'undefined') {
-    console.error('[mcp-app]', 'Chart.js is not loaded.');
+    app.sendLog({ level: "error", data: `[mcp-app] Chart.js is not loaded.`, logger: APP_NAME });
     showChartError(canvas.parentElement?.parentElement, 'Chart.js library not available');
     return;
   }
@@ -876,12 +934,12 @@ function renderPieChart(canvas: HTMLCanvasElement, values: number[], colors: str
   }
 
   if (!values || values.length === 0) {
-    console.warn('[mcp-app]', 'Invalid pie chart values:', values);
+    app.sendLog({ level: "warning", data: `[mcp-app] Invalid pie chart values: ${JSON.stringify(values)}`, logger: APP_NAME });
     return;
   }
   
   if (!canvas || !canvas.getContext('2d')) {
-    console.warn('[mcp-app]', 'Invalid canvas element or 2d context not available');
+    app.sendLog({ level: "warning", data: `[mcp-app] Invalid canvas element or 2d context not available`, logger: APP_NAME });
     return;
   }
 
@@ -1044,7 +1102,7 @@ function renderData(data: any) {
     const tableData = normalizeTableData(payload);
     
     if (!tableData || !tableData.rows || tableData.rows.length === 0) {
-      console.warn('[mcp-app]', 'Invalid or empty data:', data);
+      app.sendLog({ level: "warning", data: `[mcp-app] Invalid or empty data: ${JSON.stringify(data)}`, logger: APP_NAME });
       showEmpty('No valid data available');
       return;
     }
@@ -1516,11 +1574,11 @@ function renderData(data: any) {
             const visibleSeries = new Set(lineChartData.series.map((_: any, i: number) => i));
             renderLineChart(lineCanvas, lineChartData, visibleSeries);
           } catch (error) {
-            console.error('[mcp-app]', 'Error rendering line chart:', error);
+            app.sendLog({ level: "error", data: `[mcp-app] Error rendering line chart: ${JSON.stringify(error)}`, logger: APP_NAME });
             showChartError(lineCanvas.closest('.chart-card'), 'Failed to render line chart: ' + (error as Error).message);
           }
         } else {
-          console.warn('[mcp-app]', 'Line chart canvas not found');
+          app.sendLog({ level: "warning", data: `[mcp-app] Line chart canvas not found`, logger: APP_NAME });
         }
       }
       
@@ -1530,18 +1588,15 @@ function renderData(data: any) {
           try {
             renderPieChart(pieCanvas, pieChartData.values, CHART_COLORS, pieChartData.labels);
           } catch (error) {
-            console.error('[mcp-app]', 'Error rendering pie chart:', error);
+            app.sendLog({ level: "error", data: `[mcp-app] Error rendering pie chart: ${JSON.stringify(error)}`, logger: APP_NAME });
             showChartError(pieCanvas.closest('.chart-card'), 'Failed to render pie chart: ' + (error as Error).message);
           }
         } else {
-          console.warn('[mcp-app]', 'Pie chart canvas not found');
+          app.sendLog({ level: "warning", data: `[mcp-app] Pie chart canvas not found`, logger: APP_NAME });
         }
       }
       
       // Notify host of size change after rendering completes
-      setTimeout(() => {
-        notifySizeChanged();
-      }, 100);
     };
     
     // Wait for Chart.js to be available, then render charts
@@ -1557,7 +1612,7 @@ function renderData(data: any) {
         }, 100);
       } else if (chartJsError) {
         // Chart.js failed to load
-        console.error('[mcp-app]', 'Chart.js failed to load - CDN blocked or unavailable');
+        app.sendLog({ level: "error", data: `[mcp-app] Chart.js failed to load - CDN blocked or unavailable`, logger: APP_NAME });
         const lineCanvas = document.getElementById('linechart');
         const pieCanvas = document.getElementById('piechart');
         if (lineCanvas) {
@@ -1566,13 +1621,12 @@ function renderData(data: any) {
         if (pieCanvas) {
           showChartError(pieCanvas.closest('.chart-card'), 'Chart.js library failed to load. CDN may be blocked by browser security policies.');
         }
-        notifySizeChanged();
       } else if (attempts < maxAttempts) {
         // Chart.js not loaded yet, wait and retry
         setTimeout(() => waitForChartJS(attempts + 1, maxAttempts), 50);
       } else {
         // Timeout - Chart.js didn't load
-        console.error('[mcp-app]', 'Chart.js failed to load after', maxAttempts, 'attempts');
+        app.sendLog({ level: "error", data: `[mcp-app] Chart.js failed to load after ${JSON.stringify(maxAttempts)} attempts`, logger: APP_NAME });
         const lineCanvas = document.getElementById('linechart');
         const pieCanvas = document.getElementById('piechart');
         if (lineCanvas) {
@@ -1581,7 +1635,6 @@ function renderData(data: any) {
         if (pieCanvas) {
           showChartError(pieCanvas.closest('.chart-card'), 'Chart.js library failed to load. Please check your network connection or browser security settings.');
         }
-        notifySizeChanged();
       }
     };
     
@@ -1601,19 +1654,14 @@ function renderData(data: any) {
       if (pieCanvas) {
         showChartError(pieCanvas.closest('.chart-card'), 'Chart.js CDN blocked. Please allow external scripts or use a different environment.');
       }
-      notifySizeChanged();
     });
     
     // Start waiting for Chart.js
     waitForChartJS();
     
   } catch (error: any) {
-    console.error('[mcp-app]', 'Render error:', error);
+    app.sendLog({ level: "error", data: `[mcp-app] Render error: ${JSON.stringify(error)}`, logger: APP_NAME });
     showError(`Error rendering dashboard: ${error.message}`);
-    // Notify size even on error
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
   }
 }
 
@@ -1660,7 +1708,6 @@ function openQueryPanel() {
     }
   }
   panel.classList.add('query-panel-open');
-  notifySizeChanged();
 }
 
 /**
@@ -1670,7 +1717,6 @@ function closeQueryPanel() {
   const panel = document.getElementById('query-filters-panel');
   if (panel) {
     panel.classList.remove('query-panel-open');
-    notifySizeChanged();
   }
 }
 
@@ -1743,8 +1789,8 @@ function runQueryWithFilters() {
       context
     }
   };
-  console.log('[mcp-app]', 'tools/call payload:', JSON.stringify(toolCallPayload, null, 2));
-  sendRequest('tools/call', toolCallPayload)
+  app.sendLog({ level: "debug", data: `[mcp-app] tools/call payload: ${JSON.stringify(JSON.stringify(toolCallPayload, null, 2))}`, logger: APP_NAME });
+  app.callTool(toolCallPayload.name, toolCallPayload.arguments)
     .then((result: any) => {
       if (result?.isError) {
         showError(result?.message || 'Query returned an error.');
@@ -1759,7 +1805,7 @@ function runQueryWithFilters() {
       }
     })
     .catch((err: Error) => {
-      console.error('[mcp-app]', 'Run query failed:', err);
+      app.sendLog({ level: "error", data: `[mcp-app] Run query failed: ${JSON.stringify(err)}`, logger: APP_NAME });
       showError(`Query failed: ${err.message}`);
     })
     .finally(() => {
@@ -1839,9 +1885,9 @@ function formatRequestAndResponseForLLM(
     (btn as HTMLButtonElement).disabled = true;
     btn.classList.add('send-loading');
   }
-  sendRequest('ui/message', {
+  app.sendMessage({
     role: 'user',
-    content: [{ type: 'text', text }],
+    content: { type: 'text', text },
   })
     .then((result: any) => {
       if (result?.isError) {
@@ -1851,7 +1897,7 @@ function formatRequestAndResponseForLLM(
       showSendNotification('Sent to LLM for analysis and recommendations');
     })
     .catch((err: Error) => {
-      console.error('Send to LLM failed:', err);
+      app.sendLog({ level: "error", data: `Send to LLM failed: ${JSON.stringify(err)}`, logger: APP_NAME });
       showSendNotification('Failed to send. Check console.');
     })
     .finally(() => {
@@ -1863,358 +1909,37 @@ function formatRequestAndResponseForLLM(
 };
 
 /* ============================================
-   MESSAGE HANDLER (Standardized MCP Protocol)
-   ============================================
-   
-   This handles all incoming messages from the MCP host.
-   You typically don't need to modify this section.
+   HOST CONTEXT HANDLER
    ============================================ */
 
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    return;
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
   }
-  
-  // Handle requests that require responses (like ui/resource-teardown)
-  if (msg.id !== undefined && msg.method === 'ui/resource-teardown') {
-    const reason = msg.params?.reason || 'Resource teardown requested';
-    
-    // Clean up resources
-    // - Clear any timers
-    if (sizeChangeTimeout) {
-      clearTimeout(sizeChangeTimeout);
-      sizeChangeTimeout = null;
-    }
-    
-    // - Disconnect observers
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-    
-    // - Cancel any pending requests (if you track them)
-    // - Destroy chart instances, etc. (template-specific cleanup)
-    if (lineChartInstance) {
-      lineChartInstance.destroy();
-      lineChartInstance = null;
-    }
-    if (pieChartInstance) {
-      pieChartInstance.destroy();
-      pieChartInstance = null;
-    }
-    
-    // Send response to host
-    window.parent.postMessage({
-      jsonrpc: "2.0",
-      id: msg.id,
-      result: {}
-    }, '*');
-    
-    return; // Don't process further
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
   }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
   }
-  console.log('[mcp-app]', 'message received:', msg);
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      console.log('[mcp-app]', 'ui/notifications/tool-result:', msg.params);
-      const data = msg.params?.structuredContent || msg.params;
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        console.warn('[mcp-app]', 'ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      if (msg.params?.theme === 'dark') {
-        document.body.classList.add('dark');
-      } else if (msg.params?.theme === 'light') {
-        document.body.classList.remove('dark');
-      }
-      // Handle display mode changes
-      if (msg.params?.displayMode) {
-        handleDisplayModeChange(msg.params.displayMode);
-      }
-      // Re-render charts with new theme
-      const lineCanvas = document.getElementById('linechart') as HTMLCanvasElement;
-      const pieCanvas = document.getElementById('piechart') as HTMLCanvasElement;
-      if (lineCanvas && lineChartInstance) {
-        const chartData = (lineChartInstance as any).data;
-        const visibleSeries = new Set<number>();
-        chartData.datasets.forEach((_: any, i: number) => {
-          const legendItem = document.querySelector(`[data-series-index="${i}"]`);
-          if (legendItem && !legendItem.classList.contains('disabled')) {
-            visibleSeries.add(i);
-          }
-        });
-        const lineChartData = { labels: chartData.labels, series: chartData.datasets.map((d: any) => ({ name: d.label, data: d.data })) };
-        renderLineChart(lineCanvas, lineChartData, visibleSeries);
-      }
-      if (pieCanvas && pieChartInstance) {
-        const chartData = (pieChartInstance as any).data;
-        renderPieChart(pieCanvas, chartData.datasets[0].data, CHART_COLORS, chartData.labels);
-      }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      console.log('[mcp-app]', 'ui/notifications/tool-input:', msg.params);
-      // Tool input notification - Host sends complete tool arguments (e.g. run_action_ui args)
-      const toolArguments = msg.params?.arguments;
-      if (toolArguments && typeof toolArguments === 'object') {
-        lastToolInput = toolArguments as Record<string, unknown>;
-        if (toolArguments.context && typeof toolArguments.context === 'object') {
-          lastRequestContext = toolArguments.context as Record<string, unknown>;
-        }
-        console.log('[mcp-app]', 'Tool input stored for New query panel:', lastToolInput);
-      }
-      break;
-      
-    case 'ui/notifications/tool-cancelled':
-      // Tool cancellation notification - Host MUST send this if tool is cancelled
-      const reason = msg.params?.reason || 'Tool execution was cancelled';
-      showError(`Operation cancelled: ${reason}`);
-      // Clean up any ongoing operations
-      // - Stop timers
-      // - Cancel pending requests
-      // - Reset UI state
-      break;
-      
-    case 'ui/notifications/initialized':
-      // Initialization notification (optional - handle if needed)
-      break;
-      
-    default:
-      // Unknown method - try to extract data as fallback
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('[mcp-app]', 'Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      }
-  }
-});
 
-/* ============================================
-   MCP COMMUNICATION
-   ============================================
-   
-   Functions for communicating with the MCP host.
-   You typically don't need to modify this section.
-   ============================================ */
-
-let requestIdCounter = 1;
-function sendRequest(method: string, params: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const id = requestIdCounter++;
-    window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, '*');
-    
-    const listener = (event: MessageEvent) => {
-      if (event.data?.id === id) {
-        window.removeEventListener('message', listener);
-        if (event.data?.result) {
-          resolve(event.data.result);
-        } else if (event.data?.error) {
-          reject(new Error(event.data.error.message || 'Unknown error'));
-        }
-      }
-    };
-    window.addEventListener('message', listener);
-    
-    // Timeout after 5 seconds
-    setTimeout(() => {
-      window.removeEventListener('message', listener);
-      reject(new Error('Request timeout'));
-    }, 5000);
-  });
-}
-
-function sendNotification(method: string, params: any) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, '*');
-}
-
-// Only send size-changed after host has acknowledged connection (avoids "Not connected" errors)
-let isConnected = false;
-
-/* ============================================
-   DISPLAY MODE HANDLING
-   ============================================
-   
-   Handles switching between inline and fullscreen display modes.
-   You may want to customize handleDisplayModeChange() to adjust
-   your layout for fullscreen mode.
-   ============================================ */
-
-let currentDisplayMode = 'inline';
-
-function handleDisplayModeChange(mode: string) {
-  currentDisplayMode = mode;
-  if (mode === 'fullscreen') {
-    document.body.classList.add('fullscreen-mode');
-    // Adjust layout for fullscreen if needed
-    const container = document.querySelector('.dashboard-container');
-    if (container) {
-      (container as HTMLElement).style.maxWidth = '100%';
-      (container as HTMLElement).style.padding = '20px';
-    }
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
   } else {
-    document.body.classList.remove('fullscreen-mode');
-    // Restore normal layout
-    const container = document.querySelector('.dashboard-container');
-    if (container) {
-      (container as HTMLElement).style.maxWidth = '';
-      (container as HTMLElement).style.padding = '';
-    }
+    document.body.classList.remove("fullscreen-mode");
   }
-  // Notify host of size change after mode change
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
 }
 
-function requestDisplayMode(mode: string): Promise<any> {
-  return sendRequest('ui/request-display-mode', { mode: mode })
-    .then(result => {
-      if (result?.mode) {
-        handleDisplayModeChange(result.mode);
-      }
-      return result;
-    })
-    .catch(err => {
-      console.warn('[mcp-app]', 'Failed to request display mode:', err);
-      throw err;
-    });
-}
-
-// Make function globally accessible for testing/debugging
-(window as any).requestDisplayMode = requestDisplayMode;
-
-/* ============================================
-   SIZE CHANGE NOTIFICATIONS
-   ============================================
-   
-   Notifies the host when the content size changes.
-   This is critical for proper iframe sizing.
-   You typically don't need to modify this section.
-   ============================================ */
-
-function notifySizeChanged() {
-  if (!isConnected) return;
-  const width = document.body.scrollWidth || document.documentElement.scrollWidth;
-  const height = document.body.scrollHeight || document.documentElement.scrollHeight;
-  
-  sendNotification('ui/notifications/size-changed', {
-    width: width,
-    height: height
-  });
-}
-
-// Debounce function to avoid too many notifications
-let sizeChangeTimeout: NodeJS.Timeout | null = null;
-function debouncedNotifySizeChanged() {
-  if (sizeChangeTimeout) {
-    clearTimeout(sizeChangeTimeout);
-  }
-  sizeChangeTimeout = setTimeout(() => {
-    notifySizeChanged();
-  }, 100); // Wait 100ms after last change
-}
-
-// Use ResizeObserver to detect size changes
-let resizeObserver: ResizeObserver | null = null;
-function setupSizeObserver() {
-  if (typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => {
-      debouncedNotifySizeChanged();
-    });
-    resizeObserver.observe(document.body);
-  } else {
-    // Fallback: use window resize and mutation observer
-    window.addEventListener('resize', debouncedNotifySizeChanged);
-    const mutationObserver = new MutationObserver(debouncedNotifySizeChanged);
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['style', 'class']
-    });
-  }
-  // Initial size is sent after init completes (in init .then())
-}
-
-/* ============================================
-   INITIALIZATION
-   ============================================
-   
-   Initializes the MCP app and sets up all required features.
-   You typically don't need to modify this section.
-   ============================================ */
-
-// Initialize MCP App - REQUIRED for MCP Apps protocol
-sendRequest('ui/initialize', {
-  appCapabilities: {
-    availableDisplayModes: ["inline", "fullscreen"]
-  },
-  clientInfo: {
-    name: APP_NAME,
-    version: APP_VERSION
-  },
-  protocolVersion: PROTOCOL_VERSION
-}).then((result: any) => {
-  isConnected = true;
-  // Extract host context from initialization result
-  const ctx = result.hostContext || result;
-  
-  // Extract host capabilities for future use
-  const hostCapabilities = result.hostCapabilities;
-  
-  // Send initialized notification after successful initialization
-  sendNotification('ui/notifications/initialized', {});
-  // Send initial size so host can size the iframe
-  setTimeout(() => notifySizeChanged(), 100);
-  // Apply theme from host context
-  if (ctx?.theme === 'dark') {
-    document.body.classList.add('dark');
-  } else if (ctx?.theme === 'light') {
-    document.body.classList.remove('dark');
-  }
-  // Handle display mode from host context
-  if (ctx?.displayMode) {
-    handleDisplayModeChange(ctx.displayMode);
-  }
-  // Handle container dimensions if provided
-  if (ctx?.containerDimensions) {
-    const dims = ctx.containerDimensions;
-    if (dims.width) {
-      document.body.style.width = dims.width + 'px';
-    }
-    if (dims.height) {
-      document.body.style.height = dims.height + 'px';
-    }
-    if (dims.maxWidth) {
-      document.body.style.maxWidth = dims.maxWidth + 'px';
-    }
-    if (dims.maxHeight) {
-      document.body.style.maxHeight = dims.maxHeight + 'px';
-    }
-  }
-}).catch(err => {
-  console.warn('[mcp-app]', 'Failed to initialize MCP App:', err);
-  // Allow size notifications even if init failed (e.g. timeout in playground)
-  isConnected = true;
-});
-
-initializeDarkMode();
-
-// Setup size observer to notify host of content size changes
-// This is critical for the host to properly size the iframe
-setupSizeObserver();
 
 /* ============================================
    ADVANCED INTERACTIVE FEATURES
@@ -2247,7 +1972,6 @@ function setupToolbarInteractions() {
         if (tableContainer) tableContainer.style.display = 'none';
       }
       
-      setTimeout(() => notifySizeChanged(), 100);
     });
   });
   
@@ -2264,7 +1988,7 @@ function setupToolbarInteractions() {
         this.classList.toggle('active');
       }
       // In a real app, this would filter the data
-      console.log('[mcp-app]', 'Filter selected:', this.dataset.filter);
+      app.sendLog({ level: "debug", data: `[mcp-app] Filter selected: ${JSON.stringify(this.dataset.filter)}`, logger: APP_NAME });
     });
   });
 }
@@ -2324,6 +2048,93 @@ function sortTable(table: HTMLTableElement, columnIndex: number) {
   rows.forEach(row => tbody.appendChild(row));
 }
 
-// Export empty object to ensure this file is treated as an ES module
-// This prevents TypeScript from treating top-level declarations as global
+/* ============================================
+   SDK APP INSTANCE (STANDALONE MODE)
+   ============================================ */
+
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  app.sendLog({ level: "info", data: "Resource teardown requested", logger: APP_NAME });
+  // Clean up chart instances
+  if (lineChartInstance) {
+    lineChartInstance.destroy();
+    lineChartInstance = null;
+  }
+  if (pieChartInstance) {
+    pieChartInstance.destroy();
+    pieChartInstance = null;
+  }
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  app.sendLog({ level: "info", data: `Tool input received: ${JSON.stringify(params.arguments)}`, logger: APP_NAME });
+  const toolArguments = params.arguments;
+  if (toolArguments && typeof toolArguments === 'object') {
+    lastToolInput = toolArguments as Record<string, unknown>;
+    if ((toolArguments as any).context && typeof (toolArguments as any).context === 'object') {
+      lastRequestContext = (toolArguments as any).context as Record<string, unknown>;
+    }
+    app.sendLog({ level: "debug", data: `[mcp-app] Tool input stored for New query panel: ${JSON.stringify(lastToolInput)}`, logger: APP_NAME });
+  }
+};
+
+app.ontoolresult = (params) => {
+  app.sendLog({ level: "info", data: "Tool result received", logger: APP_NAME });
+
+  // Check for tool execution errors
+  if (params.isError) {
+    app.sendLog({ level: "error", data: `Tool execution failed: ${JSON.stringify(params.content)}`, logger: APP_NAME });
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    app.sendLog({ level: "warning", data: `Tool result received but no data found: ${JSON.stringify(params)}`, logger: APP_NAME });
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  app.sendLog({ level: "info", data: `Tool cancelled: ${JSON.stringify(reason)}`, logger: APP_NAME });
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  app.sendLog({ level: "error", data: `App error: ${JSON.stringify(error)}`, logger: APP_NAME });
+};
+
+app.onhostcontextchanged = (ctx) => {
+  app.sendLog({ level: "info", data: `Host context changed: ${JSON.stringify(ctx)}`, logger: APP_NAME });
+  handleHostContextChanged(ctx);
+};
+
+/* ============================================
+   CONNECT TO HOST
+   ============================================ */
+
+app
+  .connect()
+  .then(() => {
+    app.sendLog({ level: "info", data: "MCP App connected to host", logger: APP_NAME });
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    app.sendLog({ level: "error", data: `Failed to connect to MCP host: ${JSON.stringify(error)}`, logger: APP_NAME });
+  });
+
 export {};

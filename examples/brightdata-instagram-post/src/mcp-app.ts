@@ -1,83 +1,90 @@
 /* ============================================
-   INSTAGRAM POST MCP APP
+   BRIGHTDATA INSTAGRAM POST MCP APP (STANDALONE MODE)
    ============================================
-   
-   Displays Instagram post information in Instagram's signature style.
-   Handles photos, videos, captions, comments, and engagement metrics.
+
+   Displays a single Instagram post with media, engagement stats,
+   comments, and tagged users.
+
+   Uses app.connect() for standalone MCP Apps protocol communication.
    ============================================ */
+
+/* ============================================
+   SDK IMPORTS
+   ============================================ */
+
+import {
+  App,
+  applyDocumentTheme,
+  applyHostFonts,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
+
+// Import styles (will be bundled by Vite)
+import "./global.css";
+import "./mcp-app.css";
+
+/* ============================================
+   APP CONFIGURATION
+   ============================================ */
+
+const APP_NAME = "Brightdata Instagram Post";
+const APP_VERSION = "1.0.0";
 
 /* ============================================
    COMMON UTILITY FUNCTIONS
    ============================================ */
 
 /**
- * Extract data from MCP protocol messages
- */
-function extractData(msg: any) {
-  if (msg?.params?.structuredContent !== undefined) {
-    return msg.params.structuredContent;
-  }
-  if (msg?.params !== undefined) {
-    return msg.params;
-  }
-  return msg;
-}
-
-/**
  * Unwrap nested API response structures
  */
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  if (Array.isArray(data)) {
-    return { rows: data };
+
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
-  
+
   return data;
 }
 
-/**
- * Initialize dark mode based on system preference
- */
-function initializeDarkMode() {
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.body.classList.add('dark');
-  }
-  
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e: MediaQueryListEvent) => {
-    document.body.classList.toggle('dark', e.matches);
-  });
-}
 
 /**
  * Escape HTML to prevent XSS attacks
  */
 function escapeHtml(str: any): string {
-  if (typeof str !== "string") return str;
+  if (typeof str !== "string") return String(str);
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
@@ -130,12 +137,12 @@ function formatRelativeTime(dateString: string): string {
   const diffMins = Math.floor(diffMs / 60000);
   const diffHours = Math.floor(diffMs / 3600000);
   const diffDays = Math.floor(diffMs / 86400000);
-  
+
   if (diffMins < 1) return 'Just now';
   if (diffMins < 60) return `${diffMins}m`;
   if (diffHours < 24) return `${diffHours}h`;
   if (diffDays < 7) return `${diffDays}d`;
-  
+
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return `${months[date.getMonth()]} ${date.getDate()}`;
 }
@@ -145,22 +152,22 @@ function formatRelativeTime(dateString: string): string {
  */
 function extractPostData(data: any): any {
   const unwrapped = unwrapData(data);
-  
+
   // Handle API response format: { status_code: 200, body: [...] }
   if (unwrapped?.body && Array.isArray(unwrapped.body) && unwrapped.body.length > 0) {
     return unwrapped.body[0];
   }
-  
+
   // Handle direct post object
   if (unwrapped?.user_posted || unwrapped?.post_id) {
     return unwrapped;
   }
-  
+
   // Handle array of posts
   if (Array.isArray(unwrapped) && unwrapped.length > 0) {
     return unwrapped[0];
   }
-  
+
   return unwrapped;
 }
 
@@ -171,11 +178,11 @@ function renderMedia(post: any): string {
   const photos = post.photos || [];
   const videos = post.videos || [];
   const allMedia = [...photos, ...videos];
-  
+
   if (allMedia.length === 0) {
     return '<div class="no-media">No media available</div>';
   }
-  
+
   if (allMedia.length === 1) {
     const isVideo = videos.length > 0 && allMedia[0] === videos[0];
     return `
@@ -191,7 +198,7 @@ function renderMedia(post: any): string {
       </div>
     `;
   }
-  
+
   // Multiple media - show carousel
   return `
     <div class="media-container carousel">
@@ -232,7 +239,7 @@ function renderComments(comments: any[]): string {
   if (!comments || comments.length === 0) {
     return '';
   }
-  
+
   return `
     <div class="comments-section">
       ${comments.slice(0, 5).map((comment: any) => `
@@ -263,7 +270,7 @@ function renderComments(comments: any[]): string {
 function renderData(data: any) {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   if (!data) {
     showEmpty('No post data received');
     return;
@@ -271,12 +278,12 @@ function renderData(data: any) {
 
   try {
     const post = extractPostData(data);
-    
+
     if (!post || !post.user_posted) {
       showEmpty('Invalid post data format');
       return;
     }
-    
+
     const {
       user_posted,
       description,
@@ -295,7 +302,7 @@ function renderData(data: any) {
       content_type,
       url
     } = post;
-    
+
     app.innerHTML = `
       <div class="container">
         <div class="instagram-post">
@@ -326,10 +333,10 @@ function renderData(data: any) {
               </a>
             ` : ''}
           </div>
-          
+
           <!-- Media -->
           ${renderMedia(post)}
-          
+
           <!-- Engagement Bar -->
           <div class="engagement-bar">
             <div class="engagement-icons">
@@ -341,7 +348,7 @@ function renderData(data: any) {
               ${likes ? `<span class="likes-count">${formatNumber(likes)} likes</span>` : ''}
             </div>
           </div>
-          
+
           <!-- Caption -->
           ${description ? `
             <div class="post-caption">
@@ -349,17 +356,17 @@ function renderData(data: any) {
               <span>${escapeHtml(description)}</span>
             </div>
           ` : ''}
-          
+
           <!-- View Comments Link -->
           ${num_comments > 0 ? `
             <div class="view-comments">
               View all ${formatNumber(num_comments)} comments
             </div>
           ` : ''}
-          
+
           <!-- Comments -->
           ${renderComments(latest_comments)}
-          
+
           <!-- Tagged Users -->
           ${tagged_users && tagged_users.length > 0 ? `
             <div class="tagged-users">
@@ -372,7 +379,7 @@ function renderData(data: any) {
               `).join(', ')}
             </div>
           ` : ''}
-          
+
           <!-- Post Meta -->
           <div class="post-meta">
             ${date_posted ? `
@@ -385,16 +392,16 @@ function renderData(data: any) {
         </div>
       </div>
     `;
-    
+
     // Setup carousel navigation
     const carouselItems = app.querySelectorAll('.carousel-item');
     const carouselDots = app.querySelectorAll('.carousel-dots .dot');
     const prevBtn = app.querySelector('#carouselPrev');
     const nextBtn = app.querySelector('#carouselNext');
-    
+
     if (carouselItems.length > 1) {
       let currentIndex = 0;
-      
+
       const showSlide = (index: number) => {
         carouselItems.forEach((item, idx) => {
           item.classList.toggle('active', idx === index);
@@ -404,253 +411,134 @@ function renderData(data: any) {
         });
         currentIndex = index;
       };
-      
+
       if (prevBtn) {
         prevBtn.addEventListener('click', () => {
           showSlide((currentIndex - 1 + carouselItems.length) % carouselItems.length);
         });
       }
-      
+
       if (nextBtn) {
         nextBtn.addEventListener('click', () => {
           showSlide((currentIndex + 1) % carouselItems.length);
         });
       }
-      
+
       carouselDots.forEach((dot, idx) => {
         dot.addEventListener('click', () => {
           showSlide(idx);
         });
       });
     }
-    
-    // Notify host of size change after rendering completes
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
-    
+
   } catch (error: any) {
-    console.error('Render error:', error);
+    app.sendLog({ level: "error", data: `Render error: ${JSON.stringify(error)}`, logger: APP_NAME });
     showError(`Error rendering post data: ${error.message}`);
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
   }
 }
 
 /* ============================================
-   MESSAGE HANDLER (Standardized MCP Protocol)
+   HOST CONTEXT HANDLER
    ============================================ */
 
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
+  }
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
+  }
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
+  }
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
+}
+
+/* ============================================
+   SDK APP INSTANCE (STANDALONE MODE)
+   ============================================ */
+
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  app.sendLog({ level: "info", data: "Resource teardown requested", logger: APP_NAME });
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  app.sendLog({ level: "info", data: `Tool input received: ${JSON.stringify(params.arguments)}`, logger: APP_NAME });
+};
+
+app.ontoolresult = (params) => {
+  app.sendLog({ level: "info", data: "Tool result received", logger: APP_NAME });
+
+  // Check for tool execution errors
+  if (params.isError) {
+    app.sendLog({ level: "error", data: `Tool execution failed: ${JSON.stringify(params.content)}`, logger: APP_NAME });
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
     return;
   }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
-  }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      const data = msg.params?.structuredContent || msg.params;
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      if (msg.params?.theme === 'dark') {
-        document.body.classList.add('dark');
-      } else if (msg.params?.theme === 'light') {
-        document.body.classList.remove('dark');
-      }
-      if (msg.params?.displayMode) {
-        handleDisplayModeChange(msg.params.displayMode);
-      }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      break;
-      
-    case 'ui/notifications/initialized':
-      break;
-      
-    default:
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      }
-  }
-});
 
-/* ============================================
-   MCP COMMUNICATION
-   ============================================ */
-
-let requestIdCounter = 1;
-function sendRequest(method: string, params: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const id = requestIdCounter++;
-    window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, '*');
-    
-    const listener = (event: MessageEvent) => {
-      if (event.data?.id === id) {
-        window.removeEventListener('message', listener);
-        if (event.data?.result) {
-          resolve(event.data.result);
-        } else if (event.data?.error) {
-          reject(new Error(event.data.error.message || 'Unknown error'));
-        }
-      }
-    };
-    window.addEventListener('message', listener);
-    
-    setTimeout(() => {
-      window.removeEventListener('message', listener);
-      reject(new Error('Request timeout'));
-    }, 5000);
-  });
-}
-
-function sendNotification(method: string, params: any) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, '*');
-}
-
-/* ============================================
-   DISPLAY MODE HANDLING
-   ============================================ */
-
-let currentDisplayMode = 'inline';
-
-function handleDisplayModeChange(mode: string) {
-  currentDisplayMode = mode;
-  if (mode === 'fullscreen') {
-    document.body.classList.add('fullscreen-mode');
-    const container = document.querySelector('.container');
-    if (container) {
-      (container as HTMLElement).style.maxWidth = '100%';
-      (container as HTMLElement).style.padding = '20px';
-    }
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
   } else {
-    document.body.classList.remove('fullscreen-mode');
-    const container = document.querySelector('.container');
-    if (container) {
-      (container as HTMLElement).style.maxWidth = '';
-      (container as HTMLElement).style.padding = '';
-    }
+    app.sendLog({ level: "warning", data: `Tool result received but no data found: ${JSON.stringify(params)}`, logger: APP_NAME });
+    showEmpty("No data received");
   }
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
+};
 
-function requestDisplayMode(mode: string): Promise<any> {
-  return sendRequest('ui/request-display-mode', { mode: mode })
-    .then(result => {
-      if (result?.mode) {
-        handleDisplayModeChange(result.mode);
-      }
-      return result;
-    })
-    .catch(err => {
-      console.warn('Failed to request display mode:', err);
-      throw err;
-    });
-}
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  app.sendLog({ level: "info", data: `Tool cancelled: ${reason}`, logger: APP_NAME });
+  showError(`Operation cancelled: ${reason}`);
+};
 
-(window as any).requestDisplayMode = requestDisplayMode;
+app.onerror = (error) => {
+  app.sendLog({ level: "error", data: `App error: ${JSON.stringify(error)}`, logger: APP_NAME });
+};
+
+app.onhostcontextchanged = (ctx) => {
+  app.sendLog({ level: "info", data: `Host context changed: ${JSON.stringify(ctx)}`, logger: APP_NAME });
+  handleHostContextChanged(ctx);
+};
 
 /* ============================================
-   SIZE CHANGE NOTIFICATIONS
+   CONNECT TO HOST
    ============================================ */
 
-function notifySizeChanged() {
-  const width = document.body.scrollWidth || document.documentElement.scrollWidth;
-  const height = document.body.scrollHeight || document.documentElement.scrollHeight;
-  
-  sendNotification('ui/notifications/size-changed', {
-    width: width,
-    height: height
+app
+  .connect()
+  .then(() => {
+    app.sendLog({ level: "info", data: "MCP App connected to host", logger: APP_NAME });
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    app.sendLog({ level: "error", data: `Failed to connect to MCP host: ${JSON.stringify(error)}`, logger: APP_NAME });
   });
-}
 
-let sizeChangeTimeout: NodeJS.Timeout | null = null;
-function debouncedNotifySizeChanged() {
-  if (sizeChangeTimeout) {
-    clearTimeout(sizeChangeTimeout);
-  }
-  sizeChangeTimeout = setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
-
-let resizeObserver: ResizeObserver | null = null;
-function setupSizeObserver() {
-  if (typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => {
-      debouncedNotifySizeChanged();
-    });
-    resizeObserver.observe(document.body);
-  } else {
-    window.addEventListener('resize', debouncedNotifySizeChanged);
-    const mutationObserver = new MutationObserver(debouncedNotifySizeChanged);
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['style', 'class']
-    });
-  }
-  
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
-
-/* ============================================
-   INITIALIZATION
-   ============================================ */
-
-sendRequest('ui/initialize', {
-  appCapabilities: {
-    availableDisplayModes: ["inline", "fullscreen"]
-  }
-}).then((ctx: any) => {
-  if (ctx?.theme === 'dark') {
-    document.body.classList.add('dark');
-  } else if (ctx?.theme === 'light') {
-    document.body.classList.remove('dark');
-  }
-  if (ctx?.displayMode) {
-    handleDisplayModeChange(ctx.displayMode);
-  }
-  if (ctx?.containerDimensions) {
-    const dims = ctx.containerDimensions;
-    if (dims.width) {
-      document.body.style.width = dims.width + 'px';
-    }
-    if (dims.height) {
-      document.body.style.height = dims.height + 'px';
-    }
-    if (dims.maxWidth) {
-      document.body.style.maxWidth = dims.maxWidth + 'px';
-    }
-    if (dims.maxHeight) {
-      document.body.style.maxHeight = dims.maxHeight + 'px';
-    }
-  }
-}).catch(err => {
-  console.warn('Failed to initialize MCP App:', err);
-});
-
-initializeDarkMode();
-setupSizeObserver();
+export {};

@@ -1,38 +1,36 @@
 /* ============================================
-   BASE TEMPLATE FOR MCP APPS
+   ASHBY LIST CANDIDATES MCP APP (STANDALONE MODE)
    ============================================
-   
-   This file contains all common logic shared across MCP apps.
-   Customize the sections marked with "TEMPLATE-SPECIFIC" below.
-   
-   Common Features:
-   - MCP Protocol message handling (JSON-RPC 2.0)
-   - Dark mode support
-   - Display mode handling (inline/fullscreen)
-   - Size change notifications
-   - Data extraction utilities
-   - Error handling
-   
-   See README.md for customization guidelines.
+
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   in standalone mode with app.connect() for direct host communication.
    ============================================ */
+
+/* ============================================
+   SDK IMPORTS
+   ============================================ */
+
+import {
+  App,
+  applyDocumentTheme,
+  applyHostFonts,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
+
+// Import styles (will be bundled by Vite)
+import "./global.css";
+import "./mcp-app.css";
+
+/* ============================================
+   APP CONFIGURATION
+   ============================================ */
+
+const APP_NAME = "Ashby List Candidates";
+const APP_VERSION = "1.0.0";
 
 /* ============================================
    COMMON UTILITY FUNCTIONS
    ============================================ */
-
-/**
- * Extract data from MCP protocol messages
- * Handles standard JSON-RPC 2.0 format from run-action.html
- */
-function extractData(msg: any) {
-  if (msg?.params?.structuredContent !== undefined) {
-    return msg.params.structuredContent;
-  }
-  if (msg?.params !== undefined) {
-    return msg.params;
-  }
-  return msg;
-}
 
 /**
  * Unwrap nested API response structures
@@ -40,62 +38,52 @@ function extractData(msg: any) {
  */
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  // Format 1: Standard table format { columns: [], rows: [] }
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
-  // Format 2: Nested in message.template_data (3rd party MCP clients)
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
-  // Format 3: Nested in message.response_content (3rd party MCP clients)
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
-  // Format 4: Common nested patterns
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
-  // Format 5: Direct rows array
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  // Format 6: If data itself is an array
-  if (Array.isArray(data)) {
-    return { rows: data };
+
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
-  
+
   return data;
 }
 
-/**
- * Initialize dark mode based on system preference
- */
-function initializeDarkMode() {
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.body.classList.add('dark');
-  }
-  
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e: MediaQueryListEvent) => {
-    document.body.classList.toggle('dark', e.matches);
-  });
-}
 
 /**
  * Escape HTML to prevent XSS attacks
  */
 function escapeHtml(str: any): string {
-  if (typeof str !== "string") return str;
+  if (typeof str !== "string") return String(str);
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
@@ -264,8 +252,8 @@ function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '-';
   try {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
       day: 'numeric',
       year: 'numeric'
     });
@@ -458,7 +446,7 @@ function renderTable(candidates: any[]): string {
           ${willingToRelocate === true ? '<span class="badge badge-success" title="Willing to relocate">Relocate</span>' : ''}
         </td>
         <td>
-          ${preferredTeams && Array.isArray(preferredTeams) && preferredTeams.length > 0 
+          ${preferredTeams && Array.isArray(preferredTeams) && preferredTeams.length > 0
             ? `<div class="teams-list">${preferredTeams.slice(0, 2).map((t: any) => `<span class="team-badge">${escapeHtml(String(t))}</span>`).join('')}${preferredTeams.length > 2 ? `<span class="team-badge">+${preferredTeams.length - 2}</span>` : ''}</div>`
             : '-'}
         </td>
@@ -489,13 +477,13 @@ function applyFiltersAndRender() {
 
   let filtered = searchCandidates(allCandidates, searchQuery);
   filtered = filterCandidates(filtered, filters);
-  
+
   if (sortColumn) {
     filtered = sortCandidates(filtered, sortColumn, sortDirection);
   }
 
   filteredCandidates = filtered;
-  
+
   // Update results count
   const countEl = document.getElementById('results-count');
   if (countEl) {
@@ -506,7 +494,7 @@ function applyFiltersAndRender() {
   const tbody = tableContainer?.querySelector('tbody');
   if (tbody) {
     tbody.innerHTML = renderTable(filtered);
-    
+
     // Update checkboxes based on selection
     filtered.forEach((candidate, index) => {
       const candidateId = candidate.id || `candidate-${index}`;
@@ -524,7 +512,7 @@ function applyFiltersAndRender() {
       }
     });
   }
-  
+
   // Update select all checkbox
   const selectAllCheckbox = document.getElementById('select-all') as HTMLInputElement;
   const headerCheckbox = document.getElementById('header-checkbox') as HTMLInputElement;
@@ -540,11 +528,6 @@ function applyFiltersAndRender() {
       return selectedCandidates.has(candidateId);
     });
   }
-
-  // Notify host of size change
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 50);
 }
 
 /**
@@ -553,7 +536,7 @@ function applyFiltersAndRender() {
 function renderData(data: any) {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   if (!data) {
     showEmpty('No data received');
     return;
@@ -562,7 +545,7 @@ function renderData(data: any) {
   try {
     // Extract candidates
     const candidates = extractCandidates(data);
-    
+
     if (!candidates || candidates.length === 0) {
       showEmpty('No candidates found');
       return;
@@ -574,7 +557,7 @@ function renderData(data: any) {
     // Create container
     const container = document.createElement('div');
     container.className = 'candidates-container';
-    
+
     // Ashby Header
     const ashbyHeader = document.createElement('div');
     ashbyHeader.className = 'ashby-header';
@@ -597,7 +580,7 @@ function renderData(data: any) {
       </div>
     `;
     container.appendChild(ashbyHeader);
-    
+
     // Header
     const header = document.createElement('div');
     header.className = 'header';
@@ -621,10 +604,10 @@ function renderData(data: any) {
     // Toolbar
     const toolbar = document.createElement('div');
     toolbar.className = 'toolbar';
-    
+
     const toolbarLeft = document.createElement('div');
     toolbarLeft.className = 'toolbar-left';
-    
+
     // Search box
     const searchBox = document.createElement('div');
     searchBox.className = 'search-box';
@@ -633,12 +616,12 @@ function renderData(data: any) {
       <input type="text" class="search-input" id="search-input" placeholder="Search by name, email, position, company...">
     `;
     toolbarLeft.appendChild(searchBox);
-    
+
     toolbar.appendChild(toolbarLeft);
-    
+
     const toolbarRight = document.createElement('div');
     toolbarRight.className = 'toolbar-right';
-    
+
     // Select All checkbox
     const selectAllContainer = document.createElement('div');
     selectAllContainer.style.display = 'flex';
@@ -649,7 +632,7 @@ function renderData(data: any) {
       <label for="select-all" style="font-size: 14px; color: var(--ashby-text-secondary); cursor: pointer;">Select All</label>
     `;
     toolbarRight.appendChild(selectAllContainer);
-    
+
     toolbar.appendChild(toolbarRight);
     container.appendChild(toolbar);
 
@@ -706,7 +689,7 @@ function renderData(data: any) {
       th.addEventListener('click', () => {
         const column = th.getAttribute('data-sort');
         if (!column) return;
-        
+
         // Update sort state
         if (sortColumn === column) {
           sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
@@ -721,7 +704,7 @@ function renderData(data: any) {
           const icon = h.querySelector('.sort-icon');
           if (icon) icon.textContent = '⇅';
         });
-        
+
         th.classList.add('sorted');
         const icon = th.querySelector('.sort-icon');
         if (icon) {
@@ -734,7 +717,7 @@ function renderData(data: any) {
 
     // Setup event listeners
     setupEventListeners();
-    
+
     // Initial render
     applyFiltersAndRender();
 
@@ -748,254 +731,12 @@ function renderData(data: any) {
 
     // Initial render
     applyFiltersAndRender();
-    
+
   } catch (error: any) {
-    console.error('Render error:', error);
+    app.sendLog({ level: "error", data: `Render error: ${JSON.stringify(error)}`, logger: APP_NAME });
     showError(`Error rendering candidates: ${error.message}`);
-    // Notify size even on error
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
   }
 }
-
-/* ============================================
-   MESSAGE HANDLER (Standardized MCP Protocol)
-   ============================================ */
-
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    return;
-  }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
-  }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      const data = msg.params?.structuredContent || msg.params;
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      if (msg.params?.theme === 'dark') {
-        document.body.classList.add('dark');
-      } else if (msg.params?.theme === 'light') {
-        document.body.classList.remove('dark');
-      }
-      // Handle display mode changes
-      if (msg.params?.displayMode) {
-        handleDisplayModeChange(msg.params.displayMode);
-      }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      // Tool input notification (optional - handle if needed)
-      break;
-      
-    case 'ui/notifications/initialized':
-      // Initialization notification (optional - handle if needed)
-      break;
-      
-    default:
-      // Unknown method - try to extract data as fallback
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      }
-  }
-});
-
-/* ============================================
-   MCP COMMUNICATION
-   ============================================ */
-
-let requestIdCounter = 1;
-function sendRequest(method: string, params: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const id = requestIdCounter++;
-    window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, '*');
-    
-    const listener = (event: MessageEvent) => {
-      if (event.data?.id === id) {
-        window.removeEventListener('message', listener);
-        if (event.data?.result) {
-          resolve(event.data.result);
-        } else if (event.data?.error) {
-          reject(new Error(event.data.error.message || 'Unknown error'));
-        }
-      }
-    };
-    window.addEventListener('message', listener);
-    
-    // Timeout after 5 seconds
-    setTimeout(() => {
-      window.removeEventListener('message', listener);
-      reject(new Error('Request timeout'));
-    }, 5000);
-  });
-}
-
-function sendNotification(method: string, params: any) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, '*');
-}
-
-/* ============================================
-   DISPLAY MODE HANDLING
-   ============================================ */
-
-let currentDisplayMode = 'inline';
-
-function handleDisplayModeChange(mode: string) {
-  currentDisplayMode = mode;
-  if (mode === 'fullscreen') {
-    document.body.classList.add('fullscreen-mode');
-    // Adjust layout for fullscreen if needed
-    const container = document.querySelector('.candidates-container');
-    if (container) {
-      (container as HTMLElement).style.maxWidth = '100%';
-      (container as HTMLElement).style.padding = '20px';
-    }
-  } else {
-    document.body.classList.remove('fullscreen-mode');
-    // Restore normal layout
-    const container = document.querySelector('.candidates-container');
-    if (container) {
-      (container as HTMLElement).style.maxWidth = '';
-      (container as HTMLElement).style.padding = '';
-    }
-  }
-  // Notify host of size change after mode change
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
-
-function requestDisplayMode(mode: string): Promise<any> {
-  return sendRequest('ui/request-display-mode', { mode: mode })
-    .then(result => {
-      if (result?.mode) {
-        handleDisplayModeChange(result.mode);
-      }
-      return result;
-    })
-    .catch(err => {
-      console.warn('Failed to request display mode:', err);
-      throw err;
-    });
-}
-
-// Make function globally accessible for testing/debugging
-(window as any).requestDisplayMode = requestDisplayMode;
-
-/* ============================================
-   SIZE CHANGE NOTIFICATIONS
-   ============================================ */
-
-function notifySizeChanged() {
-  const width = document.body.scrollWidth || document.documentElement.scrollWidth;
-  const height = document.body.scrollHeight || document.documentElement.scrollHeight;
-  
-  sendNotification('ui/notifications/size-changed', {
-    width: width,
-    height: height
-  });
-}
-
-// Debounce function to avoid too many notifications
-let sizeChangeTimeout: NodeJS.Timeout | null = null;
-function debouncedNotifySizeChanged() {
-  if (sizeChangeTimeout) {
-    clearTimeout(sizeChangeTimeout);
-  }
-  sizeChangeTimeout = setTimeout(() => {
-    notifySizeChanged();
-  }, 100); // Wait 100ms after last change
-}
-
-// Use ResizeObserver to detect size changes
-let resizeObserver: ResizeObserver | null = null;
-function setupSizeObserver() {
-  if (typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => {
-      debouncedNotifySizeChanged();
-    });
-    resizeObserver.observe(document.body);
-  } else {
-    // Fallback: use window resize and mutation observer
-    window.addEventListener('resize', debouncedNotifySizeChanged);
-    const mutationObserver = new MutationObserver(debouncedNotifySizeChanged);
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['style', 'class']
-    });
-  }
-  
-  // Send initial size after a short delay to ensure content is rendered
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
-
-/* ============================================
-   INITIALIZATION
-   ============================================ */
-
-// Initialize MCP App - REQUIRED for MCP Apps protocol
-sendRequest('ui/initialize', {
-  appCapabilities: {
-    availableDisplayModes: ["inline", "fullscreen"]
-  }
-}).then((ctx: any) => {
-  // Apply theme from host context
-  if (ctx?.theme === 'dark') {
-    document.body.classList.add('dark');
-  } else if (ctx?.theme === 'light') {
-    document.body.classList.remove('dark');
-  }
-  // Handle display mode from host context
-  if (ctx?.displayMode) {
-    handleDisplayModeChange(ctx.displayMode);
-  }
-  // Handle container dimensions if provided
-  if (ctx?.containerDimensions) {
-    const dims = ctx.containerDimensions;
-    if (dims.width) {
-      document.body.style.width = dims.width + 'px';
-    }
-    if (dims.height) {
-      document.body.style.height = dims.height + 'px';
-    }
-    if (dims.maxWidth) {
-      document.body.style.maxWidth = dims.maxWidth + 'px';
-    }
-    if (dims.maxHeight) {
-      document.body.style.maxHeight = dims.maxHeight + 'px';
-    }
-  }
-}).catch(err => {
-  console.warn('Failed to initialize MCP App:', err);
-  // Fallback to system preference if initialization fails
-});
-
-initializeDarkMode();
-
-// Setup size observer to notify host of content size changes
-// This is critical for the host to properly size the iframe
-setupSizeObserver();
 
 /* ============================================
    ADVANCED INTERACTIVE FEATURES
@@ -1008,13 +749,13 @@ function setupEventListeners() {
   // Search handler
   const searchInput = document.getElementById('search-input') as HTMLInputElement;
   if (searchInput) {
-    let searchTimeout: NodeJS.Timeout;
+    let searchTimeout: number;
     searchInput.addEventListener('input', () => {
       clearTimeout(searchTimeout);
-      searchTimeout = setTimeout(applyFiltersAndRender, 300);
+      searchTimeout = window.setTimeout(applyFiltersAndRender, 300);
     });
   }
-  
+
   // Filter handlers
   ['filter-experience', 'filter-visa', 'filter-relocate', 'filter-tag'].forEach(id => {
     const filter = document.getElementById(id) as HTMLSelectElement;
@@ -1059,12 +800,12 @@ function setupEventListeners() {
       selectedCandidates.delete(candidateId);
     }
   });
-  
+
   // Update all checkboxes
   document.querySelectorAll('.candidate-checkbox').forEach((checkbox: any) => {
     checkbox.checked = checked;
   });
-  
+
   // Update row styles
   document.querySelectorAll('tbody tr').forEach((row: any) => {
     const candidateId = row.getAttribute('data-candidate-id');
@@ -1076,7 +817,7 @@ function setupEventListeners() {
       }
     }
   });
-  
+
   updateSelectionUI();
 };
 
@@ -1102,7 +843,7 @@ function setupEventListeners() {
 function updateSelectionUI() {
   const bulkActions = document.getElementById('bulk-actions');
   const selectedCount = document.getElementById('selected-count');
-  
+
   if (bulkActions && selectedCount) {
     if (selectedCandidates.size > 0) {
       bulkActions.classList.add('active');
@@ -1111,9 +852,8 @@ function updateSelectionUI() {
       bulkActions.classList.remove('active');
     }
   }
-  
-  notifySizeChanged();
-}
+
+  }
 
 /**
  * Show candidate modal
@@ -1123,14 +863,14 @@ function updateSelectionUI() {
     const id = c.id || `candidate-${i}`;
     return id === candidateId;
   });
-  
+
   if (!candidate) return;
-  
+
   const modal = document.getElementById('candidate-modal');
   const modalContent = document.getElementById('modal-content');
-  
+
   if (!modal || !modalContent) return;
-  
+
   const experience = getCustomFieldLabel(candidate, 'Experience level') || '-';
   const needsVisa = getCustomField(candidate, 'Needs visa');
   const willingToRelocate = getCustomField(candidate, 'Willing to relocate');
@@ -1143,7 +883,7 @@ function updateSelectionUI() {
   const linkedin = candidate.linkedInProfileUrl || '-';
   const github = candidate.githubProfileUrl || '-';
   const portfolio = candidate.portfolioUrl || '-';
-  
+
   modalContent.innerHTML = `
     <div class="modal-header">
       <div>
@@ -1156,7 +896,7 @@ function updateSelectionUI() {
         <span class="icon-inline">${iconX()}</span>
       </button>
     </div>
-    
+
     <div class="modal-section">
       <div class="modal-section-title">Contact Information</div>
       <div class="modal-field">
@@ -1178,7 +918,7 @@ function updateSelectionUI() {
       </div>
       ` : ''}
     </div>
-    
+
     <div class="modal-section">
       <div class="modal-section-title">Professional Information</div>
       <div class="modal-field">
@@ -1204,7 +944,7 @@ function updateSelectionUI() {
       </div>
       ` : ''}
     </div>
-    
+
     <div class="modal-section">
       <div class="modal-section-title">Additional Details</div>
       ${needsVisa === true ? `
@@ -1226,7 +966,7 @@ function updateSelectionUI() {
       </div>
       ` : ''}
     </div>
-    
+
     ${(linkedin !== '-' || github !== '-' || portfolio !== '-') ? `
     <div class="modal-section">
       <div class="modal-section-title">Online Profiles</div>
@@ -1250,7 +990,7 @@ function updateSelectionUI() {
       ` : ''}
     </div>
     ` : ''}
-    
+
     <div class="modal-section">
       <div class="modal-section-title">Last Updated</div>
       <div class="modal-field">
@@ -1258,12 +998,11 @@ function updateSelectionUI() {
       </div>
     </div>
   `;
-  
+
   modal.classList.add('active');
   document.body.style.overflow = 'hidden';
-  
-  notifySizeChanged();
-};
+
+  };
 
 /**
  * Close candidate modal
@@ -1274,8 +1013,7 @@ function updateSelectionUI() {
     modal.classList.remove('active');
   }
   document.body.style.overflow = '';
-  notifySizeChanged();
-};
+  };
 
 // Close modal on escape key
 document.addEventListener('keydown', function(e) {
@@ -1303,7 +1041,7 @@ if (modalEl) {
     alert('No candidates available to export');
     return;
   }
-  
+
   if (format === 'csv') {
     exportToCSV(candidates);
   } else {
@@ -1319,12 +1057,12 @@ if (modalEl) {
     alert('No candidates selected');
     return;
   }
-  
+
   const candidates = filteredCandidates.filter((candidate, index) => {
     const candidateId = candidate.id || `candidate-${index}`;
     return selectedCandidates.has(candidateId);
   });
-  
+
   exportToCSV(candidates, 'ashby-candidates-selected.csv');
 };
 
@@ -1333,7 +1071,7 @@ if (modalEl) {
  */
 function exportToCSV(candidates: any[], filename: string = 'ashby-candidates.csv') {
   if (!candidates || candidates.length === 0) return;
-  
+
   const headers = ['Name', 'Position', 'Company', 'Email', 'Location', 'Experience', 'Tags', 'Updated'];
   const rows = candidates.map(candidate => {
     const tags = (candidate.tags || []).map((t: any) => t.title).join('; ');
@@ -1349,17 +1087,17 @@ function exportToCSV(candidates: any[], filename: string = 'ashby-candidates.csv
       formatDate(candidate.updatedAt)
     ];
   });
-  
+
   const csv = [
     headers.join(','),
     ...rows.map(row => row.map(cell => {
       const str = String(cell || '');
-      return str.includes(',') || str.includes('"') || str.includes('\n') 
-        ? `"${str.replace(/"/g, '""')}"` 
+      return str.includes(',') || str.includes('"') || str.includes('\n')
+        ? `"${str.replace(/"/g, '""')}"`
         : str;
     }).join(','))
   ].join('\n');
-  
+
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
@@ -1378,3 +1116,109 @@ function exportToJSON(candidates: any[], filename: string = 'ashby-candidates.js
   link.download = filename;
   link.click();
 }
+
+/* ============================================
+   HOST CONTEXT HANDLER
+   ============================================ */
+
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
+  }
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
+  }
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
+  }
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
+}
+
+/* ============================================
+   SDK APP INSTANCE (STANDALONE MODE)
+   ============================================ */
+
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  app.sendLog({ level: "info", data: "Resource teardown requested", logger: APP_NAME });
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  app.sendLog({ level: "info", data: `Tool input received: ${JSON.stringify(params.arguments)}`, logger: APP_NAME });
+};
+
+app.ontoolresult = (params) => {
+  app.sendLog({ level: "info", data: "Tool result received", logger: APP_NAME });
+
+  // Check for tool execution errors
+  if (params.isError) {
+    app.sendLog({ level: "error", data: `Tool execution failed: ${JSON.stringify(params.content)}`, logger: APP_NAME });
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    app.sendLog({ level: "warning", data: `Tool result received but no data found: ${JSON.stringify(params)}`, logger: APP_NAME });
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  app.sendLog({ level: "info", data: `Tool cancelled: ${reason}`, logger: APP_NAME });
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  app.sendLog({ level: "error", data: `App error: ${JSON.stringify(error)}`, logger: APP_NAME });
+};
+
+app.onhostcontextchanged = (ctx) => {
+  app.sendLog({ level: "info", data: `Host context changed: ${JSON.stringify(ctx)}`, logger: APP_NAME });
+  handleHostContextChanged(ctx);
+};
+
+/* ============================================
+   CONNECT TO HOST
+   ============================================ */
+
+app
+  .connect()
+  .then(() => {
+    app.sendLog({ level: "info", data: "MCP App connected to host", logger: APP_NAME });
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    app.sendLog({ level: "error", data: `Failed to connect to MCP host: ${JSON.stringify(error)}`, logger: APP_NAME });
+  });
+
+export {};

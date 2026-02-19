@@ -1,13 +1,35 @@
 /* ============================================
-   Google Calendar Events MCP App
+   GOOGLE CALENDAR EVENTS MCP APP (STANDALONE MODE)
    ============================================
+
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   in standalone mode with app.connect().
+
    Renders Google Calendar API events list (calendar#events)
    in Google Calendar style with icon actions.
    ============================================ */
 
+/* ============================================
+   SDK IMPORTS
+   ============================================ */
+
+import {
+  App,
+  applyDocumentTheme,
+  applyHostFonts,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
+
+// Import styles (will be bundled by Vite)
+import "./global.css";
+import "./mcp-app.css";
+
+/* ============================================
+   APP CONFIGURATION
+   ============================================ */
+
 const APP_NAME = "Google Calendar Events";
 const APP_VERSION = "1.0.0";
-const PROTOCOL_VERSION = "2026-01-26";
 
 function unwrapData(data: any): any {
   if (!data) return null;
@@ -17,17 +39,9 @@ function unwrapData(data: any): any {
   return data;
 }
 
-function initializeDarkMode() {
-  if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-    document.body.classList.add("dark");
-  }
-  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e: MediaQueryListEvent) => {
-    document.body.classList.toggle("dark", e.matches);
-  });
-}
 
 function escapeHtml(str: any): string {
-  if (typeof str !== "string") return str;
+  if (typeof str !== "string") return String(str);
   const div = document.createElement("div");
   div.textContent = str;
   return div.innerHTML;
@@ -186,137 +200,116 @@ function renderData(data: any) {
     html += '</div>';
 
     app.innerHTML = html;
-    setTimeout(() => notifySizeChanged(), 50);
   } catch (err: any) {
-    console.error("Render error:", err);
+    app.sendLog({ level: "error", data: `Render error: ${JSON.stringify(err)}`, logger: APP_NAME });
     showError("Error rendering calendar: " + err.message);
-    setTimeout(() => notifySizeChanged(), 50);
   }
 }
 
-window.addEventListener("message", function (event: MessageEvent) {
-  const msg = event.data;
-  if (!msg || msg.jsonrpc !== "2.0") return;
-  if (msg.id !== undefined && msg.method === "ui/resource-teardown") {
-    if (sizeChangeTimeout) {
-      clearTimeout(sizeChangeTimeout);
-      sizeChangeTimeout = null;
+/* ============================================
+   HOST CONTEXT HANDLER
+   ============================================ */
+
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
     }
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-    window.parent.postMessage({ jsonrpc: "2.0", id: msg.id, result: {} }, "*");
-    return;
   }
-  if (msg.id !== undefined && !msg.method) return;
-  switch (msg.method) {
-    case "ui/notifications/tool-result":
-      const data = msg.params?.structuredContent ?? msg.params;
-      if (data !== undefined) renderData(data);
-      else showEmpty("No data received.");
-      break;
-    case "ui/notifications/host-context-changed":
-      if (msg.params?.theme === "dark") document.body.classList.add("dark");
-      else if (msg.params?.theme === "light") document.body.classList.remove("dark");
-      if (msg.params?.displayMode) handleDisplayModeChange(msg.params.displayMode);
-      break;
-    case "ui/notifications/tool-cancelled":
-      showError("Cancelled: " + (msg.params?.reason || "Tool cancelled"));
-      break;
-    default:
-      if (msg.params) {
-        const fallback = msg.params.structuredContent ?? msg.params;
-        if (fallback && fallback !== msg) renderData(fallback);
-      }
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
   }
-});
 
-let requestIdCounter = 1;
-function sendRequest(method: string, params: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const id = requestIdCounter++;
-    window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, "*");
-    const listener = (event: MessageEvent) => {
-      if (event.data?.id === id) {
-        window.removeEventListener("message", listener);
-        if (event.data?.result) resolve(event.data.result);
-        else if (event.data?.error) reject(new Error(event.data.error.message || "Unknown error"));
-      }
-    };
-    window.addEventListener("message", listener);
-    setTimeout(() => {
-      window.removeEventListener("message", listener);
-      reject(new Error("Request timeout"));
-    }, 5000);
-  });
-}
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
+  }
 
-function sendNotification(method: string, params: any) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, "*");
-}
-
-let currentDisplayMode = "inline";
-function handleDisplayModeChange(mode: string) {
-  currentDisplayMode = mode;
-  if (mode === "fullscreen") {
+  if (ctx.displayMode === "fullscreen") {
     document.body.classList.add("fullscreen-mode");
-    const el = document.querySelector(".gcal-widget");
-    if (el) (el as HTMLElement).style.maxWidth = "100%";
   } else {
     document.body.classList.remove("fullscreen-mode");
-    const el = document.querySelector(".gcal-widget");
-    if (el) (el as HTMLElement).style.maxWidth = "";
   }
-  setTimeout(() => notifySizeChanged(), 100);
 }
 
-function notifySizeChanged() {
-  const w = document.body.scrollWidth || document.documentElement.scrollWidth;
-  const h = document.body.scrollHeight || document.documentElement.scrollHeight;
-  sendNotification("ui/notifications/size-changed", { width: w, height: h });
-}
+/* ============================================
+   SDK APP INSTANCE (STANDALONE MODE)
+   ============================================ */
 
-let sizeChangeTimeout: ReturnType<typeof setTimeout> | null = null;
-function debouncedNotifySizeChanged() {
-  if (sizeChangeTimeout) clearTimeout(sizeChangeTimeout);
-  sizeChangeTimeout = setTimeout(() => notifySizeChanged(), 100);
-}
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
 
-let resizeObserver: ResizeObserver | null = null;
-function setupSizeObserver() {
-  if (typeof ResizeObserver !== "undefined") {
-    resizeObserver = new ResizeObserver(() => debouncedNotifySizeChanged());
-    resizeObserver.observe(document.body);
+app.onteardown = async () => {
+  app.sendLog({ level: "info", data: "Resource teardown requested", logger: APP_NAME });
+  // Add any cleanup logic specific to this app
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  app.sendLog({ level: "info", data: `Tool input received: ${JSON.stringify(params.arguments)}`, logger: APP_NAME });
+};
+
+app.ontoolresult = (params) => {
+  app.sendLog({ level: "info", data: "Tool result received", logger: APP_NAME });
+
+  // Check for tool execution errors
+  if (params.isError) {
+    app.sendLog({ level: "error", data: `Tool execution failed: ${JSON.stringify(params.content)}`, logger: APP_NAME });
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
   } else {
-    window.addEventListener("resize", debouncedNotifySizeChanged);
-    const mo = new MutationObserver(debouncedNotifySizeChanged);
-    mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["style", "class"] });
+    app.sendLog({ level: "warning", data: `Tool result received but no data found: ${JSON.stringify(params)}`, logger: APP_NAME });
+    showEmpty("No data received");
   }
-  setTimeout(() => notifySizeChanged(), 100);
-}
+};
 
-sendRequest("ui/initialize", {
-  appCapabilities: { availableDisplayModes: ["inline", "fullscreen"] },
-  appInfo: { name: APP_NAME, version: APP_VERSION },
-  protocolVersion: PROTOCOL_VERSION,
-})
-  .then((result: any) => {
-    const ctx = result.hostContext ?? result;
-    sendNotification("ui/notifications/initialized", {});
-    if (ctx?.theme === "dark") document.body.classList.add("dark");
-    else if (ctx?.theme === "light") document.body.classList.remove("dark");
-    if (ctx?.displayMode) handleDisplayModeChange(ctx.displayMode);
-    if (ctx?.containerDimensions) {
-      const d = ctx.containerDimensions;
-      if (d.width) document.body.style.width = d.width + "px";
-      if (d.height) document.body.style.height = d.height + "px";
-      if (d.maxWidth) document.body.style.maxWidth = d.maxWidth + "px";
-      if (d.maxHeight) document.body.style.maxHeight = d.maxHeight + "px";
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  app.sendLog({ level: "info", data: `Tool cancelled: ${reason}`, logger: APP_NAME });
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  app.sendLog({ level: "error", data: `App error: ${JSON.stringify(error)}`, logger: APP_NAME });
+};
+
+app.onhostcontextchanged = (ctx) => {
+  app.sendLog({ level: "info", data: `Host context changed: ${JSON.stringify(ctx)}`, logger: APP_NAME });
+  handleHostContextChanged(ctx);
+};
+
+/* ============================================
+   CONNECT TO HOST
+   ============================================ */
+
+app
+  .connect()
+  .then(() => {
+    app.sendLog({ level: "info", data: "MCP App connected to host", logger: APP_NAME });
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
     }
   })
-  .catch(() => {});
+  .catch((error) => {
+    app.sendLog({ level: "error", data: `Failed to connect to MCP host: ${JSON.stringify(error)}`, logger: APP_NAME });
+  });
 
-initializeDarkMode();
-setupSizeObserver();
+// Export empty object to ensure this file is treated as an ES module
 export {};

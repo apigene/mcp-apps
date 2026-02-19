@@ -1,18 +1,9 @@
 /* ============================================
-   BASE TEMPLATE (SDK UTILITIES VERSION) FOR MCP APPS
+   XYZ USERS MCP APP (STANDALONE MODE)
    ============================================
 
-   This file uses the official @modelcontextprotocol/ext-apps SDK
-   for utilities only (theme helpers, types, auto-resize).
-
-   Benefits of this approach:
-   - SDK utilities for theme, fonts, and styling
-   - Full TypeScript type safety
-   - Manual message handling for proxy compatibility
-   - Works with run-action.html proxy layer
-   - No SDK connection conflicts with proxy initialization
-
-   See README.md for customization guidelines.
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   in standalone mode with app.connect().
    ============================================ */
 
 /* ============================================
@@ -32,24 +23,10 @@ import "./mcp-app.css";
 
 /* ============================================
    APP CONFIGURATION
-   ============================================
-   TEMPLATE-SPECIFIC: Update these values for your app
    ============================================ */
 
 const APP_NAME = "XYZ Users";
 const APP_VERSION = "1.0.0";
-
-/* ============================================
-   EXTERNAL DEPENDENCIES
-   ============================================
-   If you use external libraries (like Chart.js), import or declare them here.
-   
-   For npm packages:
-   import Chart from "chart.js/auto";
-   
-   For CDN scripts (requires CSP configuration):
-   declare const Chart: any;
-   ============================================ */
 
 /* ============================================
    COMMON UTILITY FUNCTIONS
@@ -163,16 +140,6 @@ function addressText(user: User): string {
 
 /* ============================================
    TEMPLATE-SPECIFIC RENDER FUNCTION
-   ============================================
-   
-   This is the main function you need to implement.
-   It receives the data and renders it in the app.
-   
-   Guidelines:
-   1. Always validate data before rendering
-   2. Use unwrapData() to handle nested structures
-   3. Use escapeHtml() when inserting user content
-   4. Handle errors gracefully with try/catch
    ============================================ */
 
 function renderData(data: any) {
@@ -233,124 +200,115 @@ function renderData(data: any) {
       </div>
     `;
 
-    console.log("Users rendered:", users.length);
+    app.sendLog({ level: "debug", data: `Users rendered: ${users.length}`, logger: APP_NAME });
   } catch (error: any) {
-    console.error("Render error:", error);
+    app.sendLog({ level: "error", data: `Render error: ${JSON.stringify(error)}`, logger: APP_NAME });
     showError(`Error rendering data: ${error.message}`);
   }
 }
 
 /* ============================================
-   SDK UTILITIES ONLY (NO CONNECTION)
-   ============================================
-
-   We use the SDK only for utilities (theme helpers, types).
-   Message handling is done manually to work with the proxy.
+   HOST CONTEXT HANDLER
    ============================================ */
 
-// Create app instance
-const app = new App({
-  name: APP_NAME,
-  version: APP_VERSION,
-});
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
+  }
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
+  }
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
+  }
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
+}
 
 /* ============================================
-   DIRECT MESSAGE HANDLING
-   ============================================
-
-   Handle messages manually to work with the proxy layer.
-   The proxy already handles ui/initialize, so we listen for notifications.
+   SDK APP INSTANCE (STANDALONE MODE)
    ============================================ */
 
-window.addEventListener("message", (event: MessageEvent) => {
-  const msg = event.data;
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
 
-  if (!msg) return;
+app.onteardown = async () => {
+  app.sendLog({ level: "info", data: "Resource teardown requested", logger: APP_NAME });
+  return {};
+};
 
-  // Handle JSON-RPC 2.0 protocol messages
-  if (msg.jsonrpc === "2.0") {
-    // Handle tool result notifications
-    if (msg.method === "ui/notifications/tool-result" && msg.params) {
-      console.info("Received tool result from proxy");
-      const data = msg.params.structuredContent || msg.params;
-      renderData(data);
-      return;
-    }
+app.ontoolinput = (params) => {
+  app.sendLog({ level: "info", data: `Tool input received: ${JSON.stringify(params.arguments)}`, logger: APP_NAME });
+};
 
-    // Handle host context changes
-    if (msg.method === "ui/notifications/host-context-changed" && msg.params) {
-      console.info("Host context changed:", msg.params);
+app.ontoolresult = (params) => {
+  app.sendLog({ level: "info", data: "Tool result received", logger: APP_NAME });
 
-      if (msg.params.theme) {
-        applyDocumentTheme(msg.params.theme);
-      }
-
-      if (msg.params.styles?.css?.fonts) {
-        applyHostFonts(msg.params.styles.css.fonts);
-      }
-
-      if (msg.params.styles?.variables) {
-        applyHostStyleVariables(msg.params.styles.variables);
-      }
-
-      if (msg.params.displayMode === "fullscreen") {
-        document.body.classList.add("fullscreen-mode");
-      } else {
-        document.body.classList.remove("fullscreen-mode");
-      }
-
-      return;
-    }
-
-    // Handle tool cancellation
-    if (msg.method === "ui/notifications/tool-cancelled") {
-      const reason = msg.params?.reason || "Unknown reason";
-      console.info("Tool cancelled:", reason);
-      showError(`Operation cancelled: ${reason}`);
-      return;
-    }
-
-    // Handle resource teardown
-    if (msg.id !== undefined && msg.method === "ui/resource-teardown") {
-      console.info("Resource teardown requested");
-
-      // TODO: Clean up your resources here
-      // - Clear any timers
-      // - Cancel pending requests
-      // - Destroy chart instances
-      // - Remove event listeners
-
-      window.parent.postMessage(
-        {
-          jsonrpc: "2.0",
-          id: msg.id,
-          result: {},
-        },
-        "*",
-      );
-      return;
-    }
-
+  // Check for tool execution errors
+  if (params.isError) {
+    app.sendLog({ level: "error", data: `Tool execution failed: ${JSON.stringify(params.content)}`, logger: APP_NAME });
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
     return;
   }
 
-});
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    app.sendLog({ level: "warning", data: `Tool result received but no data found: ${JSON.stringify(params)}`, logger: APP_NAME });
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  app.sendLog({ level: "info", data: `Tool cancelled: ${reason}`, logger: APP_NAME });
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  app.sendLog({ level: "error", data: `App error: ${JSON.stringify(error)}`, logger: APP_NAME });
+};
+
+app.onhostcontextchanged = (ctx) => {
+  app.sendLog({ level: "info", data: `Host context changed: ${JSON.stringify(ctx)}`, logger: APP_NAME });
+  handleHostContextChanged(ctx);
+};
 
 /* ============================================
-   APP INITIALIZATION
-   ============================================
-   
-   No SDK connection needed - the proxy handles ui/initialize.
-   We only set up auto-resize and lifecycle cleanup.
+   CONNECT TO HOST
    ============================================ */
 
-// Setup automatic size change notifications
-// The SDK will monitor DOM changes and notify the host automatically
-const cleanupResize = app.setupSizeChangedNotifications();
+app
+  .connect()
+  .then(() => {
+    app.sendLog({ level: "info", data: "MCP App connected to host", logger: APP_NAME });
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    app.sendLog({ level: "error", data: `Failed to connect to MCP host: ${JSON.stringify(error)}`, logger: APP_NAME });
+  });
 
-// Optional: Clean up on page unload
-window.addEventListener("beforeunload", () => {
-  cleanupResize();
-});
-
-console.info("MCP App initialized (SDK utilities mode)");
+export {};

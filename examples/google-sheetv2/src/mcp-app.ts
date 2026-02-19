@@ -1,10 +1,32 @@
 /* ============================================
-   GOOGLE SHEET MCP APP
+   GOOGLE SHEETV2 MCP APP (STANDALONE MODE)
    ============================================
-   
-   Displays Google Sheets embedded in an iframe.
-   Extracts spreadsheet ID from API response/URL and embeds the sheet.
+
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   in standalone mode with app.connect() for full MCP integration.
    ============================================ */
+
+/* ============================================
+   SDK IMPORTS
+   ============================================ */
+
+import {
+  App,
+  applyDocumentTheme,
+  applyHostFonts,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
+
+// Import styles (will be bundled by Vite)
+import "./global.css";
+import "./mcp-app.css";
+
+/* ============================================
+   APP CONFIGURATION
+   ============================================ */
+
+const APP_NAME = "Google Sheetv2";
+const APP_VERSION = "1.0.0";
 
 /* ============================================
    COMMON UTILITY FUNCTIONS
@@ -22,58 +44,49 @@ function extractData(msg: any) {
 
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  // Keep the full data structure for spreadsheet ID extraction
-  // Don't unwrap if it contains message with input/request info
-  if (data.message && (data.message.input || data.message.request)) {
-    return data; // Keep full structure to access input/request
-  }
-  
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
-    // Return message object to preserve input/request fields
-    return data.message;
+    return data.message.template_data;
   }
-  
   if (data.message?.response_content) {
-    // Return message object to preserve input/request fields
-    return data.message;
+    return data.message.response_content;
   }
-  
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  if (Array.isArray(data)) {
-    return { rows: data };
+
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
-  
+
   return data;
 }
 
-function initializeDarkMode() {
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.body.classList.add('dark');
-  }
-  
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e: MediaQueryListEvent) => {
-    document.body.classList.toggle('dark', e.matches);
-  });
-}
 
 function escapeHtml(str: any): string {
-  if (typeof str !== "string") return str;
+  if (typeof str !== "string") return String(str);
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
@@ -135,7 +148,7 @@ function extractSpreadsheetId(url: string): string | null {
       return match[1];
     }
   } catch (error) {
-    console.error('Error extracting spreadsheet ID:', error);
+    app.sendLog({ level: "error", data: `Error extracting spreadsheet ID: ${error}`, logger: APP_NAME });
   }
   
   return null;
@@ -306,13 +319,13 @@ function extractSheetData(data: any): any {
  * Render Google Sheet directly from spreadsheet ID
  */
 function renderSheetFromId(spreadsheetId: string, range?: string, rowCount?: number) {
-  const app = document.getElementById('app');
-  if (!app) return;
+  const appElement = document.getElementById('app');
+  if (!appElement) return;
   
   const embedUrl = buildEmbedUrl(spreadsheetId);
   const editUrl = buildEditUrl(spreadsheetId);
-  
-  app.innerHTML = `
+
+  appElement.innerHTML = `
     <div class="container">
       <div class="sheet-header">
         <div class="sheet-info">
@@ -338,9 +351,6 @@ function renderSheetFromId(spreadsheetId: string, range?: string, rowCount?: num
   `;
   
   // Notify host of size change after rendering completes
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 50);
 }
 
 /**
@@ -455,7 +465,7 @@ function setupTableInteractivity() {
             target.style.backgroundColor = originalBg;
           }, 200);
         } catch (err) {
-          console.warn('Failed to copy:', err);
+          app.sendLog({ level: "warning", data: `Failed to copy: ${err}`, logger: APP_NAME });
         }
       }
     });
@@ -467,8 +477,8 @@ function setupTableInteractivity() {
    ============================================ */
 
 function renderData(data: any) {
-  const app = document.getElementById('app');
-  if (!app) return;
+  const appElement = document.getElementById('app');
+  if (!appElement) return;
   
   if (!data) {
     showEmpty('No sheet data received');
@@ -498,7 +508,7 @@ function renderData(data: any) {
     
     // Log for debugging
     if (!spreadsheetId) {
-      console.log('Data structure received:', JSON.stringify(data, null, 2).substring(0, 500));
+      app.sendLog({ level: "debug", data: `Data structure received: ${JSON.stringify(data, null, 2).substring(0, 500)}`, logger: APP_NAME });
     }
     
     // Extract sheet data for metadata display
@@ -517,7 +527,7 @@ function renderData(data: any) {
       const headers = values.length > 0 ? values[0] : [];
       const rows = values.slice(1);
       
-      app.innerHTML = `
+      appElement.innerHTML = `
         <div class="container">
           <div class="sheet-header">
             <div class="sheet-info">
@@ -534,7 +544,7 @@ function renderData(data: any) {
               ${headers.length > 0 ? `
                 <thead>
                   <tr>
-                    ${headers.map((header: any, idx: number) => 
+                    ${headers.map((header: any, idx: number) =>
                       `<th data-col="${idx}" title="${escapeHtml(String(header || ''))}">${escapeHtml(String(header || ''))}</th>`
                     ).join('')}
                   </tr>
@@ -566,7 +576,7 @@ function renderData(data: any) {
       const headers = values.length > 0 ? values[0] : [];
       const rows = values.slice(1);
       
-      app.innerHTML = `
+      appElement.innerHTML = `
         <div class="container">
           <div class="sheet-header">
             <div class="sheet-info">
@@ -583,7 +593,7 @@ function renderData(data: any) {
               ${headers.length > 0 ? `
                 <thead>
                   <tr>
-                    ${headers.map((header: any, idx: number) => 
+                    ${headers.map((header: any, idx: number) =>
                       `<th data-col="${idx}" title="${escapeHtml(String(header || ''))}">${escapeHtml(String(header || ''))}</th>`
                     ).join('')}
                   </tr>
@@ -609,311 +619,175 @@ function renderData(data: any) {
     }
     
     // Notify host of size change after rendering completes
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
     
   } catch (error: any) {
-    console.error('Render error:', error);
+    app.sendLog({ level: "error", data: `Render error: ${error}`, logger: APP_NAME });
     showError(`Error rendering sheet: ${error.message}`);
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
   }
 }
 
 /* ============================================
-   MESSAGE HANDLER (Standardized MCP Protocol)
+   HOST CONTEXT HANDLER
    ============================================ */
 
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  // Log all incoming messages for debugging
-  if (msg && msg.jsonrpc === '2.0' && msg.method) {
-    console.log('[Google Sheets App] Received message:', msg.method, msg);
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
   }
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    return;
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
   }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
   }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      console.log('[Google Sheets App] tool-result received:', JSON.stringify(msg, null, 2));
-      const data = msg.params?.structuredContent || msg.params;
-      
-      // Also check if tool-result contains request/input info with spreadsheet ID
-      const toolResultParams = msg.params;
-      const spreadsheetIdFromResult = toolResultParams?.arguments?.context?.spreadsheetId ||
-                                     toolResultParams?.input?.context?.spreadsheetId ||
-                                     toolResultParams?.request?.context?.spreadsheetId;
-      
-      if (spreadsheetIdFromResult) {
-        console.log('[Google Sheets App] Found spreadsheet ID in tool-result:', spreadsheetIdFromResult);
-        renderSheetFromId(spreadsheetIdFromResult);
-        break;
-      }
-      
-      if (data !== undefined) {
-        console.log('[Google Sheets App] Rendering data from tool-result');
-        renderData(data);
-      } else {
-        console.warn('[Google Sheets App] tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      if (msg.params?.theme === 'dark') {
-        document.body.classList.add('dark');
-      } else if (msg.params?.theme === 'light') {
-        document.body.classList.remove('dark');
-      }
-      if (msg.params?.displayMode) {
-        handleDisplayModeChange(msg.params.displayMode);
-      }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      // Extract spreadsheet ID from tool-input message
-      const params = msg.params;
-      
-      // Debug logging - log the entire message structure
-      console.log('[Google Sheets App] tool-input received:', JSON.stringify(msg, null, 2));
-      console.log('[Google Sheets App] params:', JSON.stringify(params, null, 2));
-      console.log('[Google Sheets App] params.arguments:', JSON.stringify(params?.arguments, null, 2));
-      console.log('[Google Sheets App] params.arguments.context:', JSON.stringify(params?.arguments?.context, null, 2));
-      
-      // Extract spreadsheet ID from params.arguments.context.spreadsheetId
-      let spreadsheetId = params?.arguments?.context?.spreadsheetId;
-      console.log('[Google Sheets App] Extracted spreadsheetId:', spreadsheetId);
-      
-      if (spreadsheetId) {
-        console.log('[Google Sheets App] Found spreadsheet ID in tool-input:', spreadsheetId);
-        renderSheetFromId(spreadsheetId);
-      } else {
-        console.warn('[Google Sheets App] No spreadsheet ID found in params.arguments.context.spreadsheetId');
-        // Fallback: try to extract from URL if present
-        const toolInput = params?.structuredContent || params?.content || params;
-        
-        if (toolInput) {
-          // Check for URL in various locations
-          let requestUrl = toolInput.url || 
-                          toolInput.request?.url || 
-                          toolInput.input?.url ||
-                          toolInput.message?.input?.url ||
-                          toolInput.message?.request?.url;
-          
-          if (requestUrl) {
-            console.log('[Google Sheets App] Found request URL:', requestUrl);
-            const extractedId = extractSpreadsheetId(requestUrl);
-            if (extractedId) {
-              console.log('[Google Sheets App] Extracted spreadsheet ID from URL:', extractedId);
-              renderSheetFromId(extractedId);
-            } else {
-              console.warn('[Google Sheets App] Could not extract spreadsheet ID from URL:', requestUrl);
-            }
-          } else {
-            // Try deep search as fallback
-            console.log('[Google Sheets App] Attempting deep search for spreadsheet ID...');
-            const deepId = getSpreadsheetId(toolInput);
-            if (deepId) {
-              console.log('[Google Sheets App] Found spreadsheet ID via deep search:', deepId);
-              renderSheetFromId(deepId);
-            } else {
-              console.warn('[Google Sheets App] No spreadsheet ID found in tool-input after all attempts');
-            }
-          }
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
+}
+
+/* ============================================
+   SDK APP INSTANCE (STANDALONE MODE)
+   ============================================ */
+
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  app.sendLog({ level: "info", data: "Resource teardown requested", logger: APP_NAME });
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  app.sendLog({ level: "info", data: `Tool input received: ${JSON.stringify(params.arguments)}`, logger: APP_NAME });
+
+  // Extract spreadsheet ID from params.arguments.context.spreadsheetId
+  const toolArguments = params.arguments as any;
+  let spreadsheetId = toolArguments?.context?.spreadsheetId;
+  app.sendLog({ level: "debug", data: `Extracted spreadsheetId: ${spreadsheetId}`, logger: APP_NAME });
+
+  if (spreadsheetId) {
+    app.sendLog({ level: "debug", data: `Found spreadsheet ID in tool-input: ${spreadsheetId}`, logger: APP_NAME });
+    renderSheetFromId(spreadsheetId);
+  } else {
+    app.sendLog({ level: "warning", data: "No spreadsheet ID found in params.arguments.context.spreadsheetId", logger: APP_NAME });
+    // Fallback: try to extract from URL if present
+    const toolInput = toolArguments;
+
+    if (toolInput) {
+      // Check for URL in various locations
+      let requestUrl = toolInput.url ||
+                      toolInput.request?.url ||
+                      toolInput.input?.url ||
+                      toolInput.message?.input?.url ||
+                      toolInput.message?.request?.url;
+
+      if (requestUrl) {
+        app.sendLog({ level: "debug", data: `Found request URL: ${requestUrl}`, logger: APP_NAME });
+        const extractedId = extractSpreadsheetId(requestUrl);
+        if (extractedId) {
+          app.sendLog({ level: "debug", data: `Extracted spreadsheet ID from URL: ${extractedId}`, logger: APP_NAME });
+          renderSheetFromId(extractedId);
         } else {
-          console.warn('[Google Sheets App] No tool-input data found in params');
+          app.sendLog({ level: "warning", data: `Could not extract spreadsheet ID from URL: ${requestUrl}`, logger: APP_NAME });
+        }
+      } else {
+        // Try deep search as fallback
+        app.sendLog({ level: "debug", data: "Attempting deep search for spreadsheet ID...", logger: APP_NAME });
+        const deepId = getSpreadsheetId(toolInput);
+        if (deepId) {
+          app.sendLog({ level: "debug", data: `Found spreadsheet ID via deep search: ${deepId}`, logger: APP_NAME });
+          renderSheetFromId(deepId);
+        } else {
+          app.sendLog({ level: "warning", data: "No spreadsheet ID found in tool-input after all attempts", logger: APP_NAME });
         }
       }
-      break;
-      
-    case 'ui/notifications/initialized':
-      console.log('[Google Sheets App] initialized received');
-      break;
-      
-    default:
-      console.log('[Google Sheets App] Unknown method received:', msg.method, msg);
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('[Google Sheets App] Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      }
-  }
-});
-
-/* ============================================
-   MCP COMMUNICATION
-   ============================================ */
-
-let requestIdCounter = 1;
-function sendRequest(method: string, params: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const id = requestIdCounter++;
-    window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, '*');
-    
-    const listener = (event: MessageEvent) => {
-      if (event.data?.id === id) {
-        window.removeEventListener('message', listener);
-        if (event.data?.result) {
-          resolve(event.data.result);
-        } else if (event.data?.error) {
-          reject(new Error(event.data.error.message || 'Unknown error'));
-        }
-      }
-    };
-    window.addEventListener('message', listener);
-    
-    // Reduced timeout for initialization to fail faster and not block
-    const timeout = method === 'ui/initialize' ? 1000 : 5000;
-    setTimeout(() => {
-      window.removeEventListener('message', listener);
-      reject(new Error('Request timeout'));
-    }, timeout);
-  });
-}
-
-function sendNotification(method: string, params: any) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, '*');
-}
-
-/* ============================================
-   DISPLAY MODE HANDLING
-   ============================================ */
-
-let currentDisplayMode = 'inline';
-
-function handleDisplayModeChange(mode: string) {
-  currentDisplayMode = mode;
-  if (mode === 'fullscreen') {
-    document.body.classList.add('fullscreen-mode');
-    const container = document.querySelector('.container');
-    if (container) {
-      (container as HTMLElement).style.maxWidth = '100%';
-      (container as HTMLElement).style.padding = '20px';
+    } else {
+      app.sendLog({ level: "warning", data: "No tool-input data found in params", logger: APP_NAME });
     }
+  }
+};
+
+app.ontoolresult = (params) => {
+  app.sendLog({ level: "info", data: "Tool result received", logger: APP_NAME });
+
+  // Check for tool execution errors
+  if (params.isError) {
+    app.sendLog({ level: "error", data: `Tool execution failed: ${JSON.stringify(params.content)}`, logger: APP_NAME });
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+
+  // Also check if tool-result contains request/input info with spreadsheet ID
+  const toolResultParams = params as any;
+  const spreadsheetIdFromResult = toolResultParams?.arguments?.context?.spreadsheetId ||
+                                 toolResultParams?.input?.context?.spreadsheetId ||
+                                 toolResultParams?.request?.context?.spreadsheetId;
+
+  if (spreadsheetIdFromResult) {
+    app.sendLog({ level: "debug", data: `Found spreadsheet ID in tool-result: ${spreadsheetIdFromResult}`, logger: APP_NAME });
+    renderSheetFromId(spreadsheetIdFromResult);
+    return;
+  }
+
+  if (data !== undefined) {
+    app.sendLog({ level: "debug", data: "Rendering data from tool-result", logger: APP_NAME });
+    renderData(data);
   } else {
-    document.body.classList.remove('fullscreen-mode');
-    const container = document.querySelector('.container');
-    if (container) {
-      (container as HTMLElement).style.maxWidth = '';
-      (container as HTMLElement).style.padding = '';
-    }
+    app.sendLog({ level: "warning", data: `Tool result received but no data found: ${JSON.stringify(params)}`, logger: APP_NAME });
+    showEmpty("No data received");
   }
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
+};
 
-function requestDisplayMode(mode: string): Promise<any> {
-  return sendRequest('ui/request-display-mode', { mode: mode })
-    .then(result => {
-      if (result?.mode) {
-        handleDisplayModeChange(result.mode);
-      }
-      return result;
-    })
-    .catch(err => {
-      console.warn('Failed to request display mode:', err);
-      throw err;
-    });
-}
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  app.sendLog({ level: "info", data: `Tool cancelled: ${reason}`, logger: APP_NAME });
+  showError(`Operation cancelled: ${reason}`);
+};
 
-(window as any).requestDisplayMode = requestDisplayMode;
+app.onerror = (error) => {
+  app.sendLog({ level: "error", data: `App error: ${error}`, logger: APP_NAME });
+};
+
+app.onhostcontextchanged = (ctx) => {
+  app.sendLog({ level: "info", data: `Host context changed: ${JSON.stringify(ctx)}`, logger: APP_NAME });
+  handleHostContextChanged(ctx);
+};
 
 /* ============================================
-   SIZE CHANGE NOTIFICATIONS
+   CONNECT TO HOST
    ============================================ */
 
-function notifySizeChanged() {
-  const width = document.body.scrollWidth || document.documentElement.scrollWidth;
-  const height = document.body.scrollHeight || document.documentElement.scrollHeight;
-  
-  sendNotification('ui/notifications/size-changed', {
-    width: width,
-    height: height
+app
+  .connect()
+  .then(() => {
+    app.sendLog({ level: "info", data: "MCP App connected to host", logger: APP_NAME });
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    app.sendLog({ level: "error", data: `Failed to connect to MCP host: ${error}`, logger: APP_NAME });
   });
-}
 
-let sizeChangeTimeout: NodeJS.Timeout | null = null;
-function debouncedNotifySizeChanged() {
-  if (sizeChangeTimeout) {
-    clearTimeout(sizeChangeTimeout);
-  }
-  sizeChangeTimeout = setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
-
-let resizeObserver: ResizeObserver | null = null;
-function setupSizeObserver() {
-  if (typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => {
-      debouncedNotifySizeChanged();
-    });
-    resizeObserver.observe(document.body);
-  } else {
-    window.addEventListener('resize', debouncedNotifySizeChanged);
-    const mutationObserver = new MutationObserver(debouncedNotifySizeChanged);
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['style', 'class']
-    });
-  }
-  
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
-
-/* ============================================
-   INITIALIZATION
-   ============================================ */
-
-// Try to initialize, but don't block if it fails (e.g., in preview/testing environments)
-sendRequest('ui/initialize', {
-  appCapabilities: {
-    availableDisplayModes: ["inline", "fullscreen"]
-  }
-}).then((ctx: any) => {
-  if (ctx?.theme === 'dark') {
-    document.body.classList.add('dark');
-  } else if (ctx?.theme === 'light') {
-    document.body.classList.remove('dark');
-  }
-  if (ctx?.displayMode) {
-    handleDisplayModeChange(ctx.displayMode);
-  }
-  if (ctx?.containerDimensions) {
-    const dims = ctx.containerDimensions;
-    if (dims.width) {
-      document.body.style.width = dims.width + 'px';
-    }
-    if (dims.height) {
-      document.body.style.height = dims.height + 'px';
-    }
-    if (dims.maxWidth) {
-      document.body.style.maxWidth = dims.maxWidth + 'px';
-    }
-    if (dims.maxHeight) {
-      document.body.style.maxHeight = dims.maxHeight + 'px';
-    }
-  }
-}).catch(err => {
-  // Silently fail - this is expected in preview/testing environments
-  // The app will still work for rendering data
-});
-
-initializeDarkMode();
-setupSizeObserver();
+export {};

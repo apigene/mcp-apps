@@ -1,10 +1,10 @@
 /* ============================================
    BASE TEMPLATE FOR MCP APPS
    ============================================
-   
+
    This file contains all common logic shared across MCP apps.
    Customize the sections marked with "TEMPLATE-SPECIFIC" below.
-   
+
    Common Features:
    - MCP Protocol message handling (JSON-RPC 2.0)
    - Dark mode support
@@ -12,7 +12,7 @@
    - Size change notifications
    - Data extraction utilities
    - Error handling
-   
+
    See README.md for customization guidelines.
    ============================================ */
 
@@ -21,6 +21,36 @@
    ============================================ */
 // Anime.js is loaded globally, check availability before use
 declare const anime: any;
+
+/* ============================================
+   FIRECRAWL SCRAPE URL MCP APP (STANDALONE MODE)
+   ============================================
+
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   with app.connect() for standalone initialization.
+   ============================================ */
+
+/* ============================================
+   SDK IMPORTS
+   ============================================ */
+
+import {
+  App,
+  applyDocumentTheme,
+  applyHostFonts,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
+
+// Import styles (will be bundled by Vite)
+import "./global.css";
+import "./mcp-app.css";
+
+/* ============================================
+   APP CONFIGURATION
+   ============================================ */
+
+const APP_NAME = "Firecrawl Scrape Url";
+const APP_VERSION = "1.0.0";
 
 /* ============================================
    COMMON UTILITY FUNCTIONS
@@ -47,96 +77,52 @@ function extractData(msg: any) {
  */
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  console.log('[Firecrawl] Unwrapping data:', data);
-  
-  // Handle direct Firecrawl response format: {success: true, data: {...}}
-  if (data.success && data.data) {
-    console.log('[Firecrawl] Detected success/data format');
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
-  // Handle nested content structure from Firecrawl
-  if (data.content && Array.isArray(data.content)) {
-    // Extract from content array
-    const contentItem = data.content[0];
-    if (contentItem?.text?.message?.response_content) {
-      return contentItem.text.message.response_content;
-    }
-    if (contentItem?.text?.message) {
-      return contentItem.text.message;
-    }
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
   }
-  
-  // Handle structuredContent structure
-  if (data.structuredContent?.message?.response_content) {
-    return data.structuredContent.message.response_content;
-  }
-  
-  // Direct data structure (but keep the wrapper if it has success flag)
-  if (data.data && !data.success) {
-    return { data: data.data };
-  }
-  
-  if (data.data) {
-    return data;
-  }
-  
-  // Standard table format { columns: [], rows: [] }
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
-    return data;
-  }
-  
-  // Format 2: Nested in message.template_data (3rd party MCP clients)
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
-  // Format 3: Nested in message.response_content (3rd party MCP clients)
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
-  // Format 4: Common nested patterns
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
-  // Format 5: Direct rows array
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  // Format 6: If data itself is an array
-  if (Array.isArray(data)) {
-    return { rows: data };
+
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
-  
+
   return data;
 }
 
-/**
- * Initialize dark mode based on system preference
- */
-function initializeDarkMode() {
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.body.classList.add('dark');
-  }
-  
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e: MediaQueryListEvent) => {
-    document.body.classList.toggle('dark', e.matches);
-  });
-}
 
 /**
  * Escape HTML to prevent XSS attacks
  */
 function escapeHtml(str: any): string {
-  if (typeof str !== "string") return str;
+  if (typeof str !== "string") return String(str);
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
@@ -187,9 +173,9 @@ function formatMetadataValue(value: any): string {
  */
 function convertMarkdownToHTML(markdown: string): string {
   if (!markdown) return '';
-  
+
   let html = markdown;
-  
+
   // Headers (process in order from most specific to least)
   html = html.replace(/^###### (.*$)/gim, '<h6>$1</h6>');
   html = html.replace(/^##### (.*$)/gim, '<h5>$1</h5>');
@@ -197,27 +183,27 @@ function convertMarkdownToHTML(markdown: string): string {
   html = html.replace(/^### (.*$)/gim, '<h3>$1</h3>');
   html = html.replace(/^## (.*$)/gim, '<h2>$1</h2>');
   html = html.replace(/^# (.*$)/gim, '<h1>$1</h1>');
-  
+
   // Bold and italic
   html = html.replace(/\*\*(.*?)\*\*/gim, '<strong>$1</strong>');
   html = html.replace(/\*(.*?)\*/gim, '<em>$1</em>');
-  
+
   // Links
   html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/gim, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
-  
+
   // Code blocks
   html = html.replace(/```([\s\S]*?)```/gim, '<pre><code>$1</code></pre>');
   html = html.replace(/`([^`]+)`/gim, '<code>$1</code>');
-  
+
   // Lists
   const lines = html.split('\n');
   let inList = false;
   let result: string[] = [];
-  
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     const isListItem = /^[-*+]\s+(.+)$/.test(line);
-    
+
     if (isListItem) {
       if (!inList) {
         result.push('<ul>');
@@ -242,17 +228,17 @@ function convertMarkdownToHTML(markdown: string): string {
       }
     }
   }
-  
+
   if (inList) {
     result.push('</ul>');
   }
-  
+
   html = result.join('\n');
-  
+
   // Clean up empty paragraphs
   html = html.replace(/<p><\/p>/gim, '');
   html = html.replace(/<p>\s*<\/p>/gim, '');
-  
+
   return html;
 }
 
@@ -261,37 +247,37 @@ function convertMarkdownToHTML(markdown: string): string {
  */
 function prepareHtmlForIframe(html: string): string {
   if (!html) return '';
-  
+
   let preparedHtml = html;
-  
+
   // Aggressively remove ALL script tags (including malformed ones)
   // Use multiple passes to catch all variations
   preparedHtml = preparedHtml.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
   preparedHtml = preparedHtml.replace(/<script[^>]*>/gi, '');
   preparedHtml = preparedHtml.replace(/<\/script>/gi, '');
-  
+
   // Remove script tags with various attributes
   preparedHtml = preparedHtml.replace(/<script\s+[^>]*>/gi, '');
-  
+
   // Remove inline event handlers
   preparedHtml = preparedHtml.replace(/\s*on\w+\s*=\s*["'][^"']*["']/gi, '');
   preparedHtml = preparedHtml.replace(/\s*on\w+\s*=\s*[^>\s]*/gi, '');
-  
+
   // Remove javascript: URLs
   preparedHtml = preparedHtml.replace(/javascript\s*:/gi, '');
-  
+
   // Remove any remaining references to anime or window.anime
   preparedHtml = preparedHtml.replace(/\bwindow\s*\.\s*anime\b/gi, 'null');
   preparedHtml = preparedHtml.replace(/\banime\s*=/gi, 'var _anime_removed =');
   preparedHtml = preparedHtml.replace(/\banimejs\b/gi, 'null');
-  
+
   // Remove any eval or Function constructors
   preparedHtml = preparedHtml.replace(/\beval\s*\(/gi, '/* eval removed */ null(');
   preparedHtml = preparedHtml.replace(/\bFunction\s*\(/gi, '/* Function removed */ null(');
-  
+
   // Check if HTML already has a viewport meta tag
   const hasViewport = /<meta[^>]*name=["']viewport["'][^>]*>/i.test(preparedHtml);
-  
+
   if (!hasViewport) {
     // Inject viewport meta tag in the head
     if (/<head[^>]*>/i.test(preparedHtml)) {
@@ -316,7 +302,7 @@ function prepareHtmlForIframe(html: string): string {
       '<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">'
     );
   }
-  
+
   // Add CSS to ensure content fits within iframe
   if (/<head[^>]*>/i.test(preparedHtml)) {
     const fitCss = `
@@ -343,7 +329,7 @@ function prepareHtmlForIframe(html: string): string {
       '$1' + fitCss
     );
   }
-  
+
   return preparedHtml;
 }
 
@@ -362,12 +348,12 @@ function prepareHtmlForIframe(html: string): string {
   // Animate tab switch
   const activeContent = document.querySelector('.tab-content.active');
   const targetTab = document.getElementById(`${tabName}-tab`);
-  
+
   // Check if anime is available and we're in the main document (not iframe)
-  const isAnimeAvailable = typeof window !== 'undefined' && 
+  const isAnimeAvailable = typeof window !== 'undefined' &&
                           typeof (window as any).anime !== 'undefined' &&
                           window.self === window.top; // Not in iframe
-  
+
   if (activeContent && targetTab && isAnimeAvailable) {
     try {
       // Fade out current tab
@@ -380,7 +366,7 @@ function prepareHtmlForIframe(html: string): string {
         complete: () => {
           activeContent.classList.remove('active');
           targetTab.classList.add('active');
-          
+
           // Fade in new tab
           (window as any).anime({
             targets: targetTab,
@@ -393,7 +379,7 @@ function prepareHtmlForIframe(html: string): string {
       });
     } catch (e) {
       // Fallback if animation fails
-      console.warn('Animation failed, using fallback:', e);
+      app.sendLog({ level: "warning", data: `Animation failed, using fallback: ${e}`, logger: APP_NAME });
       activeContent.classList.remove('active');
       if (targetTab) {
         targetTab.classList.add('active');
@@ -410,9 +396,6 @@ function prepareHtmlForIframe(html: string): string {
   }
 
   // Notify size change when switching tabs
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 50);
 };
 
 /**
@@ -421,7 +404,7 @@ function prepareHtmlForIframe(html: string): string {
 (window as any).adjustZoom = function(delta: number) {
   const iframe = document.getElementById('html-preview-iframe') as HTMLIFrameElement;
   const zoomValue = document.getElementById('zoom-value');
-  
+
   if (iframe && zoomValue) {
     currentZoom = Math.max(0.25, Math.min(2.0, currentZoom + delta));
     iframe.style.transform = `scale(${currentZoom})`;
@@ -429,11 +412,8 @@ function prepareHtmlForIframe(html: string): string {
     iframe.style.width = `${100 / currentZoom}%`;
     iframe.style.height = `${800 / currentZoom}px`;
     zoomValue.textContent = Math.round(currentZoom * 100) + '%';
-    
+
     // Notify size change
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
   }
 };
 
@@ -443,18 +423,15 @@ function prepareHtmlForIframe(html: string): string {
 (window as any).resetZoom = function() {
   const iframe = document.getElementById('html-preview-iframe') as HTMLIFrameElement;
   const zoomValue = document.getElementById('zoom-value');
-  
+
   if (iframe && zoomValue) {
     currentZoom = 1.0;
     iframe.style.transform = '';
     iframe.style.width = '100%';
     iframe.style.height = '800px';
     zoomValue.textContent = '100%';
-    
+
     // Notify size change
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
   }
 };
 
@@ -462,13 +439,13 @@ function prepareHtmlForIframe(html: string): string {
  * Main render function
  */
 function renderData(data: any) {
-  const app = document.getElementById('app');
-  
-  if (!app) {
-    console.error('App element not found!');
+  const appEl = document.getElementById('app');
+
+  if (!appEl) {
+    app.sendLog({ level: "error", data: "App element not found!", logger: APP_NAME });
     return;
   }
-  
+
   if (!data) {
     showEmpty('No data received');
     return;
@@ -476,15 +453,15 @@ function renderData(data: any) {
 
   try {
     // Debug logging
-    console.log('[Firecrawl] Received data:', data);
-    
+    app.sendLog({ level: "debug", data: `Received data: ${JSON.stringify(data)}`, logger: APP_NAME });
+
     // Unwrap nested data structures
     const unwrapped = unwrapData(data);
-    console.log('[Firecrawl] Unwrapped data:', unwrapped);
-    
+    app.sendLog({ level: "debug", data: `Unwrapped data: ${JSON.stringify(unwrapped)}`, logger: APP_NAME });
+
     // Handle different data structures
     let scrapeData = null;
-    
+
     // Check if unwrapped has a data property (e.g., {success: true, data: {...}})
     if (unwrapped && typeof unwrapped === 'object') {
       if (unwrapped.data && typeof unwrapped.data === 'object') {
@@ -497,11 +474,11 @@ function renderData(data: any) {
     } else {
       scrapeData = unwrapped;
     }
-    
-    console.log('[Firecrawl] Scrape data:', scrapeData);
-    
+
+    app.sendLog({ level: "debug", data: `Scrape data: ${JSON.stringify(scrapeData)}`, logger: APP_NAME });
+
     if (!scrapeData || (typeof scrapeData === 'object' && Object.keys(scrapeData).length === 0)) {
-      console.warn('[Firecrawl] No scrape data found after unwrapping');
+      app.sendLog({ level: "warning", data: "No scrape data found after unwrapping", logger: APP_NAME });
       showEmpty('No scrape data found');
       return;
     }
@@ -514,7 +491,7 @@ function renderData(data: any) {
     const contentType = scrapeData.contentType || scrapeData.content_type || 'text/html';
     const cachedAt = scrapeData.cachedAt || scrapeData.cached_at;
     const creditsUsed = scrapeData.creditsUsed || scrapeData.credits_used;
-    
+
     // Keep contentHtml for HTML content, markdown will be rendered separately
     let contentHtml = html;
 
@@ -675,13 +652,13 @@ function renderData(data: any) {
 
     htmlContent += `</div>`;
 
-    app.innerHTML = htmlContent;
+    appEl.innerHTML = htmlContent;
 
     // Animate elements on load (only in main document, not iframe)
-    const isAnimeAvailable = typeof window !== 'undefined' && 
+    const isAnimeAvailable = typeof window !== 'undefined' &&
                             typeof (window as any).anime !== 'undefined' &&
                             window.self === window.top; // Not in iframe
-    
+
     if (isAnimeAvailable) {
       try {
         (window as any).anime({
@@ -694,7 +671,7 @@ function renderData(data: any) {
         });
       } catch (e) {
         // Fallback: use CSS animations if anime fails
-        console.warn('Anime.js animation failed, using CSS fallback:', e);
+        app.sendLog({ level: "warning", data: `Anime.js animation failed, using CSS fallback: ${e}`, logger: APP_NAME });
         document.querySelectorAll('.animate-item').forEach((el, index) => {
           (el as HTMLElement).style.opacity = '1';
           (el as HTMLElement).style.transform = 'translateY(0)';
@@ -711,275 +688,114 @@ function renderData(data: any) {
     // No iframe needed - content is rendered directly
 
   } catch (error: any) {
-    console.error('[Firecrawl] Render error:', error);
-    console.error('[Firecrawl] Error stack:', error.stack);
+    app.sendLog({ level: "error", data: `Render error: ${error}`, logger: APP_NAME });
+    app.sendLog({ level: "error", data: `Error stack: ${error.stack}`, logger: APP_NAME });
     showError(`Error rendering data: ${error.message || 'Unknown error'}`);
-    // Notify size even on error
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
   }
-  
-  // Notify host of size change after rendering completes
-  // Use setTimeout to ensure DOM is fully updated
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 50);
 }
 
 /* ============================================
-   MESSAGE HANDLER (Standardized MCP Protocol)
+   HOST CONTEXT HANDLER
    ============================================ */
 
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  console.log('[Firecrawl] Received message event:', event);
-  console.log('[Firecrawl] Message data:', msg);
-  
-  // Handle direct data (not wrapped in JSON-RPC)
-  if (msg && typeof msg === 'object' && (msg.success || msg.data || msg.metadata)) {
-    console.log('[Firecrawl] Detected direct data format, rendering directly');
-    renderData(msg);
-    return;
-  }
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    console.log('[Firecrawl] Message is not JSON-RPC format, skipping');
-    return;
-  }
-  
-  if (msg.id !== undefined && !msg.method) {
-    console.log('[Firecrawl] Message has ID but no method, skipping');
-    return;
-  }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      const data = msg.params?.structuredContent || msg.params || msg;
-      console.log('[Firecrawl] Received tool-result message:', msg);
-      console.log('[Firecrawl] Extracted data:', data);
-      if (data !== undefined && data !== null) {
-        renderData(data);
-      } else {
-        console.warn('[Firecrawl] ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      if (msg.params?.theme === 'dark') {
-        document.body.classList.add('dark');
-      } else if (msg.params?.theme === 'light') {
-        document.body.classList.remove('dark');
-      }
-      // Handle display mode changes
-      if (msg.params?.displayMode) {
-        handleDisplayModeChange(msg.params.displayMode);
-      }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      // Tool input notification (optional - handle if needed)
-      break;
-      
-    case 'ui/notifications/initialized':
-      // Initialization notification (optional - handle if needed)
-      break;
-      
-    default:
-      // Unknown method - try to extract data as fallback
-      console.log('[Firecrawl] Unknown method:', msg.method, '- attempting to extract data');
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('[Firecrawl] Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      } else if (msg.data || msg.success) {
-        // Try direct data access
-        console.log('[Firecrawl] Attempting direct data access');
-        renderData(msg);
-      }
-  }
-});
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
 
-/* ============================================
-   MCP COMMUNICATION
-   ============================================ */
-
-let requestIdCounter = 1;
-function sendRequest(method: string, params: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const id = requestIdCounter++;
-    window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, '*');
-    
-    const listener = (event: MessageEvent) => {
-      if (event.data?.id === id) {
-        window.removeEventListener('message', listener);
-        if (event.data?.result) {
-          resolve(event.data.result);
-        } else if (event.data?.error) {
-          reject(new Error(event.data.error.message || 'Unknown error'));
-        }
-      }
-    };
-    window.addEventListener('message', listener);
-    
-    // Timeout after 5 seconds
-    setTimeout(() => {
-      window.removeEventListener('message', listener);
-      reject(new Error('Request timeout'));
-    }, 5000);
-  });
-}
-
-function sendNotification(method: string, params: any) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, '*');
-}
-
-/* ============================================
-   DISPLAY MODE HANDLING
-   ============================================ */
-
-let currentDisplayMode = 'inline';
-
-function handleDisplayModeChange(mode: string) {
-  currentDisplayMode = mode;
-  if (mode === 'fullscreen') {
-    document.body.classList.add('fullscreen-mode');
-    // Adjust layout for fullscreen if needed
-    const container = document.querySelector('.container');
-    if (container) {
-      (container as HTMLElement).style.maxWidth = '100%';
-      (container as HTMLElement).style.padding = '20px';
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
     }
+  }
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
+  }
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
+  }
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
   } else {
-    document.body.classList.remove('fullscreen-mode');
-    // Restore normal layout
-    const container = document.querySelector('.container');
-    if (container) {
-      (container as HTMLElement).style.maxWidth = '';
-      (container as HTMLElement).style.padding = '';
-    }
+    document.body.classList.remove("fullscreen-mode");
   }
-  // Notify host of size change after mode change
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
 }
-
-function requestDisplayMode(mode: string): Promise<any> {
-  return sendRequest('ui/request-display-mode', { mode: mode })
-    .then(result => {
-      if (result?.mode) {
-        handleDisplayModeChange(result.mode);
-      }
-      return result;
-    })
-    .catch(err => {
-      console.warn('Failed to request display mode:', err);
-      throw err;
-    });
-}
-
-// Make function globally accessible for testing/debugging
-(window as any).requestDisplayMode = requestDisplayMode;
 
 /* ============================================
-   SIZE CHANGE NOTIFICATIONS
+   SDK APP INSTANCE (STANDALONE MODE)
    ============================================ */
 
-function notifySizeChanged() {
-  const width = document.body.scrollWidth || document.documentElement.scrollWidth;
-  const height = document.body.scrollHeight || document.documentElement.scrollHeight;
-  
-  sendNotification('ui/notifications/size-changed', {
-    width: width,
-    height: height
-  });
-}
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
 
-// Debounce function to avoid too many notifications
-let sizeChangeTimeout: NodeJS.Timeout | null = null;
-function debouncedNotifySizeChanged() {
-  if (sizeChangeTimeout) {
-    clearTimeout(sizeChangeTimeout);
+app.onteardown = async () => {
+  app.sendLog({ level: "info", data: "Resource teardown requested", logger: APP_NAME });
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  app.sendLog({ level: "info", data: `Tool input received: ${JSON.stringify(params.arguments)}`, logger: APP_NAME });
+};
+
+app.ontoolresult = (params) => {
+  app.sendLog({ level: "info", data: "Tool result received", logger: APP_NAME });
+
+  // Check for tool execution errors
+  if (params.isError) {
+    app.sendLog({ level: "error", data: `Tool execution failed: ${JSON.stringify(params.content)}`, logger: APP_NAME });
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
   }
-  sizeChangeTimeout = setTimeout(() => {
-    notifySizeChanged();
-  }, 100); // Wait 100ms after last change
-}
 
-// Use ResizeObserver to detect size changes
-let resizeObserver: ResizeObserver | null = null;
-function setupSizeObserver() {
-  if (typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => {
-      debouncedNotifySizeChanged();
-    });
-    resizeObserver.observe(document.body);
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
   } else {
-    // Fallback: use window resize and mutation observer
-    window.addEventListener('resize', debouncedNotifySizeChanged);
-    const mutationObserver = new MutationObserver(debouncedNotifySizeChanged);
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['style', 'class']
-    });
+    app.sendLog({ level: "warning", data: `Tool result received but no data found: ${JSON.stringify(params)}`, logger: APP_NAME });
+    showEmpty("No data received");
   }
-  
-  // Send initial size after a short delay to ensure content is rendered
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  app.sendLog({ level: "info", data: `Tool cancelled: ${reason}`, logger: APP_NAME });
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  app.sendLog({ level: "error", data: `App error: ${error}`, logger: APP_NAME });
+};
+
+app.onhostcontextchanged = (ctx) => {
+  app.sendLog({ level: "info", data: `Host context changed: ${JSON.stringify(ctx)}`, logger: APP_NAME });
+  handleHostContextChanged(ctx);
+};
 
 /* ============================================
-   INITIALIZATION
+   CONNECT TO HOST
    ============================================ */
 
-// Initialize MCP App - REQUIRED for MCP Apps protocol
-sendRequest('ui/initialize', {
-  appCapabilities: {
-    availableDisplayModes: ["inline", "fullscreen"]
-  }
-}).then((ctx: any) => {
-  // Apply theme from host context
-  if (ctx?.theme === 'dark') {
-    document.body.classList.add('dark');
-  } else if (ctx?.theme === 'light') {
-    document.body.classList.remove('dark');
-  }
-  // Handle display mode from host context
-  if (ctx?.displayMode) {
-    handleDisplayModeChange(ctx.displayMode);
-  }
-  // Handle container dimensions if provided
-  if (ctx?.containerDimensions) {
-    const dims = ctx.containerDimensions;
-    if (dims.width) {
-      document.body.style.width = dims.width + 'px';
+app
+  .connect()
+  .then(() => {
+    app.sendLog({ level: "info", data: "MCP App connected to host", logger: APP_NAME });
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
     }
-    if (dims.height) {
-      document.body.style.height = dims.height + 'px';
-    }
-    if (dims.maxWidth) {
-      document.body.style.maxWidth = dims.maxWidth + 'px';
-    }
-    if (dims.maxHeight) {
-      document.body.style.maxHeight = dims.maxHeight + 'px';
-    }
-  }
-}).catch(err => {
-  console.warn('Failed to initialize MCP App:', err);
-  // Fallback to system preference if initialization fails
-});
+  })
+  .catch((error) => {
+    app.sendLog({ level: "error", data: `Failed to connect to MCP host: ${error}`, logger: APP_NAME });
+  });
 
-initializeDarkMode();
-
-// Setup size observer to notify host of content size changes
-// This is critical for the host to properly size the iframe
-setupSizeObserver();
+export {};

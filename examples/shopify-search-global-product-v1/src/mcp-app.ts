@@ -1,9 +1,32 @@
 /* ============================================
    SHOPIFY CATALOG BASIC MCP APP
    ============================================
-   
+
    Simple horizontal scrollable catalog layout
    ============================================ */
+
+/* ============================================
+   SHOPIFY SEARCH GLOBAL PRODUCT V1 MCP APP (STANDALONE MODE)
+   ============================================
+
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   in standalone mode with app.connect() for initialization.
+   ============================================ */
+
+/* ============================================
+   SDK IMPORTS
+   ============================================ */
+
+import {
+  App,
+  applyDocumentTheme,
+  applyHostFonts,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
+
+// Import styles (will be bundled by Vite)
+import "./global.css";
+import "./mcp-app.css";
 
 /* ============================================
    APP CONFIGURATION
@@ -11,7 +34,6 @@
 
 const APP_NAME = "Shopify Catalog Basic";
 const APP_VERSION = "1.0.0";
-const PROTOCOL_VERSION = "2026-01-26";
 
 /* ============================================
    COMMON UTILITY FUNCTIONS
@@ -29,57 +51,49 @@ function extractData(msg: any) {
 
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  if (data.body?.offers) {
-    return data.body.offers;
-  }
-  if (data.offers) {
-    return data.offers;
-  }
-  
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  if (Array.isArray(data)) {
+
+  // Standard table format
+  if (data.columns) {
     return data;
   }
-  
+
   return data;
 }
 
-function initializeDarkMode() {
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.body.classList.add('dark');
-  }
-  
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e: MediaQueryListEvent) => {
-    document.body.classList.toggle('dark', e.matches);
-  });
-}
 
 function escapeHtml(str: any): string {
-  if (typeof str !== "string") return str;
+  if (typeof str !== "string") return String(str);
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
@@ -118,26 +132,26 @@ function formatPrice(amount: number, currency: string = 'USD'): string {
 
 function formatPriceRange(priceRange: any): string {
   if (!priceRange) return '';
-  
+
   const min = priceRange.min?.amount || 0;
   const max = priceRange.max?.amount || 0;
   const currency = priceRange.min?.currency || priceRange.max?.currency || 'USD';
-  
+
   if (min === max) {
     return formatPrice(min, currency);
   }
-  
+
   return `${formatPrice(min, currency)} - ${formatPrice(max, currency)}`;
 }
 
 function renderRating(rating: any): string {
   if (!rating || !rating.rating) return '';
-  
+
   const stars = Math.round(rating.rating * 2) / 2; // Round to nearest 0.5
   const fullStars = Math.floor(stars);
   const hasHalfStar = stars % 1 !== 0;
   const emptyStars = Math.max(0, 5 - Math.ceil(stars));
-  
+
   let starsHtml = '★'.repeat(fullStars);
   if (hasHalfStar) {
     starsHtml += '☆';
@@ -145,10 +159,10 @@ function renderRating(rating: any): string {
   } else {
     starsHtml += '☆'.repeat(emptyStars);
   }
-  
+
   const count = rating.count || 0;
   const countText = count >= 1000 ? `${(count / 1000).toFixed(1)}K` : count.toString();
-  
+
   return `
     <div class="product-rating">
       <span class="rating-stars">${starsHtml}</span>
@@ -159,10 +173,10 @@ function renderRating(rating: any): string {
 
 function getShopLogo(shopName: string): { initials: string; color: string } {
   if (!shopName || typeof shopName !== 'string') return { initials: '?', color: 'blue' };
-  
+
   const words = shopName.trim().split(' ').filter(w => w.length > 0);
   let initials: string;
-  
+
   if (words.length >= 2) {
     const first = words[0][0] || '';
     const second = words[1][0] || '';
@@ -172,34 +186,34 @@ function getShopLogo(shopName: string): { initials: string; color: string } {
   } else {
     initials = (shopName[0] || '?').toUpperCase() + '?';
   }
-  
+
   // Simple color assignment based on shop name
   const colors = ['yellow', 'green', 'red', 'blue'];
   const hash = shopName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   const color = colors[hash % colors.length] || 'blue';
-  
+
   return { initials, color };
 }
 
 function renderProductCard(product: any, index: number): string {
-  const imageUrl = product.media && product.media.length > 0 
-    ? product.media[0].url 
+  const imageUrl = product.media && product.media.length > 0
+    ? product.media[0].url
     : 'https://via.placeholder.com/300x300?text=No+Image';
-  
-  const imageAlt = product.media && product.media.length > 0 
+
+  const imageAlt = product.media && product.media.length > 0
     ? (product.media[0].altText || product.title || 'Product image')
     : (product.title || 'Product image');
-  
+
   const productUrl = product.lookupUrl || '#';
   const priceDisplay = formatPriceRange(product.priceRange) || '';
   const ratingHtml = renderRating(product.rating) || '';
-  
-  const shopName = product.variants && product.variants.length > 0 
+
+  const shopName = product.variants && product.variants.length > 0
     ? (product.variants[0].shop?.name || '')
     : '';
-  
+
   const shopLogo = getShopLogo(shopName);
-  
+
   return `
     <div class="product-card" data-product-index="${index}">
       <div class="product-image-container">
@@ -215,7 +229,7 @@ function renderProductCard(product: any, index: number): string {
             <span class="shop-name">${escapeHtml(shopName)}</span>
           </div>
         ` : ''}
-        <a href="${escapeHtml(productUrl)}" target="_blank" rel="noopener noreferrer" 
+        <a href="${escapeHtml(productUrl)}" target="_blank" rel="noopener noreferrer"
            class="place-order-btn" onclick="event.stopPropagation()">
           Place Order
         </a>
@@ -233,13 +247,13 @@ let carouselWrapper: HTMLElement | null = null;
 
 function scrollCarousel(direction: 'left' | 'right') {
   if (!carouselWrapper) return;
-  
+
   const scrollAmount = 320; // Card width + gap
   const currentScroll = carouselWrapper.scrollLeft;
-  const newScroll = direction === 'left' 
-    ? currentScroll - scrollAmount 
+  const newScroll = direction === 'left'
+    ? currentScroll - scrollAmount
     : currentScroll + scrollAmount;
-  
+
   carouselWrapper.scrollTo({
     left: newScroll,
     behavior: 'smooth'
@@ -248,14 +262,14 @@ function scrollCarousel(direction: 'left' | 'right') {
 
 function updateNavButtons() {
   if (!carouselWrapper) return;
-  
+
   const leftBtn = document.querySelector('.nav-button.left') as HTMLButtonElement;
   const rightBtn = document.querySelector('.nav-button.right') as HTMLButtonElement;
-  
+
   if (leftBtn) {
     leftBtn.disabled = carouselWrapper.scrollLeft <= 0;
   }
-  
+
   if (rightBtn) {
     const maxScroll = carouselWrapper.scrollWidth - carouselWrapper.clientWidth;
     rightBtn.disabled = carouselWrapper.scrollLeft >= maxScroll - 10;
@@ -265,7 +279,7 @@ function updateNavButtons() {
 function renderData(data: any) {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   if (!data) {
     showEmpty('No data received');
     return;
@@ -273,7 +287,7 @@ function renderData(data: any) {
 
   try {
     const unwrapped = unwrapData(data);
-    
+
     let products: any[] = [];
     if (Array.isArray(unwrapped)) {
       products = unwrapped;
@@ -283,22 +297,16 @@ function renderData(data: any) {
       products = unwrapped.body.offers;
     } else {
       showEmpty('No products found in the catalog');
-      setTimeout(() => {
-        notifySizeChanged();
-      }, 50);
       return;
     }
-    
+
     if (products.length === 0) {
       showEmpty('No products available');
-      setTimeout(() => {
-        notifySizeChanged();
-      }, 50);
       return;
     }
-    
+
     allProducts = products;
-    
+
     app.innerHTML = `
       <div class="container">
         <div class="header">
@@ -323,7 +331,7 @@ function renderData(data: any) {
             </button>
           </div>
         </div>
-        
+
         <div class="carousel-container">
           <button class="nav-button left" onclick="scrollCarousel('left')" aria-label="Scroll left">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -341,278 +349,127 @@ function renderData(data: any) {
         </div>
       </div>
     `;
-    
+
     carouselWrapper = document.getElementById('carousel-wrapper');
-    
+
     if (carouselWrapper) {
       carouselWrapper.addEventListener('scroll', updateNavButtons);
       updateNavButtons();
     }
-    
+
     (window as any).scrollCarousel = scrollCarousel;
-    
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
-    
+
   } catch (error: any) {
-    console.error('Render error:', error);
+    app.sendLog({ level: "error", data: `Render error: ${JSON.stringify(error)}`, logger: APP_NAME });
     showError(`Error rendering catalog: ${error.message}`);
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
   }
 }
 
 /* ============================================
-   MESSAGE HANDLER
+   HOST CONTEXT HANDLER
    ============================================ */
 
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    return;
-  }
-  
-  if (msg.id !== undefined && msg.method === 'ui/resource-teardown') {
-    if (sizeChangeTimeout) {
-      clearTimeout(sizeChangeTimeout);
-      sizeChangeTimeout = null;
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
     }
-    
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-    
-    if (carouselWrapper) {
-      carouselWrapper.removeEventListener('scroll', updateNavButtons);
-    }
-    
-    window.parent.postMessage({
-      jsonrpc: "2.0",
-      id: msg.id,
-      result: {}
-    }, '*');
-    
-    return;
   }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
   }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      const data = msg.params?.structuredContent || msg.params;
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      if (msg.params?.theme === 'dark') {
-        document.body.classList.add('dark');
-      } else if (msg.params?.theme === 'light') {
-        document.body.classList.remove('dark');
-      }
-      if (msg.params?.displayMode) {
-        handleDisplayModeChange(msg.params.displayMode);
-      }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      const toolArguments = msg.params?.arguments;
-      if (toolArguments) {
-        console.log('Tool input received:', toolArguments);
-      }
-      break;
-      
-    case 'ui/notifications/tool-cancelled':
-      const reason = msg.params?.reason || 'Tool execution was cancelled';
-      showError(`Operation cancelled: ${reason}`);
-      break;
-      
-    case 'ui/notifications/initialized':
-      break;
-      
-    default:
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      }
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
   }
-});
 
-/* ============================================
-   MCP COMMUNICATION
-   ============================================ */
-
-let requestIdCounter = 1;
-function sendRequest(method: string, params: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const id = requestIdCounter++;
-    window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, '*');
-    
-    const listener = (event: MessageEvent) => {
-      if (event.data?.id === id) {
-        window.removeEventListener('message', listener);
-        if (event.data?.result) {
-          resolve(event.data.result);
-        } else if (event.data?.error) {
-          reject(new Error(event.data.error.message || 'Unknown error'));
-        }
-      }
-    };
-    window.addEventListener('message', listener);
-    
-    setTimeout(() => {
-      window.removeEventListener('message', listener);
-      reject(new Error('Request timeout'));
-    }, 5000);
-  });
-}
-
-function sendNotification(method: string, params: any) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, '*');
-}
-
-/* ============================================
-   DISPLAY MODE HANDLING
-   ============================================ */
-
-let currentDisplayMode = 'inline';
-
-function handleDisplayModeChange(mode: string) {
-  currentDisplayMode = mode;
-  if (mode === 'fullscreen') {
-    document.body.classList.add('fullscreen-mode');
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
   } else {
-    document.body.classList.remove('fullscreen-mode');
+    document.body.classList.remove("fullscreen-mode");
   }
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
 }
-
-function requestDisplayMode(mode: string): Promise<any> {
-  return sendRequest('ui/request-display-mode', { mode: mode })
-    .then(result => {
-      if (result?.mode) {
-        handleDisplayModeChange(result.mode);
-      }
-      return result;
-    })
-    .catch(err => {
-      console.warn('Failed to request display mode:', err);
-      throw err;
-    });
-}
-
-(window as any).requestDisplayMode = requestDisplayMode;
 
 /* ============================================
-   SIZE CHANGE NOTIFICATIONS
+   SDK APP INSTANCE (STANDALONE MODE)
    ============================================ */
 
-function notifySizeChanged() {
-  const width = document.body.scrollWidth || document.documentElement.scrollWidth;
-  const height = document.body.scrollHeight || document.documentElement.scrollHeight;
-  
-  sendNotification('ui/notifications/size-changed', {
-    width: width,
-    height: height
-  });
-}
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
 
-let sizeChangeTimeout: NodeJS.Timeout | null = null;
-function debouncedNotifySizeChanged() {
-  if (sizeChangeTimeout) {
-    clearTimeout(sizeChangeTimeout);
+app.onteardown = async () => {
+  app.sendLog({ level: "info", data: "Resource teardown requested", logger: APP_NAME });
+  if (carouselWrapper) {
+    carouselWrapper.removeEventListener('scroll', updateNavButtons);
   }
-  sizeChangeTimeout = setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
+  return {};
+};
 
-let resizeObserver: ResizeObserver | null = null;
-function setupSizeObserver() {
-  if (typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => {
-      debouncedNotifySizeChanged();
-    });
-    resizeObserver.observe(document.body);
+app.ontoolinput = (params) => {
+  app.sendLog({ level: "info", data: `Tool input received: ${JSON.stringify(params.arguments)}`, logger: APP_NAME });
+};
+
+app.ontoolresult = (params) => {
+  app.sendLog({ level: "info", data: "Tool result received", logger: APP_NAME });
+
+  // Check for tool execution errors
+  if (params.isError) {
+    app.sendLog({ level: "error", data: `Tool execution failed: ${JSON.stringify(params.content)}`, logger: APP_NAME });
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
   } else {
-    window.addEventListener('resize', debouncedNotifySizeChanged);
-    const mutationObserver = new MutationObserver(debouncedNotifySizeChanged);
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['style', 'class']
-    });
+    app.sendLog({ level: "warning", data: `Tool result received but no data found: ${JSON.stringify(params)}`, logger: APP_NAME });
+    showEmpty("No data received");
   }
-  
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  app.sendLog({ level: "info", data: `Tool cancelled: ${reason}`, logger: APP_NAME });
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  app.sendLog({ level: "error", data: `App error: ${JSON.stringify(error)}`, logger: APP_NAME });
+};
+
+app.onhostcontextchanged = (ctx) => {
+  app.sendLog({ level: "info", data: `Host context changed: ${JSON.stringify(ctx)}`, logger: APP_NAME });
+  handleHostContextChanged(ctx);
+};
 
 /* ============================================
-   INITIALIZATION
+   CONNECT TO HOST
    ============================================ */
 
-sendRequest('ui/initialize', {
-  appCapabilities: {
-    availableDisplayModes: ["inline", "fullscreen"]
-  },
-  appInfo: {
-    name: APP_NAME,
-    version: APP_VERSION
-  },
-  protocolVersion: PROTOCOL_VERSION
-}).then((result: any) => {
-  const ctx = result.hostContext || result;
-  
-  sendNotification('ui/notifications/initialized', {});
-  
-  if (ctx?.theme === 'dark') {
-    document.body.classList.add('dark');
-  } else if (ctx?.theme === 'light') {
-    document.body.classList.remove('dark');
-  }
-  
-  if (ctx?.displayMode) {
-    handleDisplayModeChange(ctx.displayMode);
-  }
-  
-  if (ctx?.containerDimensions) {
-    const dims = ctx.containerDimensions;
-    if (dims.width) {
-      document.body.style.width = dims.width + 'px';
+app
+  .connect()
+  .then(() => {
+    app.sendLog({ level: "info", data: "MCP App connected to host", logger: APP_NAME });
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
     }
-    if (dims.height) {
-      document.body.style.height = dims.height + 'px';
-    }
-    if (dims.maxWidth) {
-      document.body.style.maxWidth = dims.maxWidth + 'px';
-    }
-    if (dims.maxHeight) {
-      document.body.style.maxHeight = dims.maxHeight + 'px';
-    }
-  }
-}).catch(err => {
-  console.warn('Failed to initialize MCP App:', err);
-});
-
-initializeDarkMode();
-setupSizeObserver();
+  })
+  .catch((error) => {
+    app.sendLog({ level: "error", data: `Failed to connect to MCP host: ${JSON.stringify(error)}`, logger: APP_NAME });
+  });
 
 export {};

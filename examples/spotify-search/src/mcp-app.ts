@@ -1,56 +1,36 @@
 /* ============================================
-   BASE TEMPLATE FOR MCP APPS
+   SPOTIFY SEARCH MCP APP
    ============================================
-   
-   This file contains all common logic shared across MCP apps.
-   Customize the sections marked with "TEMPLATE-SPECIFIC" below.
-   
-   Common Features:
-   - MCP Protocol message handling (JSON-RPC 2.0)
-   - Dark mode support
-   - Display mode handling (inline/fullscreen)
-   - Size change notifications
-   - Data extraction utilities
-   - Error handling
-   
-   See README.md for customization guidelines.
+
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   with app.connect() for direct MCP host integration.
    ============================================ */
+
+/* ============================================
+   SDK IMPORTS
+   ============================================ */
+
+import {
+  App,
+  applyDocumentTheme,
+  applyHostFonts,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
+
+// Import styles (will be bundled by Vite)
+import "./global.css";
+import "./mcp-app.css";
 
 /* ============================================
    APP CONFIGURATION
-   ============================================
-   TEMPLATE-SPECIFIC: Update these values for your app
    ============================================ */
 
-const APP_NAME = "Spotify Search";  // Spotify Search Results App
-const APP_VERSION = "1.0.0";         // Version 1.0.0
-const PROTOCOL_VERSION = "2026-01-26"; // MCP Apps protocol version
-
-/* ============================================
-   EXTERNAL DEPENDENCIES
-   ============================================
-   If you use external libraries (like Chart.js), declare them here.
-   Example:
-   declare const Chart: any;
-   ============================================ */
+const APP_NAME = "Spotify Search";
+const APP_VERSION = "1.0.0";
 
 /* ============================================
    COMMON UTILITY FUNCTIONS
    ============================================ */
-
-/**
- * Extract data from MCP protocol messages
- * Handles standard JSON-RPC 2.0 format from run-action.html
- */
-function extractData(msg: any) {
-  if (msg?.params?.structuredContent !== undefined) {
-    return msg.params.structuredContent;
-  }
-  if (msg?.params !== undefined) {
-    return msg.params;
-  }
-  return msg;
-}
 
 /**
  * Unwrap nested API response structures
@@ -58,76 +38,52 @@ function extractData(msg: any) {
  */
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  // Format 1: response_content at top level (API gateway format)
-  if (data.response_content) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
-  // Format 2: Standard table format { columns: [], rows: [] }
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
-    return data;
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
   }
-  
-  // Format 3: Nested in message.template_data (3rd party MCP clients)
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
-  // Format 4: Nested in message.response_content (3rd party MCP clients)
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
-  // Format 5: Common nested patterns
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
-  // Format 6: Direct rows array
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  // Format 7: If data itself is an array
-  if (Array.isArray(data)) {
-    return { rows: data };
+
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
-  
-  // Format 8: Handle raw JSON strings (fallback)
-  if (typeof data === 'string') {
-    try {
-      return JSON.parse(data);
-    } catch (e) {
-      return data;
-    }
-  }
-  
+
   return data;
 }
 
-/**
- * Initialize dark mode based on system preference
- */
-function initializeDarkMode() {
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.body.classList.add('dark');
-  }
-  
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e: MediaQueryListEvent) => {
-    document.body.classList.toggle('dark', e.matches);
-  });
-}
 
 /**
  * Escape HTML to prevent XSS attacks
  */
 function escapeHtml(str: any): string {
-  if (typeof str !== "string") return str;
+  if (typeof str !== "string") return String(str);
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
@@ -137,9 +93,9 @@ function escapeHtml(str: any): string {
  * Show error message in the app
  */
 function showError(message: string) {
-  const app = document.getElementById('app');
-  if (app) {
-    app.innerHTML = `<div class="error">${escapeHtml(message)}</div>`;
+  const appContainer = document.getElementById('app');
+  if (appContainer) {
+    appContainer.innerHTML = `<div class="error">${escapeHtml(message)}</div>`;
   }
 }
 
@@ -148,9 +104,9 @@ function showError(message: string) {
  * Override the default message by passing a custom message
  */
 function showEmpty(message: string = 'No data available.') {
-  const app = document.getElementById('app');
-  if (app) {
-    app.innerHTML = `<div class="empty">${escapeHtml(message)}</div>`;
+  const appContainer = document.getElementById('app');
+  if (appContainer) {
+    appContainer.innerHTML = `<div class="empty">${escapeHtml(message)}</div>`;
   }
 }
 
@@ -200,6 +156,15 @@ function getArtistNames(artists: any[]): string {
   return artists.map((a: any) => a.name).join(', ');
 }
 
+/**
+ * Audio Playback State
+ *
+ * Note: HTML5 Audio API does not require special MCP permissions.
+ * The Audio API is a standard browser feature that works without
+ * requesting camera, microphone, geolocation, or clipboardWrite permissions.
+ * Audio playback is allowed by default in modern browsers (user gesture
+ * requirements are handled by click events on play buttons).
+ */
 let currentAudio: HTMLAudioElement | null = null;
 let currentlyPlayingId: string | null = null;
 let selectedTrackId: string | null = null;
@@ -207,6 +172,9 @@ let tracksData: any[] = [];
 
 /**
  * Play track preview
+ *
+ * Uses HTML5 Audio API which does not require MCP permissions.
+ * Preview URLs are 30-second clips provided by Spotify API.
  */
 function playTrack(trackId: string, previewUrl: string | null, spotifyUrl: string) {
   // If clicking the same track that's playing, pause it
@@ -253,8 +221,8 @@ function playTrack(trackId: string, previewUrl: string | null, spotifyUrl: strin
   currentlyPlayingId = null;
   
   if (!previewUrl) {
-    // No preview available, open Spotify
-    window.open(spotifyUrl, '_blank');
+    // No preview available, open Spotify via SDK
+    app.openLink(spotifyUrl);
     return;
   }
   
@@ -404,13 +372,12 @@ function stopPlayback() {
    1. Always validate data before rendering
    2. Use unwrapData() to handle nested structures
    3. Use escapeHtml() when inserting user content
-   4. Call notifySizeChanged() after rendering completes
-   5. Handle errors gracefully with try/catch
+   4. Handle errors gracefully with try/catch
    ============================================ */
 
 function renderData(data: any) {
-  const app = document.getElementById('app');
-  if (!app) return;
+  const appContainer = document.getElementById('app');
+  if (!appContainer) return;
   
   // Stop any playing audio when re-rendering (but keep track selection)
   if (!selectedTrackId) {
@@ -424,36 +391,36 @@ function renderData(data: any) {
 
   try {
     const unwrapped = unwrapData(data);
-    console.log('Unwrapped data:', unwrapped);
-    
+    app.sendLog({ level: "debug", data: `Unwrapped data: ${JSON.stringify(unwrapped)}`, logger: APP_NAME });
+
     // Extract tracks from Spotify API response
     let tracks: any[] = [];
     // Handle response_content.tracks.items format (from API gateway)
     if (unwrapped?.response_content?.tracks?.items && Array.isArray(unwrapped.response_content.tracks.items)) {
       tracks = unwrapped.response_content.tracks.items;
-      console.log('Found tracks in response_content.tracks.items:', tracks.length);
+      app.sendLog({ level: "debug", data: `Found tracks in response_content.tracks.items: ${tracks.length}`, logger: APP_NAME });
     } else if (unwrapped?.body?.tracks?.items && Array.isArray(unwrapped.body.tracks.items)) {
       tracks = unwrapped.body.tracks.items;
-      console.log('Found tracks in body.tracks.items:', tracks.length);
+      app.sendLog({ level: "debug", data: `Found tracks in body.tracks.items: ${tracks.length}`, logger: APP_NAME });
     } else if (unwrapped?.tracks?.items && Array.isArray(unwrapped.tracks.items)) {
       tracks = unwrapped.tracks.items;
-      console.log('Found tracks in tracks.items:', tracks.length);
+      app.sendLog({ level: "debug", data: `Found tracks in tracks.items: ${tracks.length}`, logger: APP_NAME });
     } else if (Array.isArray(unwrapped)) {
       tracks = unwrapped;
-      console.log('Found tracks as direct array:', tracks.length);
+      app.sendLog({ level: "debug", data: `Found tracks as direct array: ${tracks.length}`, logger: APP_NAME });
     } else {
-      console.warn('No tracks found in data structure. Available keys:', Object.keys(unwrapped || {}));
+      app.sendLog({ level: "warning", data: `No tracks found in data structure. Available keys: ${Object.keys(unwrapped || {})}`, logger: APP_NAME });
     }
-    
+
     tracksData = tracks;
-    
+
     if (tracks.length === 0) {
-      console.warn('No tracks extracted. Showing empty state.');
+      app.sendLog({ level: "warning", data: "No tracks extracted. Showing empty state.", logger: APP_NAME });
       showEmpty('No tracks found');
       return;
     }
-    
-    console.log('Rendering', tracks.length, 'tracks');
+
+    app.sendLog({ level: "debug", data: `Rendering ${tracks.length} tracks`, logger: APP_NAME });
     
     // Render detail view or list view
     if (selectedTrackId) {
@@ -467,26 +434,16 @@ function renderData(data: any) {
     } else {
       renderTracksList(tracks, unwrapped);
     }
-    
-    // Notify host of size change after rendering completes
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
-    
   } catch (error: any) {
-    console.error('Render error:', error);
-    console.error('Data that failed to render:', data);
+    app.sendLog({ level: "error", data: `Render error: ${error}`, logger: APP_NAME });
+    app.sendLog({ level: "error", data: `Data that failed to render: ${JSON.stringify(data)}`, logger: APP_NAME });
     showError(`Error rendering data: ${error.message}`);
-    // Notify size even on error
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
   }
 }
 
 function renderTracksList(tracks: any[], unwrapped: any) {
-  const app = document.getElementById('app');
-  if (!app) return;
+  const appContainer = document.getElementById('app');
+  if (!appContainer) return;
   
   // Get total count if available (handle multiple data formats)
   const total = unwrapped?.response_content?.tracks?.total || 
@@ -494,7 +451,7 @@ function renderTracksList(tracks: any[], unwrapped: any) {
                 unwrapped?.tracks?.total || 
                 tracks.length;
   
-  app.innerHTML = `
+  appContainer.innerHTML = `
     <div class="spotify-container">
       <div class="spotify-header">
         <div class="spotify-logo">
@@ -519,7 +476,7 @@ function renderTracksList(tracks: any[], unwrapped: any) {
               <div class="track-image-wrapper">
                 <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(track.album?.name || 'Album')}" class="track-image" loading="lazy">
                 <div class="track-overlay">
-                  <button class="play-button" onclick="event.stopPropagation(); playTrack('${escapeHtml(track.id)}', ${hasPreview ? `'${escapeHtml(previewUrl)}'` : 'null'}, '${escapeHtml(spotifyUrl)}')" title="${hasPreview ? 'Play preview' : 'Open in Spotify'}">
+                  <button class="play-button" data-action="play" data-track-id="${escapeHtml(track.id)}" data-preview-url="${hasPreview ? escapeHtml(previewUrl) : ''}" data-spotify-url="${escapeHtml(spotifyUrl)}" title="${hasPreview ? 'Play preview' : 'Open in Spotify'}">
                     ${hasPreview ? `
                       <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M8 5v14l11-7z"/>
@@ -550,23 +507,37 @@ function renderTracksList(tracks: any[], unwrapped: any) {
     </div>
   `;
   
-  // Add click handlers for cards (to view details)
-  const cards = app.querySelectorAll('.track-card');
-  cards.forEach(card => {
-    const trackId = card.getAttribute('data-track-id');
-    if (trackId) {
-      card.addEventListener('click', (e) => {
-        // Don't trigger if clicking buttons
-        if ((e.target as HTMLElement).closest('.play-button')) return;
+  // Event delegation for all interactive elements
+  appContainer.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+
+    // Handle play button clicks
+    const playButton = target.closest('[data-action="play"]');
+    if (playButton) {
+      e.stopPropagation();
+      const trackId = playButton.getAttribute('data-track-id');
+      const previewUrl = playButton.getAttribute('data-preview-url') || null;
+      const spotifyUrl = playButton.getAttribute('data-spotify-url') || '#';
+      if (trackId) {
+        playTrack(trackId, previewUrl || null, spotifyUrl);
+      }
+      return;
+    }
+
+    // Handle card clicks (to view details)
+    const card = target.closest('.track-card');
+    if (card) {
+      const trackId = card.getAttribute('data-track-id');
+      if (trackId) {
         viewTrackDetails(trackId);
-      });
+      }
     }
   });
 }
 
 function renderTrackDetail(track: any) {
-  const app = document.getElementById('app');
-  if (!app) return;
+  const appContainer = document.getElementById('app');
+  if (!appContainer) return;
   
   const imageUrl = getAlbumImage(track.album);
   const artistNames = getArtistNames(track.artists || []);
@@ -592,10 +563,10 @@ function renderTrackDetail(track: any) {
     }
   }
   
-  app.innerHTML = `
+  appContainer.innerHTML = `
     <div class="spotify-container">
       <div class="spotify-header">
-        <button class="back-button" onclick="viewTracksList()" title="Back to list">
+        <button class="back-button" data-action="back" title="Back to list">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M19 12H5M12 19l-7-7 7-7"/>
           </svg>
@@ -615,7 +586,7 @@ function renderTrackDetail(track: any) {
           <div class="track-detail-image">
             <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(track.album?.name || 'Album')}" class="detail-album-image">
             <div class="detail-play-overlay">
-              <button class="detail-play-button" onclick="playTrack('${escapeHtml(track.id)}', ${hasPreview ? `'${escapeHtml(previewUrl)}'` : 'null'}, '${escapeHtml(spotifyUrl)}')" title="${hasPreview ? 'Play preview' : 'Open in Spotify'}">
+              <button class="detail-play-button" data-action="play" data-track-id="${escapeHtml(track.id)}" data-preview-url="${hasPreview ? escapeHtml(previewUrl) : ''}" data-spotify-url="${escapeHtml(spotifyUrl)}" title="${hasPreview ? 'Play preview' : 'Open in Spotify'}">
                 ${hasPreview ? `
                   <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M8 5v14l11-7z"/>
@@ -719,7 +690,7 @@ function renderTrackDetail(track: any) {
                   Open in Spotify
                 </a>
                 ${hasPreview ? `
-                  <button class="spotify-play-button" onclick="playTrack('${escapeHtml(track.id)}', '${escapeHtml(previewUrl)}', '${escapeHtml(spotifyUrl)}')">
+                  <button class="spotify-play-button" data-action="play" data-track-id="${escapeHtml(track.id)}" data-preview-url="${escapeHtml(previewUrl)}" data-spotify-url="${escapeHtml(spotifyUrl)}">
                     <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor">
                       <path d="M8 5v14l11-7z"/>
                     </svg>
@@ -758,6 +729,28 @@ function renderTrackDetail(track: any) {
       if (actionPauseIcon) (actionPauseIcon as HTMLElement).style.display = 'block';
     }
   }
+
+  // Event delegation for all interactive elements in detail view
+  appContainer.addEventListener('click', (e) => {
+    const target = e.target as HTMLElement;
+
+    // Handle back button click
+    if (target.closest('[data-action="back"]')) {
+      viewTracksList();
+      return;
+    }
+
+    // Handle play button clicks
+    const playButton = target.closest('[data-action="play"]');
+    if (playButton) {
+      const trackId = playButton.getAttribute('data-track-id');
+      const previewUrl = playButton.getAttribute('data-preview-url') || null;
+      const spotifyUrl = playButton.getAttribute('data-spotify-url') || '#';
+      if (trackId) {
+        playTrack(trackId, previewUrl || null, spotifyUrl);
+      }
+    }
+  });
 }
 
 // Global navigation functions
@@ -771,171 +764,12 @@ function viewTracksList() {
   renderData({ body: { tracks: { items: tracksData } } });
 }
 
-// Make functions globally accessible
-(window as any).viewTrackDetails = viewTrackDetails;
-(window as any).viewTracksList = viewTracksList;
-
-// Make playTrack globally accessible
-(window as any).playTrack = playTrack;
-
-/* ============================================
-   MESSAGE HANDLER (Standardized MCP Protocol)
-   ============================================
-   
-   This handles all incoming messages from the MCP host.
-   You typically don't need to modify this section.
-   ============================================ */
-
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    return;
-  }
-  
-  // Handle requests that require responses (like ui/resource-teardown)
-  if (msg.id !== undefined && msg.method === 'ui/resource-teardown') {
-    const reason = msg.params?.reason || 'Resource teardown requested';
-    
-    // Clean up resources
-    // - Clear any timers
-    if (sizeChangeTimeout) {
-      clearTimeout(sizeChangeTimeout);
-      sizeChangeTimeout = null;
-    }
-    
-    // - Disconnect observers
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-    
-    // - Cancel any pending requests (if you track them)
-    // - Destroy chart instances, etc. (template-specific cleanup)
-    
-    // Send response to host
-    window.parent.postMessage({
-      jsonrpc: "2.0",
-      id: msg.id,
-      result: {}
-    }, '*');
-    
-    return; // Don't process further
-  }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
-  }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      const data = msg.params?.structuredContent || msg.params;
-      if (data !== undefined) {
-        console.log('Received tool-result data:', data);
-        renderData(data);
-      } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      if (msg.params?.theme === 'dark') {
-        document.body.classList.add('dark');
-      } else if (msg.params?.theme === 'light') {
-        document.body.classList.remove('dark');
-      }
-      // Handle display mode changes
-      if (msg.params?.displayMode) {
-        handleDisplayModeChange(msg.params.displayMode);
-      }
-      // Re-render if needed (e.g., for charts that need theme updates)
-      // You may want to add logic here to re-render your content with new theme
-      break;
-      
-    case 'ui/notifications/tool-input':
-      // Tool input notification - Host MUST send this with complete tool arguments
-      const toolArguments = msg.params?.arguments;
-      if (toolArguments) {
-        // Store tool arguments for reference (may be needed for context)
-        // Template-specific: You can use this for initial rendering or context
-        console.log('Tool input received:', toolArguments);
-        // Example: Show loading state with input parameters
-        // Example: Store for later use in renderData()
-      }
-      break;
-      
-    case 'ui/notifications/tool-cancelled':
-      // Tool cancellation notification - Host MUST send this if tool is cancelled
-      const reason = msg.params?.reason || 'Tool execution was cancelled';
-      showError(`Operation cancelled: ${reason}`);
-      // Clean up any ongoing operations
-      // - Stop timers
-      // - Cancel pending requests
-      // - Reset UI state
-      break;
-      
-    case 'ui/notifications/initialized':
-      // Initialization notification (optional - handle if needed)
-      break;
-      
-    default:
-      // Unknown method - try to extract data as fallback
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      }
-  }
-});
-
-/* ============================================
-   MCP COMMUNICATION
-   ============================================
-   
-   Functions for communicating with the MCP host.
-   You typically don't need to modify this section.
-   ============================================ */
-
-let requestIdCounter = 1;
-function sendRequest(method: string, params: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const id = requestIdCounter++;
-    window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, '*');
-    
-    const listener = (event: MessageEvent) => {
-      if (event.data?.id === id) {
-        window.removeEventListener('message', listener);
-        if (event.data?.result) {
-          resolve(event.data.result);
-        } else if (event.data?.error) {
-          reject(new Error(event.data.error.message || 'Unknown error'));
-        }
-      }
-    };
-    window.addEventListener('message', listener);
-    
-    // Timeout after 5 seconds
-    setTimeout(() => {
-      window.removeEventListener('message', listener);
-      reject(new Error('Request timeout'));
-    }, 5000);
-  });
-}
-
-function sendNotification(method: string, params: any) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, '*');
-}
+// Note: playTrack, viewTrackDetails, viewTracksList are now called via
+// event delegation (data-action attributes) instead of global onclick handlers.
+// This improves security by avoiding inline event handlers and XSS risks.
 
 /* ============================================
    DISPLAY MODE HANDLING
-   ============================================
-   
-   Handles switching between inline and fullscreen display modes.
-   You may want to customize handleDisplayModeChange() to adjust
-   your layout for fullscreen mode.
    ============================================ */
 
 let currentDisplayMode = 'inline';
@@ -944,7 +778,6 @@ function handleDisplayModeChange(mode: string) {
   currentDisplayMode = mode;
   if (mode === 'fullscreen') {
     document.body.classList.add('fullscreen-mode');
-    // Adjust layout for fullscreen if needed
     const container = document.querySelector('.container');
     if (container) {
       (container as HTMLElement).style.maxWidth = '100%';
@@ -952,158 +785,118 @@ function handleDisplayModeChange(mode: string) {
     }
   } else {
     document.body.classList.remove('fullscreen-mode');
-    // Restore normal layout
     const container = document.querySelector('.container');
     if (container) {
       (container as HTMLElement).style.maxWidth = '';
       (container as HTMLElement).style.padding = '';
     }
   }
-  // Notify host of size change after mode change
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
-
-function requestDisplayMode(mode: string): Promise<any> {
-  return sendRequest('ui/request-display-mode', { mode: mode })
-    .then(result => {
-      if (result?.mode) {
-        handleDisplayModeChange(result.mode);
-      }
-      return result;
-    })
-    .catch(err => {
-      console.warn('Failed to request display mode:', err);
-      throw err;
-    });
-}
-
-// Make function globally accessible for testing/debugging
-(window as any).requestDisplayMode = requestDisplayMode;
-
-/* ============================================
-   SIZE CHANGE NOTIFICATIONS
-   ============================================
-   
-   Notifies the host when the content size changes.
-   This is critical for proper iframe sizing.
-   You typically don't need to modify this section.
-   ============================================ */
-
-function notifySizeChanged() {
-  const width = document.body.scrollWidth || document.documentElement.scrollWidth;
-  const height = document.body.scrollHeight || document.documentElement.scrollHeight;
-  
-  sendNotification('ui/notifications/size-changed', {
-    width: width,
-    height: height
-  });
-}
-
-// Debounce function to avoid too many notifications
-let sizeChangeTimeout: NodeJS.Timeout | null = null;
-function debouncedNotifySizeChanged() {
-  if (sizeChangeTimeout) {
-    clearTimeout(sizeChangeTimeout);
-  }
-  sizeChangeTimeout = setTimeout(() => {
-    notifySizeChanged();
-  }, 100); // Wait 100ms after last change
-}
-
-// Use ResizeObserver to detect size changes
-let resizeObserver: ResizeObserver | null = null;
-function setupSizeObserver() {
-  if (typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => {
-      debouncedNotifySizeChanged();
-    });
-    resizeObserver.observe(document.body);
-  } else {
-    // Fallback: use window resize and mutation observer
-    window.addEventListener('resize', debouncedNotifySizeChanged);
-    const mutationObserver = new MutationObserver(debouncedNotifySizeChanged);
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['style', 'class']
-    });
-  }
-  
-  // Send initial size after a short delay to ensure content is rendered
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
 }
 
 /* ============================================
-   INITIALIZATION
-   ============================================
-   
-   Initializes the MCP app and sets up all required features.
-   You typically don't need to modify this section.
+   HOST CONTEXT HANDLER
    ============================================ */
 
-// Initialize MCP App - REQUIRED for MCP Apps protocol
-sendRequest('ui/initialize', {
-  appCapabilities: {
-    availableDisplayModes: ["inline", "fullscreen"]
-  },
-  clientInfo: {
-    name: APP_NAME,
-    version: APP_VERSION
-  },
-  protocolVersion: PROTOCOL_VERSION
-}).then((result: any) => {
-  // Extract host context from initialization result
-  const ctx = result.hostContext || result;
-  
-  // Extract host capabilities for future use
-  const hostCapabilities = result.hostCapabilities;
-  
-  // Send initialized notification after successful initialization
-  sendNotification('ui/notifications/initialized', {});
-  // Apply theme from host context
-  if (ctx?.theme === 'dark') {
-    document.body.classList.add('dark');
-  } else if (ctx?.theme === 'light') {
-    document.body.classList.remove('dark');
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
   }
-  // Handle display mode from host context
-  if (ctx?.displayMode) {
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
+  }
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
+  }
+
+  if (ctx.displayMode) {
     handleDisplayModeChange(ctx.displayMode);
   }
-  // Handle container dimensions if provided
-  if (ctx?.containerDimensions) {
-    const dims = ctx.containerDimensions;
-    if (dims.width) {
-      document.body.style.width = dims.width + 'px';
-    }
-    if (dims.height) {
-      document.body.style.height = dims.height + 'px';
-    }
-    if (dims.maxWidth) {
-      document.body.style.maxWidth = dims.maxWidth + 'px';
-    }
-    if (dims.maxHeight) {
-      document.body.style.maxHeight = dims.maxHeight + 'px';
-    }
+}
+
+/* ============================================
+   SDK APP INSTANCE (STANDALONE MODE)
+   ============================================ */
+
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+// Register event handlers BEFORE connect()
+
+app.onteardown = async () => {
+  app.sendLog({ level: "info", data: "Resource teardown requested", logger: APP_NAME });
+  stopPlayback();
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  app.sendLog({ level: "info", data: `Tool input received: ${JSON.stringify(params.arguments)}`, logger: APP_NAME });
+};
+
+app.ontoolresult = (params) => {
+  app.sendLog({ level: "info", data: "Tool result received", logger: APP_NAME });
+
+  // Check for tool execution errors
+  if (params.isError) {
+    app.sendLog({ level: "error", data: `Tool execution failed: ${JSON.stringify(params.content)}`, logger: APP_NAME });
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
   }
-}).catch(err => {
-  console.error('Failed to initialize MCP App:', err);
-  console.error('Initialization error details:', err);
-  // Fallback to system preference if initialization fails
-  // Continue anyway - initialization failure shouldn't prevent rendering
-});
 
-initializeDarkMode();
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    app.sendLog({ level: "warning", data: `Tool result received but no data found: ${JSON.stringify(params)}`, logger: APP_NAME });
+    showEmpty("No data received");
+  }
+};
 
-// Setup size observer to notify host of content size changes
-// This is critical for the host to properly size the iframe
-setupSizeObserver();
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  app.sendLog({ level: "info", data: `Tool cancelled: ${reason}`, logger: APP_NAME });
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  app.sendLog({ level: "error", data: `App error: ${error}`, logger: APP_NAME });
+};
+
+app.onhostcontextchanged = (ctx) => {
+  app.sendLog({ level: "info", data: `Host context changed: ${JSON.stringify(ctx)}`, logger: APP_NAME });
+  handleHostContextChanged(ctx);
+};
+
+/* ============================================
+   CONNECT TO HOST
+   ============================================ */
+
+app
+  .connect()
+  .then(() => {
+    app.sendLog({ level: "info", data: "MCP App connected to host", logger: APP_NAME });
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    app.sendLog({ level: "error", data: `Failed to connect to MCP host: ${error}`, logger: APP_NAME });
+  });
 
 // Export empty object to ensure this file is treated as an ES module
-// This prevents TypeScript from treating top-level declarations as global
 export {};

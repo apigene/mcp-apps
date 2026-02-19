@@ -1,8 +1,9 @@
 /* ============================================
-   REBRICKABLE TEMPLATE - LEGO STYLE
+   REBRICKABLE LEGO PARTS 3D MCP APP (STANDALONE MODE)
    ============================================
-   
-   This file handles Rebrickable API responses with LEGO-themed rendering.
+
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   in standalone mode with app.connect().
    Includes 3D rendering support with Three.js and LDrawLoader.
    ============================================ */
 
@@ -12,7 +13,6 @@
 
 const APP_NAME = "Rebrickable";
 const APP_VERSION = "2.0.0";
-const PROTOCOL_VERSION = "2026-01-26"; // MCP Apps protocol version
 
 // Three.js and LDrawLoader are loaded via script tags in HTML
 declare const THREE: any;
@@ -20,75 +20,67 @@ declare const LDrawLoader: any;
 declare const OrbitControls: any;
 
 /* ============================================
-   COMMON UTILITY FUNCTIONS
+   SDK IMPORTS
    ============================================ */
 
-/**
- * Extract data from MCP protocol messages
- */
-function extractData(msg: any) {
-  if (msg?.params?.structuredContent !== undefined) {
-    return msg.params.structuredContent;
-  }
-  if (msg?.params !== undefined) {
-    return msg.params;
-  }
-  return msg;
-}
+import {
+  App,
+  applyDocumentTheme,
+  applyHostFonts,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
+
+// Import styles (will be bundled by Vite)
+import "./global.css";
+import "./mcp-app.css";
+
+/* ============================================
+   COMMON UTILITY FUNCTIONS
+   ============================================ */
 
 /**
  * Unwrap nested API response structures
  */
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  // If data has body property (Rebrickable API format)
-  if (data.body) {
-    return data.body;
-  }
-  
-  // Standard table format
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
-  // Nested patterns
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
+  if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
-  
+  if (data.records) return data.records;
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  if (Array.isArray(data)) {
-    return { rows: data };
-  }
-  
-  return data;
-}
 
-/**
- * Initialize dark mode
- */
-function initializeDarkMode() {
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.body.classList.add('dark');
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
-  
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e: MediaQueryListEvent) => {
-    document.body.classList.toggle('dark', e.matches);
-  });
+
+  return data;
 }
 
 /**
@@ -132,7 +124,7 @@ function formatExternalIds(externalIds: any): string {
   if (!externalIds || typeof externalIds !== 'object') {
     return '';
   }
-  
+
   let badges = '';
   for (const [key, values] of Object.entries(externalIds)) {
     if (Array.isArray(values)) {
@@ -142,7 +134,7 @@ function formatExternalIds(externalIds: any): string {
       });
     }
   }
-  
+
   return badges;
 }
 
@@ -151,7 +143,7 @@ function formatExternalIds(externalIds: any): string {
  */
 function init3DViewer(containerId: string, partNum: string) {
   if (typeof THREE === 'undefined') {
-    console.warn('Three.js not loaded, skipping 3D viewer');
+    app.sendLog({ level: "warning", data: "Three.js not loaded, skipping 3D viewer", logger: APP_NAME });
     return;
   }
 
@@ -162,7 +154,7 @@ function init3DViewer(containerId: string, partNum: string) {
     // Create scene
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xf0f0f0);
-    
+
     // Create camera
     const camera = new THREE.PerspectiveCamera(
       45,
@@ -182,11 +174,11 @@ function init3DViewer(containerId: string, partNum: string) {
     // Add lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
-    
+
     const directionalLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
     directionalLight1.position.set(50, 50, 50);
     scene.add(directionalLight1);
-    
+
     const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
     directionalLight2.position.set(-50, -50, -50);
     scene.add(directionalLight2);
@@ -205,7 +197,7 @@ function init3DViewer(containerId: string, partNum: string) {
     // Note: This requires LDraw parts library to be available
     // For now, we'll create a simple placeholder geometry
     const geometry = new THREE.BoxGeometry(20, 8, 10);
-    const material = new THREE.MeshStandardMaterial({ 
+    const material = new THREE.MeshStandardMaterial({
       color: 0xff0000, // LEGO red
       roughness: 0.3,
       metalness: 0.1
@@ -220,14 +212,14 @@ function init3DViewer(containerId: string, partNum: string) {
     // Animation loop
     function animate() {
       requestAnimationFrame(animate);
-      
+
       if (controls) {
         controls.update();
       } else {
         // Simple rotation if no controls
         cube.rotation.y += 0.005;
       }
-      
+
       renderer.render(scene, camera);
     }
     animate();
@@ -243,7 +235,7 @@ function init3DViewer(containerId: string, partNum: string) {
     resizeObserver.observe(container);
 
   } catch (error) {
-    console.error('Error initializing 3D viewer:', error);
+    app.sendLog({ level: "error", data: `Error initializing 3D viewer: ${JSON.stringify(error)}`, logger: APP_NAME });
     container.innerHTML = '<div class="viewer-error">3D viewer unavailable</div>';
   }
 }
@@ -259,10 +251,10 @@ function renderPartCard(part: any, index: number): string {
   const partUrl = part.part_url || '#';
   const externalIds = formatExternalIds(part.external_ids);
   const containerId = `part-viewer-${index}`;
-  
+
   // Check if we have LDraw ID for 3D rendering
   const hasLDraw = part.external_ids?.LDraw && Array.isArray(part.external_ids.LDraw) && part.external_ids.LDraw.length > 0;
-  
+
   let imageHtml = '';
   if (imageUrl) {
     imageHtml = `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(name)}" class="part-image" />`;
@@ -272,7 +264,7 @@ function renderPartCard(part: any, index: number): string {
   } else {
     imageHtml = `<div class="part-image-placeholder">🧱</div>`;
   }
-  
+
   return `
     <div class="part-card">
       <div class="part-image-container">
@@ -297,7 +289,7 @@ function renderPartCard(part: any, index: number): string {
 function renderData(data: any) {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   if (!data) {
     showEmpty('No data received');
     return;
@@ -306,7 +298,7 @@ function renderData(data: any) {
   try {
     // Unwrap data to get the body
     const unwrapped = unwrapData(data);
-    
+
     // Handle Rebrickable API response format
     let body = unwrapped;
     if (data.body) {
@@ -316,21 +308,21 @@ function renderData(data: any) {
     } else if (unwrapped.results) {
       body = unwrapped;
     }
-    
+
     // Extract parts/results
     const results = body.results || body.items || (Array.isArray(body) ? body : []);
     const count = body.count || results.length;
     const next = body.next;
     const previous = body.previous;
-    
+
     if (!results || results.length === 0) {
       showEmpty('No parts found.');
       return;
     }
-    
+
     // Build HTML
     let html = '<div class="container">';
-    
+
     // Header with stats
     html += `
       <div class="header">
@@ -347,14 +339,14 @@ function renderData(data: any) {
         </div>
       </div>
     `;
-    
+
     // Parts grid
     html += '<div class="parts-grid">';
     results.forEach((part: any, index: number) => {
       html += renderPartCard(part, index);
     });
     html += '</div>';
-    
+
     // Pagination (if available)
     if (next || previous) {
       html += '<div class="pagination">';
@@ -367,11 +359,11 @@ function renderData(data: any) {
       }
       html += '</div>';
     }
-    
+
     html += '</div>';
-    
+
     app.innerHTML = html;
-    
+
     // Initialize 3D viewers after DOM is ready
     setTimeout(() => {
       results.forEach((part: any, index: number) => {
@@ -381,301 +373,116 @@ function renderData(data: any) {
           init3DViewer(containerId, part.part_num);
         }
       });
-      
-      // Notify host of size change after rendering completes
-      notifySizeChanged();
     }, 100);
-    
+
   } catch (error: any) {
-    console.error('Render error:', error);
+    app.sendLog({ level: "error", data: `Render error: ${JSON.stringify(error)}`, logger: APP_NAME });
     showError(`Error rendering data: ${error.message}`);
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
   }
 }
 
 /* ============================================
-   MESSAGE HANDLER
+   HOST CONTEXT HANDLER
    ============================================ */
 
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
+  }
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
+  }
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
+  }
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
+}
+
+/* ============================================
+   SDK APP INSTANCE (STANDALONE MODE)
+   ============================================ */
+
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  app.sendLog({ level: "info", data: "Resource teardown requested", logger: APP_NAME });
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  app.sendLog({ level: "info", data: `Tool input received: ${JSON.stringify(params.arguments)}`, logger: APP_NAME });
+};
+
+app.ontoolresult = (params) => {
+  app.sendLog({ level: "info", data: "Tool result received", logger: APP_NAME });
+
+  // Check for tool execution errors
+  if (params.isError) {
+    app.sendLog({ level: "error", data: `Tool execution failed: ${JSON.stringify(params.content)}`, logger: APP_NAME });
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
     return;
   }
-  
-  // Handle requests that require responses (like ui/resource-teardown)
-  if (msg.id !== undefined && msg.method === 'ui/resource-teardown') {
-    const reason = msg.params?.reason || 'Resource teardown requested';
-    
-    // Clean up resources
-    // - Clear any timers
-    if (sizeChangeTimeout) {
-      clearTimeout(sizeChangeTimeout);
-      sizeChangeTimeout = null;
-    }
-    
-    // - Disconnect observers
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-    
-    // - Clean up 3D viewers (Three.js scenes, renderers, etc.)
-    // Note: Three.js cleanup would require tracking all scene instances
-    // For now, the DOM removal will handle most cleanup
-    
-    // Send response to host
-    window.parent.postMessage({
-      jsonrpc: "2.0",
-      id: msg.id,
-      result: {}
-    }, '*');
-    
-    return; // Don't process further
-  }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
-  }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      const data = msg.params?.structuredContent || msg.params;
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      if (msg.params?.theme === 'dark') {
-        document.body.classList.add('dark');
-      } else if (msg.params?.theme === 'light') {
-        document.body.classList.remove('dark');
-      }
-      if (msg.params?.displayMode) {
-        handleDisplayModeChange(msg.params.displayMode);
-      }
-      // Re-render if needed (e.g., for 3D viewers that need theme updates)
-      break;
-      
-    case 'ui/notifications/tool-input':
-      // Tool input notification - Host MUST send this with complete tool arguments
-      const toolArguments = msg.params?.arguments;
-      if (toolArguments) {
-        // Store tool arguments for reference (may be needed for context)
-        console.log('Tool input received:', toolArguments);
-        // Example: Could show loading state with input parameters
-      }
-      break;
-      
-    case 'ui/notifications/tool-cancelled':
-      // Tool cancellation notification - Host MUST send this if tool is cancelled
-      const reason = msg.params?.reason || 'Tool execution was cancelled';
-      showError(`Operation cancelled: ${reason}`);
-      // Clean up any ongoing operations
-      // - Stop timers
-      // - Cancel pending requests
-      // - Reset UI state
-      break;
-      
-    case 'ui/notifications/initialized':
-      // Initialization notification (optional - handle if needed)
-      break;
-      
-    default:
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      }
-  }
-});
 
-/* ============================================
-   MCP COMMUNICATION
-   ============================================ */
-
-let requestIdCounter = 1;
-function sendRequest(method: string, params: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const id = requestIdCounter++;
-    window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, '*');
-    
-    const listener = (event: MessageEvent) => {
-      if (event.data?.id === id) {
-        window.removeEventListener('message', listener);
-        if (event.data?.result) {
-          resolve(event.data.result);
-        } else if (event.data?.error) {
-          reject(new Error(event.data.error.message || 'Unknown error'));
-        }
-      }
-    };
-    window.addEventListener('message', listener);
-    
-    setTimeout(() => {
-      window.removeEventListener('message', listener);
-      reject(new Error('Request timeout'));
-    }, 5000);
-  });
-}
-
-function sendNotification(method: string, params: any) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, '*');
-}
-
-/* ============================================
-   DISPLAY MODE HANDLING
-   ============================================ */
-
-let currentDisplayMode = 'inline';
-
-function handleDisplayModeChange(mode: string) {
-  currentDisplayMode = mode;
-  if (mode === 'fullscreen') {
-    document.body.classList.add('fullscreen-mode');
-    const container = document.querySelector('.container');
-    if (container) {
-      (container as HTMLElement).style.maxWidth = '100%';
-      (container as HTMLElement).style.padding = '20px';
-    }
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
   } else {
-    document.body.classList.remove('fullscreen-mode');
-    const container = document.querySelector('.container');
-    if (container) {
-      (container as HTMLElement).style.maxWidth = '';
-      (container as HTMLElement).style.padding = '';
-    }
+    app.sendLog({ level: "warning", data: `Tool result received but no data found: ${JSON.stringify(params)}`, logger: APP_NAME });
+    showEmpty("No data received");
   }
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
+};
 
-function requestDisplayMode(mode: string): Promise<any> {
-  return sendRequest('ui/request-display-mode', { mode: mode })
-    .then(result => {
-      if (result?.mode) {
-        handleDisplayModeChange(result.mode);
-      }
-      return result;
-    })
-    .catch(err => {
-      console.warn('Failed to request display mode:', err);
-      throw err;
-    });
-}
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  app.sendLog({ level: "info", data: `Tool cancelled: ${reason}`, logger: APP_NAME });
+  showError(`Operation cancelled: ${reason}`);
+};
 
-(window as any).requestDisplayMode = requestDisplayMode;
+app.onerror = (error) => {
+  app.sendLog({ level: "error", data: `App error: ${JSON.stringify(error)}`, logger: APP_NAME });
+};
+
+app.onhostcontextchanged = (ctx) => {
+  app.sendLog({ level: "info", data: `Host context changed: ${JSON.stringify(ctx)}`, logger: APP_NAME });
+  handleHostContextChanged(ctx);
+};
 
 /* ============================================
-   SIZE CHANGE NOTIFICATIONS
+   CONNECT TO HOST
    ============================================ */
 
-function notifySizeChanged() {
-  const width = document.body.scrollWidth || document.documentElement.scrollWidth;
-  const height = document.body.scrollHeight || document.documentElement.scrollHeight;
-  
-  sendNotification('ui/notifications/size-changed', {
-    width: width,
-    height: height
+app
+  .connect()
+  .then(() => {
+    app.sendLog({ level: "info", data: "MCP App connected to host", logger: APP_NAME });
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    app.sendLog({ level: "error", data: `Failed to connect to MCP host: ${JSON.stringify(error)}`, logger: APP_NAME });
   });
-}
 
-let sizeChangeTimeout: NodeJS.Timeout | null = null;
-function debouncedNotifySizeChanged() {
-  if (sizeChangeTimeout) {
-    clearTimeout(sizeChangeTimeout);
-  }
-  sizeChangeTimeout = setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
-
-let resizeObserver: ResizeObserver | null = null;
-function setupSizeObserver() {
-  if (typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => {
-      debouncedNotifySizeChanged();
-    });
-    resizeObserver.observe(document.body);
-  } else {
-    window.addEventListener('resize', debouncedNotifySizeChanged);
-    const mutationObserver = new MutationObserver(debouncedNotifySizeChanged);
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['style', 'class']
-    });
-  }
-  
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
-
-/* ============================================
-   INITIALIZATION
-   ============================================ */
-
-sendRequest('ui/initialize', {
-  appCapabilities: {
-    availableDisplayModes: ["inline", "fullscreen"]
-  },
-  clientInfo: {
-    name: APP_NAME,
-    version: APP_VERSION
-  },
-  protocolVersion: PROTOCOL_VERSION
-}).then((result: any) => {
-  // Extract host context from initialization result
-  const ctx = result.hostContext || result;
-  
-  // Extract host capabilities for future use
-  const hostCapabilities = result.hostCapabilities;
-  
-  // Send initialized notification after successful initialization
-  sendNotification('ui/notifications/initialized', {});
-  
-  if (ctx?.theme === 'dark') {
-    document.body.classList.add('dark');
-  } else if (ctx?.theme === 'light') {
-    document.body.classList.remove('dark');
-  }
-  if (ctx?.displayMode) {
-    handleDisplayModeChange(ctx.displayMode);
-  }
-  if (ctx?.containerDimensions) {
-    const dims = ctx.containerDimensions;
-    if (dims.width) {
-      document.body.style.width = dims.width + 'px';
-    }
-    if (dims.height) {
-      document.body.style.height = dims.height + 'px';
-    }
-    if (dims.maxWidth) {
-      document.body.style.maxWidth = dims.maxWidth + 'px';
-    }
-    if (dims.maxHeight) {
-      document.body.style.maxHeight = dims.maxHeight + 'px';
-    }
-  }
-}).catch(err => {
-  console.warn('Failed to initialize MCP App:', err);
-});
-
-initializeDarkMode();
-setupSizeObserver();
-
-// Export empty object to ensure this file is treated as an ES module
-// This prevents TypeScript from treating top-level declarations as global
 export {};

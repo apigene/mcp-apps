@@ -1,41 +1,32 @@
 /* ============================================
-   BASE TEMPLATE FOR MCP APPS
+   BRIGHTDATA LINKEDIN POST MCP APP (STANDALONE MODE)
    ============================================
-   
-   This file contains all common logic shared across MCP apps.
-   Customize the sections marked with "TEMPLATE-SPECIFIC" below.
-   
-   Common Features:
-   - MCP Protocol message handling (JSON-RPC 2.0)
-   - Dark mode support
-   - Display mode handling (inline/fullscreen)
-   - Size change notifications
-   - Data extraction utilities
-   - Error handling
-   
-   See README.md for customization guidelines.
+
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   in standalone mode with app.connect() for full MCP integration.
    ============================================ */
+
+/* ============================================
+   SDK IMPORTS
+   ============================================ */
+
+import {
+  App,
+  applyDocumentTheme,
+  applyHostFonts,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
+
+// Import styles (will be bundled by Vite)
+import "./global.css";
+import "./mcp-app.css";
 
 /* ============================================
    APP CONFIGURATION
-   ============================================
-   TEMPLATE-SPECIFIC: Update these values for your app
    ============================================ */
 
-const APP_NAME = "LinkedIn Post";
+const APP_NAME = "Brightdata Linkedin Post";
 const APP_VERSION = "1.0.0";
-const PROTOCOL_VERSION = "2026-01-26"; // MCP Apps protocol version
-
-const DEBUG = true; // set to false to disable render debug logs
-function debugLog(...args: unknown[]) {
-  if (DEBUG) console.log("[LinkedIn Post]", ...args);
-}
-
-/* ============================================
-   EXTERNAL DEPENDENCIES
-   ============================================
-   If you use external libraries (like Chart.js), declare them here.
-   ============================================ */
 
 /* ============================================
    COMMON UTILITY FUNCTIONS
@@ -61,62 +52,52 @@ function extractData(msg: any) {
  */
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  // Format 1: Standard table format { columns: [], rows: [] }
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
-  // Format 2: Nested in message.template_data (3rd party MCP clients)
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
-  // Format 3: Nested in message.response_content (3rd party MCP clients)
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
-  // Format 4: Common nested patterns
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
-  // Format 5: Direct rows array
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  // Format 6: If data itself is an array
-  if (Array.isArray(data)) {
-    return { rows: data };
+
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
-  
+
   return data;
 }
 
-/**
- * Initialize dark mode based on system preference
- */
-function initializeDarkMode() {
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.body.classList.add('dark');
-  }
-  
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e: MediaQueryListEvent) => {
-    document.body.classList.toggle('dark', e.matches);
-  });
-}
 
 /**
  * Escape HTML to prevent XSS attacks
  */
 function escapeHtml(str: any): string {
-  if (typeof str !== "string") return str;
+  if (typeof str !== "string") return String(str);
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
@@ -146,7 +127,7 @@ function showEmpty(message: string = 'No data available.') {
 /* ============================================
    TEMPLATE-SPECIFIC FUNCTIONS
    ============================================
-   
+
    Add your template-specific utility functions here.
    Examples:
    - Data normalization functions
@@ -181,7 +162,7 @@ function getInitials(name: string | undefined): string {
  */
 function formatRelativeDate(dateString: string | undefined): string {
   if (!dateString) return '';
-  
+
   try {
     const date = new Date(dateString);
     const now = new Date();
@@ -192,7 +173,7 @@ function formatRelativeDate(dateString: string | undefined): string {
     const diffWeeks = Math.floor(diffDays / 7);
     const diffMonths = Math.floor(diffDays / 30);
     const diffYears = Math.floor(diffDays / 365);
-    
+
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins} ${diffMins === 1 ? 'minute' : 'minutes'} ago`;
     if (diffHours < 24) return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
@@ -210,12 +191,12 @@ function formatRelativeDate(dateString: string | undefined): string {
  */
 function formatDate(dateString: string | undefined): string {
   if (!dateString) return '';
-  
+
   try {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit'
@@ -235,7 +216,7 @@ function renderCommentCard(comment: any, index: number): string {
   const commentDate = formatRelativeDate(comment.comment_date);
   const numReactions = comment.num_reactions || 0;
   const taggedUsers = comment.tagged_users || [];
-  
+
   return `
     <div class="comment-card">
       <a href="${userUrl}" target="_blank" rel="noopener noreferrer" class="comment-author-link">
@@ -271,60 +252,59 @@ function renderCommentCard(comment: any, index: number): string {
 /* ============================================
    TEMPLATE-SPECIFIC RENDER FUNCTION
    ============================================
-   
+
    This is the main function you need to implement.
    It receives the data and renders it in the app.
-   
+
    Guidelines:
    1. Always validate data before rendering
    2. Use unwrapData() to handle nested structures
    3. Use escapeHtml() when inserting user content
-   4. Call notifySizeChanged() after rendering completes
-   5. Handle errors gracefully with try/catch
+   4. Handle errors gracefully with try/catch
    ============================================ */
 
 /**
  * Main render function - renders the LinkedIn post
  */
 function renderData(data: any) {
-  const app = document.getElementById('app');
-  if (!app) return;
-  
+  const appElement = document.getElementById('app');
+  if (!appElement) return;
+
   if (!data) {
-    debugLog("renderData: no data");
+    app.sendLog({ level: "debug", data: "renderData: no data", logger: APP_NAME });
     showEmpty('No LinkedIn post data received');
     return;
   }
 
-  debugLog("renderData: received", typeof data === "object" ? Object.keys(data) : typeof data);
+  app.sendLog({ level: "debug", data: `renderData: received ${typeof data === "object" ? Object.keys(data) : typeof data}`, logger: APP_NAME });
 
   try {
     // Unwrap nested structures
     const unwrapped = unwrapData(data);
-    debugLog("renderData: unwrapped keys", typeof unwrapped === "object" && unwrapped !== null ? Object.keys(unwrapped) : typeof unwrapped);
+    app.sendLog({ level: "debug", data: `renderData: unwrapped keys ${typeof unwrapped === "object" && unwrapped !== null ? Object.keys(unwrapped) : typeof unwrapped}`, logger: APP_NAME });
 
     // Bright Data format: body.content[0].text is a JSON string of post array
     const content = unwrapped?.body?.content;
     if (Array.isArray(content) && content.length > 0) {
       const first = content[0];
-      debugLog("renderData: body.content[0]", { type: first?.type, hasText: typeof first?.text === "string", textLength: typeof first?.text === "string" ? first.text.length : 0 });
+      app.sendLog({ level: "debug", data: `renderData: body.content[0] ${JSON.stringify({ type: first?.type, hasText: typeof first?.text === "string", textLength: typeof first?.text === "string" ? first.text.length : 0 })}`, logger: APP_NAME });
       if (first?.type === 'text' && typeof first.text === 'string') {
         try {
           const parsed = JSON.parse(first.text) as any[];
           if (Array.isArray(parsed) && parsed.length > 0) {
-            debugLog("renderData: Bright Data format OK, posts count =", parsed.length);
+            app.sendLog({ level: "debug", data: `renderData: Bright Data format OK, posts count = ${parsed.length}`, logger: APP_NAME });
             const post = parsed[0];
             return renderPost(post);
           }
-          debugLog("renderData: Bright Data parse OK but empty or not array", { isArray: Array.isArray(parsed), length: parsed?.length });
+          app.sendLog({ level: "debug", data: `renderData: Bright Data parse OK but empty or not array ${JSON.stringify({ isArray: Array.isArray(parsed), length: parsed?.length })}`, logger: APP_NAME });
         } catch (parseErr) {
-          debugLog("renderData: Bright Data JSON.parse failed", parseErr);
+          app.sendLog({ level: "debug", data: `renderData: Bright Data JSON.parse failed ${parseErr}`, logger: APP_NAME });
         }
       } else {
-        debugLog("renderData: body.content[0] not text block, skipping Bright Data path");
+        app.sendLog({ level: "debug", data: "renderData: body.content[0] not text block, skipping Bright Data path", logger: APP_NAME });
       }
     } else {
-      debugLog("renderData: no body.content array", { hasBody: !!unwrapped?.body, contentIsArray: Array.isArray(content), contentLength: content?.length });
+      app.sendLog({ level: "debug", data: `renderData: no body.content array ${JSON.stringify({ hasBody: !!unwrapped?.body, contentIsArray: Array.isArray(content), contentLength: content?.length })}`, logger: APP_NAME });
     }
 
     // Handle array response (body is an array)
@@ -343,21 +323,18 @@ function renderData(data: any) {
       post = unwrapped;
       source = "unwrapped";
     }
-    debugLog("renderData: post source =", source, "post =", post ? (post.id ?? post.url ?? "(no id/url)") : null);
+    app.sendLog({ level: "debug", data: `renderData: post source = ${source}, post = ${post ? (post.id ?? post.url ?? "(no id/url)") : null}`, logger: APP_NAME });
 
     if (!post) {
-      debugLog("renderData: no post found, unwrapped =", unwrapped);
+      app.sendLog({ level: "debug", data: `renderData: no post found, unwrapped = ${JSON.stringify(unwrapped)}`, logger: APP_NAME });
       showEmpty('No post data found');
       return;
     }
 
     renderPost(post);
   } catch (error: any) {
-    console.error('Render error:', error);
+    app.sendLog({ level: "error", data: `Render error: ${error}`, logger: APP_NAME });
     showError(`Error rendering LinkedIn post: ${error.message}`);
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
   }
 }
 
@@ -365,12 +342,12 @@ function renderData(data: any) {
  * Render a single post object into the app container
  */
 function renderPost(post: any) {
-  const app = document.getElementById('app');
-  if (!app) {
-    debugLog("renderPost: #app not found");
+  const appEl = document.getElementById('app');
+  if (!appEl) {
+    app.sendLog({ level: "debug", data: "renderPost: #app not found", logger: APP_NAME });
     return;
   }
-  debugLog("renderPost: rendering", { id: post.id, url: post.url, hasPostText: !!(post.post_text || post.post_text_html) });
+  app.sendLog({ level: "debug", data: `renderPost: rendering ${JSON.stringify({ id: post.id, url: post.url, hasPostText: !!(post.post_text || post.post_text_html) })}`, logger: APP_NAME });
 
     const url = post.url || '';
     const postId = post.id || '';
@@ -391,12 +368,12 @@ function renderPost(post: any) {
     const postType = post.post_type || 'post';
     const accountType = post.account_type || 'Person';
     const authorProfilePic = post.author_profile_pic || '';
-    
+
     // Extract user name from userUrl or use userId
     const userNameMatch = userUrl.match(/in\/([^?]+)/);
     const userName = userNameMatch ? userNameMatch[1].replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : userId;
-    
-    app.innerHTML = `
+
+    appEl.innerHTML = `
       <div class="linkedin-post-container">
         <!-- Post Card -->
         <div class="post-card">
@@ -404,7 +381,7 @@ function renderPost(post: any) {
           <div class="post-header">
             <a href="${escapeHtml(userUrl)}" target="_blank" rel="noopener noreferrer" class="author-link">
               <div class="author-avatar">
-                ${authorProfilePic 
+                ${authorProfilePic
                   ? `<img src="${escapeHtml(authorProfilePic)}" alt="${escapeHtml(userName)}" class="avatar-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />`
                   : ''
                 }
@@ -422,13 +399,13 @@ function renderPost(post: any) {
 
           <!-- Post Content -->
           <div class="post-content">
-            ${postTextHtml 
+            ${postTextHtml
               ? `<div class="post-text-html">${postTextHtml}</div>`
-              : postText 
+              : postText
                 ? `<div class="post-text">${escapeHtml(postText).replace(/\n/g, '<br/>')}</div>`
                 : ''
             }
-            
+
             ${images.length > 0 ? `
               <div class="post-images">
                 ${images.map((img: string, idx: number) => `
@@ -458,7 +435,7 @@ function renderPost(post: any) {
                 ` : ''}
               </div>
             ` : ''}
-            
+
             ${url ? `
               <div class="post-link-wrapper">
                 <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="post-link">
@@ -518,174 +495,12 @@ function renderPost(post: any) {
         </div>
       </div>
     `;
-    
-    // Notify host of size change after rendering completes
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
-}
-
-/* ============================================
-   MESSAGE HANDLER (Standardized MCP Protocol)
-   ============================================
-   
-   This handles all incoming messages from the MCP host.
-   You typically don't need to modify this section.
-   ============================================ */
-
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    return;
-  }
-  
-  // Handle requests that require responses (like ui/resource-teardown)
-  if (msg.id !== undefined && msg.method === 'ui/resource-teardown') {
-    const reason = msg.params?.reason || 'Resource teardown requested';
-    
-    // Clean up resources
-    // - Clear any timers
-    if (sizeChangeTimeout) {
-      clearTimeout(sizeChangeTimeout);
-      sizeChangeTimeout = null;
-    }
-    
-    // - Disconnect observers
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-    
-    // - Cancel any pending requests (if you track them)
-    // - Destroy chart instances, etc. (template-specific cleanup)
-    
-    // Send response to host
-    window.parent.postMessage({
-      jsonrpc: "2.0",
-      id: msg.id,
-      result: {}
-    }, '*');
-    
-    return; // Don't process further
-  }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
-  }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result': {
-      const data = msg.params?.structuredContent || msg.params;
-      debugLog("tool-result: data source =", msg.params?.structuredContent !== undefined ? "structuredContent" : "params", "keys =", data && typeof data === "object" ? Object.keys(data) : typeof data);
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-    }
-      
-    case 'ui/notifications/host-context-changed':
-      if (msg.params?.theme === 'dark') {
-        document.body.classList.add('dark');
-      } else if (msg.params?.theme === 'light') {
-        document.body.classList.remove('dark');
-      }
-      // Handle display mode changes
-      if (msg.params?.displayMode) {
-        handleDisplayModeChange(msg.params.displayMode);
-      }
-      // Re-render if needed (e.g., for charts that need theme updates)
-      // You may want to add logic here to re-render your content with new theme
-      break;
-      
-    case 'ui/notifications/tool-input':
-      // Tool input notification - Host MUST send this with complete tool arguments
-      const toolArguments = msg.params?.arguments;
-      if (toolArguments) {
-        // Store tool arguments for reference (may be needed for context)
-        // Template-specific: You can use this for initial rendering or context
-        // Example: Show loading state with input parameters
-        // Example: Store for later use in renderData()
-      }
-      break;
-      
-    case 'ui/notifications/tool-cancelled':
-      // Tool cancellation notification - Host MUST send this if tool is cancelled
-      const reason = msg.params?.reason || 'Tool execution was cancelled';
-      showError(`Operation cancelled: ${reason}`);
-      // Clean up any ongoing operations
-      // - Stop timers
-      // - Cancel pending requests
-      // - Reset UI state
-      break;
-      
-    case 'ui/notifications/initialized':
-      // Initialization notification (optional - handle if needed)
-      break;
-      
-    default:
-      // Unknown method - try to extract data as fallback
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      }
-  }
-});
-
-/* ============================================
-   MCP COMMUNICATION
-   ============================================
-   
-   Functions for communicating with the MCP host.
-   You typically don't need to modify this section.
-   ============================================ */
-
-let requestIdCounter = 1;
-function sendRequest(method: string, params: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const id = requestIdCounter++;
-    window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, '*');
-    
-    const listener = (event: MessageEvent) => {
-      if (event.data?.id === id) {
-        window.removeEventListener('message', listener);
-        if (event.data?.result) {
-          resolve(event.data.result);
-        } else if (event.data?.error) {
-          reject(new Error(event.data.error.message || 'Unknown error'));
-        }
-      }
-    };
-    window.addEventListener('message', listener);
-    
-    // Timeout after 5 seconds
-    setTimeout(() => {
-      window.removeEventListener('message', listener);
-      reject(new Error('Request timeout'));
-    }, 5000);
-  });
-}
-
-function sendNotification(method: string, params: any) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, '*');
-}
-
-// Only send size-changed / initialized after host has acknowledged connection
-let isConnected = false;
-function setConnected(value: boolean) {
-  isConnected = value;
 }
 
 /* ============================================
    DISPLAY MODE HANDLING
    ============================================
-   
+
    Handles switching between inline and fullscreen display modes.
    You may want to customize handleDisplayModeChange() to adjust
    your layout for fullscreen mode.
@@ -712,150 +527,110 @@ function handleDisplayModeChange(mode: string) {
       (container as HTMLElement).style.padding = '';
     }
   }
-  // Notify host of size change after mode change
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
 }
-
-function requestDisplayMode(mode: string): Promise<any> {
-  return sendRequest('ui/request-display-mode', { mode: mode })
-    .then(result => {
-      if (result?.mode) {
-        handleDisplayModeChange(result.mode);
-      }
-      return result;
-    })
-    .catch(err => {
-      console.warn('Failed to request display mode:', err);
-      throw err;
-    });
-}
-
-// Make function globally accessible for testing/debugging
-(window as any).requestDisplayMode = requestDisplayMode;
 
 /* ============================================
-   SIZE CHANGE NOTIFICATIONS
-   ============================================
-   
-   Notifies the host when the content size changes.
-   This is critical for proper iframe sizing.
-   You typically don't need to modify this section.
+   HOST CONTEXT HANDLER
    ============================================ */
 
-function notifySizeChanged() {
-  if (!isConnected) return;
-  const width = document.body.scrollWidth || document.documentElement.scrollWidth;
-  const height = document.body.scrollHeight || document.documentElement.scrollHeight;
-  
-  sendNotification('ui/notifications/size-changed', {
-    width: width,
-    height: height
-  });
-}
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
 
-// Debounce function to avoid too many notifications
-let sizeChangeTimeout: number | null = null;
-function debouncedNotifySizeChanged() {
-  if (sizeChangeTimeout) {
-    clearTimeout(sizeChangeTimeout);
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
   }
-  sizeChangeTimeout = setTimeout(() => {
-    notifySizeChanged();
-  }, 100); // Wait 100ms after last change
-}
 
-// Use ResizeObserver to detect size changes
-let resizeObserver: ResizeObserver | null = null;
-function setupSizeObserver() {
-  if (typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => {
-      debouncedNotifySizeChanged();
-    });
-    resizeObserver.observe(document.body);
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
+  }
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
+  }
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
   } else {
-    // Fallback: use window resize and mutation observer
-    window.addEventListener('resize', debouncedNotifySizeChanged);
-    const mutationObserver = new MutationObserver(debouncedNotifySizeChanged);
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['style', 'class']
-    });
+    document.body.classList.remove("fullscreen-mode");
   }
-  // Initial size is sent after init completes (in init .then())
 }
 
 /* ============================================
-   INITIALIZATION
-   ============================================
-   
-   Initializes the MCP app and sets up all required features.
-   You typically don't need to modify this section.
+   SDK APP INSTANCE (STANDALONE MODE)
    ============================================ */
 
-// Initialize MCP App - REQUIRED for MCP Apps protocol
-sendRequest('ui/initialize', {
-  appCapabilities: {
-    availableDisplayModes: ["inline", "fullscreen"]
-  },
-  clientInfo: {
-    name: APP_NAME,
-    version: APP_VERSION
-  },
-  protocolVersion: PROTOCOL_VERSION
-}).then((result: any) => {
-  // Mark connected so size-changed and other notifications are allowed
-  setConnected(true);
-  // Extract host context from initialization result
-  const ctx = result.hostContext || result;
-  
-  // Extract host capabilities for future use
-  const hostCapabilities = result.hostCapabilities;
-  
-  // Send initialized notification after successful initialization
-  sendNotification('ui/notifications/initialized', {});
-  // Send initial size after a short delay so host can size the iframe
-  setTimeout(() => notifySizeChanged(), 100);
-  // Apply theme from host context
-  if (ctx?.theme === 'dark') {
-    document.body.classList.add('dark');
-  } else if (ctx?.theme === 'light') {
-    document.body.classList.remove('dark');
-  }
-  // Handle display mode from host context
-  if (ctx?.displayMode) {
-    handleDisplayModeChange(ctx.displayMode);
-  }
-  // Handle container dimensions if provided
-  if (ctx?.containerDimensions) {
-    const dims = ctx.containerDimensions;
-    if (dims.width) {
-      document.body.style.width = dims.width + 'px';
-    }
-    if (dims.height) {
-      document.body.style.height = dims.height + 'px';
-    }
-    if (dims.maxWidth) {
-      document.body.style.maxWidth = dims.maxWidth + 'px';
-    }
-    if (dims.maxHeight) {
-      document.body.style.maxHeight = dims.maxHeight + 'px';
-    }
-  }
-}).catch(err => {
-  console.warn('Failed to initialize MCP App:', err);
-  // Fallback to system preference if initialization fails
-});
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
 
-initializeDarkMode();
+app.onteardown = async () => {
+  app.sendLog({ level: "info", data: "Resource teardown requested", logger: APP_NAME });
+  return {};
+};
 
-// Setup size observer to notify host of content size changes
-// This is critical for the host to properly size the iframe
-setupSizeObserver();
+app.ontoolinput = (params) => {
+  app.sendLog({ level: "info", data: `Tool input received: ${JSON.stringify(params.arguments)}`, logger: APP_NAME });
+};
 
-// Export empty object to ensure this file is treated as an ES module
-// This prevents TypeScript from treating top-level declarations as global
+app.ontoolresult = (params) => {
+  app.sendLog({ level: "info", data: "Tool result received", logger: APP_NAME });
+
+  // Check for tool execution errors
+  if (params.isError) {
+    app.sendLog({ level: "error", data: `Tool execution failed: ${JSON.stringify(params.content)}`, logger: APP_NAME });
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    app.sendLog({ level: "warning", data: `Tool result received but no data found: ${JSON.stringify(params)}`, logger: APP_NAME });
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  app.sendLog({ level: "info", data: `Tool cancelled: ${reason}`, logger: APP_NAME });
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  app.sendLog({ level: "error", data: `App error: ${error}`, logger: APP_NAME });
+};
+
+app.onhostcontextchanged = (ctx) => {
+  app.sendLog({ level: "info", data: `Host context changed: ${JSON.stringify(ctx)}`, logger: APP_NAME });
+  handleHostContextChanged(ctx);
+};
+
+/* ============================================
+   CONNECT TO HOST
+   ============================================ */
+
+app
+  .connect()
+  .then(() => {
+    app.sendLog({ level: "info", data: "MCP App connected to host", logger: APP_NAME });
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    app.sendLog({ level: "error", data: `Failed to connect to MCP host: ${error}`, logger: APP_NAME });
+  });
+
 export {};

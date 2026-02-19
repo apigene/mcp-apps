@@ -32,6 +32,11 @@ let templates = [];
 let selectedUiElements = new Set();
 let selectedMcpFeatures = new Set();
 
+// Standalone mode support
+let initializeHandled = false;
+let pendingToolResult = null;
+let pendingMockSource = null;
+
 function initMcpCopy() {
   const urlEl = document.getElementById("mcp-server-url");
   const btn = document.getElementById("mcp-server-copy");
@@ -88,29 +93,76 @@ function postToFrame(payload) {
   frameEl.contentWindow.postMessage(payload, "*");
 }
 
-async function sendInitialEvents(templateName) {
-  const { payload, source } = await fetchMockPayload(templateName);
+/**
+ * Handle messages from iframe (standalone mode apps)
+ * Standalone apps send ui/initialize request and expect a response
+ */
+function handleFrameMessage(event) {
+  const msg = event.data;
+  if (!msg || msg.jsonrpc !== "2.0") return;
 
-  postToFrame({
-    jsonrpc: "2.0",
-    method: "ui/notifications/host-context-changed",
-    params: {
-      theme: "light",
-      displayMode: "inline",
-    },
-  });
+  // Handle ui/initialize request from standalone apps
+  if (msg.method === "ui/initialize" && msg.id !== undefined) {
+    console.log("Received ui/initialize from app, id:", msg.id);
+    initializeHandled = true;
 
-  postToFrame({
-    jsonrpc: "2.0",
-    method: "ui/notifications/tool-result",
-    params: {
-      structuredContent: payload,
-      content: [{ type: "text", text: "MCP Apps Playground mock event" }],
-    },
-  });
+    // Respond to ui/initialize with full McpUiInitializeResult
+    postToFrame({
+      jsonrpc: "2.0",
+      id: msg.id,
+      result: {
+        protocolVersion: "2026-01-26",
+        hostInfo: {
+          name: "MCP Apps Playground",
+          version: "1.0.0",
+        },
+        hostCapabilities: {
+          openLinks: {},
+          logging: {},
+        },
+        hostContext: {
+          theme: "light",
+          displayMode: "inline",
+          availableDisplayModes: ["inline", "fullscreen"],
+          containerDimensions: { width: 800, maxHeight: 600 },
+        },
+      },
+    });
 
-  return source;
+    // Send tool-result after initialization completes
+    if (pendingToolResult) {
+      setTimeout(() => {
+        console.log("Sending tool-result to app:", pendingToolResult);
+        postToFrame(pendingToolResult);
+        const selected = templates.find((t) => t.name === selectEl.value);
+        if (selected && pendingMockSource) {
+          setStatus(
+            `Selected: ${selected.name}\nStatus: preview loaded + mock events sent\nMock source: ${pendingMockSource}`,
+          );
+        }
+        pendingToolResult = null;
+        pendingMockSource = null;
+      }, 100);
+    } else {
+      console.warn("No pending tool-result to send!");
+    }
+    return;
+  }
+
+  // Log size-changed notifications
+  if (msg.method === "ui/notifications/size-changed") {
+    console.log("App resized:", msg.params);
+    return;
+  }
+
+  // Log initialized notification
+  if (msg.method === "ui/notifications/initialized") {
+    console.log("App initialized");
+    return;
+  }
 }
+
+window.addEventListener("message", handleFrameMessage);
 
 const REPO_TEMPLATES = "https://github.com/apigene/mcp-apps/tree/main/examples";
 
@@ -235,6 +287,11 @@ async function loadSelectedTemplate() {
   const selected = templates.find((template) => template.name === selectEl.value);
   if (!selected) return;
 
+  // Reset state
+  initializeHandled = false;
+  pendingToolResult = null;
+  pendingMockSource = null;
+
   setStatus(`Selected: ${selected.name}\nPreparing template...`);
 
   const prepareResult = await prepareTemplate(selected.name);
@@ -242,27 +299,35 @@ async function loadSelectedTemplate() {
 
   if (prepareResult.built) {
     const method = prepareResult.installed ? "install + build" : "build";
-    setStatus(`Selected: ${selected.name}\nPrepared via ${method}\nLoading preview...`);
+    setStatus(`Selected: ${selected.name}\nPrepared via ${method}\nLoading mock data...`);
   } else {
-    setStatus(`Selected: ${selected.name}\nAlready built\nLoading preview...`);
+    setStatus(`Selected: ${selected.name}\nAlready built\nLoading mock data...`);
   }
+
+  // Fetch mock payload BEFORE loading iframe
+  try {
+    const { payload, source } = await fetchMockPayload(selected.name);
+    // structuredContent must be an object, wrap arrays
+    const structuredContent = Array.isArray(payload) ? { items: payload } : payload;
+    pendingToolResult = {
+      jsonrpc: "2.0",
+      method: "ui/notifications/tool-result",
+      params: {
+        structuredContent,
+        content: [{ type: "text", text: "MCP Apps Playground mock event" }],
+      },
+    };
+    pendingMockSource = source;
+    console.log("Mock payload ready, loading iframe...");
+  } catch (error) {
+    console.error("Failed to load mock payload:", error);
+    setStatus(`Selected: ${selected.name}\nStatus: mock payload failed`);
+  }
+
+  // Now load the iframe - app will send ui/initialize and we'll have payload ready
+  setStatus(`Selected: ${selected.name}\nLoading preview...`);
   frameEl.src = `/template/${selected.distPath.replace(/^\//, "")}`;
 }
-
-frameEl.addEventListener("load", async () => {
-  const selected = templates.find((template) => template.name === selectEl.value);
-  if (!selected) return;
-
-  try {
-    const source = await sendInitialEvents(selected.name);
-    setStatus(
-      `Selected: ${selected.name}\nStatus: preview loaded + mock events sent\nMock source: ${source}`,
-    );
-  } catch (error) {
-    console.error(error);
-    setStatus(`Selected: ${selected.name}\nStatus: preview loaded, mock payload failed`);
-  }
-});
 
 selectEl.addEventListener("change", () => {
   updateSourceLink();

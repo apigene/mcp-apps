@@ -1,8 +1,10 @@
 /* ============================================
-   AHREFS BACKLINKS MCP APP (SDK VERSION)
+   AHREFS BACKLINKS MCP APP (STANDALONE MODE)
    ============================================
+
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   in standalone mode with app.connect() for direct host communication.
    Displays Ahrefs Site Explorer all-backlinks API response.
-   Uses body.backlinks only; search, filter, and sort in-app.
    ============================================ */
 
 import {
@@ -337,53 +339,113 @@ function renderData(data: any) {
     bindControls();
     renderTable();
   } catch (error: any) {
-    console.error("Render error:", error);
+    app.sendLog({ level: "error", data: `Render error: ${JSON.stringify(error)}`, logger: APP_NAME });
     showError(`Error rendering data: ${error.message}`);
   }
 }
 
 /* ============================================
-   SDK & MESSAGE HANDLING
+   HOST CONTEXT HANDLER
    ============================================ */
 
-const app = new App({ name: APP_NAME, version: APP_VERSION });
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
 
-window.addEventListener("message", (event: MessageEvent) => {
-  const msg = event.data;
-  if (!msg) return;
-
-  if (msg.jsonrpc === "2.0") {
-    if (msg.method === "ui/notifications/tool-result" && msg.params) {
-      const data = msg.params.structuredContent || msg.params;
-      renderData(data);
-      return;
-    }
-
-    if (msg.method === "ui/notifications/host-context-changed" && msg.params) {
-      if (msg.params.theme) applyDocumentTheme(msg.params.theme);
-      if (msg.params.styles?.css?.fonts) applyHostFonts(msg.params.styles.css.fonts);
-      if (msg.params.styles?.variables) applyHostStyleVariables(msg.params.styles.variables);
-      if (msg.params.displayMode === "fullscreen") {
-        document.body.classList.add("fullscreen-mode");
-      } else {
-        document.body.classList.remove("fullscreen-mode");
-      }
-      return;
-    }
-
-    if (msg.method === "ui/notifications/tool-cancelled") {
-      showError(`Cancelled: ${msg.params?.reason || "Unknown"}`);
-      return;
-    }
-
-    if (msg.id !== undefined && msg.method === "ui/resource-teardown") {
-      window.parent.postMessage({ jsonrpc: "2.0", id: msg.id, result: {} }, "*");
-      return;
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
     }
   }
-});
 
-const cleanupResize = app.setupSizeChangedNotifications();
-window.addEventListener("beforeunload", () => cleanupResize());
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
+  }
 
-console.info("Ahrefs Backlinks MCP App initialized");
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
+  }
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
+}
+
+/* ============================================
+   SDK APP INSTANCE (STANDALONE MODE)
+   ============================================ */
+
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  app.sendLog({ level: "info", data: "Resource teardown requested", logger: APP_NAME });
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  app.sendLog({ level: "info", data: `Tool input received: ${JSON.stringify(params.arguments)}`, logger: APP_NAME });
+};
+
+app.ontoolresult = (params) => {
+  app.sendLog({ level: "info", data: "Tool result received", logger: APP_NAME });
+
+  // Check for tool execution errors
+  if (params.isError) {
+    app.sendLog({ level: "error", data: `Tool execution failed: ${JSON.stringify(params.content)}`, logger: APP_NAME });
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    app.sendLog({ level: "warning", data: `Tool result received but no data found: ${JSON.stringify(params)}`, logger: APP_NAME });
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  app.sendLog({ level: "info", data: `Tool cancelled: ${reason}`, logger: APP_NAME });
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  app.sendLog({ level: "error", data: `App error: ${JSON.stringify(error)}`, logger: APP_NAME });
+};
+
+app.onhostcontextchanged = (ctx) => {
+  app.sendLog({ level: "info", data: `Host context changed: ${JSON.stringify(ctx)}`, logger: APP_NAME });
+  handleHostContextChanged(ctx);
+};
+
+/* ============================================
+   CONNECT TO HOST
+   ============================================ */
+
+app
+  .connect()
+  .then(() => {
+    app.sendLog({ level: "info", data: "MCP App connected to host", logger: APP_NAME });
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    app.sendLog({ level: "error", data: `Failed to connect to MCP host: ${JSON.stringify(error)}`, logger: APP_NAME });
+  });
+
+export {};

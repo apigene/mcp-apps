@@ -1,10 +1,33 @@
 /* ============================================
-   GOOGLE SHEET MCP APP
+   GOOGLE SHEET MCP APP (STANDALONE MODE)
    ============================================
-   
-   Displays Google Sheets embedded in an iframe.
-   Extracts spreadsheet ID from API response/URL and embeds the sheet.
+
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   in standalone mode with app.connect().
+
    ============================================ */
+
+/* ============================================
+   SDK IMPORTS
+   ============================================ */
+
+import {
+  App,
+  applyDocumentTheme,
+  applyHostFonts,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
+
+// Import styles (will be bundled by Vite)
+import "./global.css";
+import "./mcp-app.css";
+
+/* ============================================
+   APP CONFIGURATION
+   ============================================ */
+
+const APP_NAME = "Google Sheet";
+const APP_VERSION = "1.0.0";
 
 /* ============================================
    COMMON UTILITY FUNCTIONS
@@ -22,58 +45,49 @@ function extractData(msg: any) {
 
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  // Keep the full data structure for spreadsheet ID extraction
-  // Don't unwrap if it contains message with input/request info
-  if (data.message && (data.message.input || data.message.request)) {
-    return data; // Keep full structure to access input/request
-  }
-  
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
-    // Return message object to preserve input/request fields
-    return data.message;
+    return data.message.template_data;
   }
-  
   if (data.message?.response_content) {
-    // Return message object to preserve input/request fields
-    return data.message;
+    return data.message.response_content;
   }
-  
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
+
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  if (Array.isArray(data)) {
-    return { rows: data };
+
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
-  
+
   return data;
 }
 
-function initializeDarkMode() {
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.body.classList.add('dark');
-  }
-  
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e: MediaQueryListEvent) => {
-    document.body.classList.toggle('dark', e.matches);
-  });
-}
 
 function escapeHtml(str: any): string {
-  if (typeof str !== "string") return str;
+  if (typeof str !== "string") return String(str);
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
@@ -103,29 +117,29 @@ function showEmpty(message: string = 'No sheet data available.') {
  */
 function extractSpreadsheetId(url: string): string | null {
   if (!url) return null;
-  
+
   try {
     // Match pattern: /spreadsheets/{ID}/
     const match = url.match(/\/spreadsheets\/([a-zA-Z0-9_-]+)\//);
     if (match && match[1]) {
       return match[1];
     }
-    
+
     // Also try without trailing slash
     const match2 = url.match(/\/spreadsheets\/([a-zA-Z0-9_-]+)/);
     if (match2 && match2[1]) {
       return match2[1];
     }
   } catch (error) {
-    console.error('Error extracting spreadsheet ID:', error);
+    app.sendLog({ level: "error", data: `Error extracting spreadsheet ID: ${error}`, logger: APP_NAME });
   }
-  
+
   return null;
 }
 
 /**
  * Extract spreadsheet ID from various data formats
- * 
+ *
  * The data structure from apigene-mcp-next can be:
  * - Direct: { status_code, body, ... }
  * - Nested in message: { message: { status_code, response_content, template_data, input, request, ... } }
@@ -134,70 +148,70 @@ function extractSpreadsheetId(url: string): string | null {
 function getSpreadsheetId(data: any): string | null {
   // First, check if data is nested in message structure (from run-action.html unwrapping)
   // The message might contain: status_code, response_content, template_data, input, request, etc.
-  
+
   // Try to get from message.input.url (if backend includes input in message)
   if (data.message?.input?.url) {
     const id = extractSpreadsheetId(data.message.input.url);
     if (id) return id;
   }
-  
+
   // Try to get from message.request.url (if backend includes request in message)
   if (data.message?.request?.url) {
     const id = extractSpreadsheetId(data.message.request.url);
     if (id) return id;
   }
-  
+
   // Try to get from input at root level
   if (data.input?.url) {
     const id = extractSpreadsheetId(data.input.url);
     if (id) return id;
   }
-  
+
   // Try to get from request URL (most common case)
   if (data.request?.url) {
     const id = extractSpreadsheetId(data.request.url);
     if (id) return id;
   }
-  
+
   // Try to get from URL field at root level
   if (data.url) {
     const id = extractSpreadsheetId(data.url);
     if (id) return id;
   }
-  
+
   // Try to get from body if it contains URL
   if (data.body?.url) {
     const id = extractSpreadsheetId(data.body.url);
     if (id) return id;
   }
-  
+
   // Try to get from response body if it contains URL
   if (data.response?.body?.url) {
     const id = extractSpreadsheetId(data.response.body.url);
     if (id) return id;
   }
-  
+
   // Try to get from response URL
   if (data.response?.url) {
     const id = extractSpreadsheetId(data.response.url);
     if (id) return id;
   }
-  
+
   // Try to get from method/url at root (some APIs structure it this way)
   if (data.method && data.url) {
     const id = extractSpreadsheetId(data.url);
     if (id) return id;
   }
-  
+
   // Deep search: recursively search for any URL field containing 'spreadsheets'
   function deepSearch(obj: any, depth: number = 0): string | null {
     if (depth > 5) return null; // Prevent infinite recursion
-    
+
     if (typeof obj === 'string' && obj.includes('spreadsheets')) {
       const id = extractSpreadsheetId(obj);
       if (id) return id;
     }
-    
+
     if (typeof obj === 'object' && obj !== null) {
       // First, check common URL field names
       const urlFields = ['url', 'requestUrl', 'request_url', 'apiUrl', 'api_url', 'endpoint'];
@@ -207,7 +221,7 @@ function getSpreadsheetId(data: any): string | null {
           if (id) return id;
         }
       }
-      
+
       // Then search recursively
       for (const key in obj) {
         if (key.toLowerCase().includes('url') || key.toLowerCase().includes('request')) {
@@ -215,20 +229,20 @@ function getSpreadsheetId(data: any): string | null {
           if (id) return id;
         }
       }
-      
+
       // Also search all values
       for (const key in obj) {
         const id = deepSearch(obj[key], depth + 1);
         if (id) return id;
       }
     }
-    
+
     return null;
   }
-  
+
   const deepId = deepSearch(data);
   if (deepId) return deepId;
-  
+
   return null;
 }
 
@@ -237,7 +251,7 @@ function getSpreadsheetId(data: any): string | null {
  */
 function buildEmbedUrl(spreadsheetId: string, options: { gid?: string; widget?: boolean } = {}): string {
   let url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/preview`;
-  
+
   const params: string[] = [];
   if (options.gid) {
     params.push(`gid=${options.gid}`);
@@ -245,11 +259,11 @@ function buildEmbedUrl(spreadsheetId: string, options: { gid?: string; widget?: 
   if (options.widget !== undefined) {
     params.push(`widget=${options.widget}`);
   }
-  
+
   if (params.length > 0) {
     url += '?' + params.join('&');
   }
-  
+
   return url;
 }
 
@@ -258,22 +272,22 @@ function buildEmbedUrl(spreadsheetId: string, options: { gid?: string; widget?: 
  */
 function extractSheetData(data: any): any {
   const unwrapped = unwrapData(data);
-  
+
   // Handle API response format: { status_code: 200, body: {...} }
   if (unwrapped?.body) {
     return unwrapped.body;
   }
-  
+
   // Handle direct response body
   if (unwrapped?.response?.body) {
     return unwrapped.response.body;
   }
-  
+
   // Handle direct sheet data
   if (unwrapped?.range || unwrapped?.values) {
     return unwrapped;
   }
-  
+
   return unwrapped;
 }
 
@@ -283,10 +297,10 @@ function extractSheetData(data: any): any {
 function setupTableInteractivity() {
   const table = document.getElementById('sheetTable') as HTMLTableElement;
   if (!table) return;
-  
+
   const cells = table.querySelectorAll('td, th');
   let selectedCell: HTMLElement | null = null;
-  
+
   // Cell selection
   cells.forEach(cell => {
     cell.addEventListener('click', (e) => {
@@ -294,13 +308,13 @@ function setupTableInteractivity() {
       if (selectedCell) {
         selectedCell.classList.remove('selected');
       }
-      
+
       // Add selection to clicked cell
       const target = e.target as HTMLElement;
       target.classList.add('selected');
       selectedCell = target;
     });
-    
+
     // Show full text on hover for truncated cells
     cell.addEventListener('mouseenter', (e) => {
       const target = e.target as HTMLElement;
@@ -310,7 +324,7 @@ function setupTableInteractivity() {
       }
     });
   });
-  
+
   // Column header hover effect
   const headers = table.querySelectorAll('th');
   headers.forEach(header => {
@@ -323,7 +337,7 @@ function setupTableInteractivity() {
         });
       }
     });
-    
+
     header.addEventListener('mouseleave', () => {
       const colIndex = header.getAttribute('data-col');
       if (colIndex !== null) {
@@ -334,16 +348,16 @@ function setupTableInteractivity() {
       }
     });
   });
-  
+
   // Keyboard navigation
   document.addEventListener('keydown', (e) => {
     if (!selectedCell) return;
-    
+
     const currentRow = parseInt(selectedCell.getAttribute('data-row') || '0');
     const currentCol = parseInt(selectedCell.getAttribute('data-col') || '0');
     let newRow = currentRow;
     let newCol = currentCol;
-    
+
     switch (e.key) {
       case 'ArrowUp':
         e.preventDefault();
@@ -364,7 +378,7 @@ function setupTableInteractivity() {
       default:
         return;
     }
-    
+
     const newCell = table.querySelector(`td[data-row="${newRow}"][data-col="${newCol}"]`) as HTMLElement;
     if (newCell) {
       selectedCell.classList.remove('selected');
@@ -373,7 +387,7 @@ function setupTableInteractivity() {
       selectedCell = newCell;
     }
   });
-  
+
   // Copy cell value on double click
   cells.forEach(cell => {
     cell.addEventListener('dblclick', async (e) => {
@@ -389,7 +403,7 @@ function setupTableInteractivity() {
             target.style.backgroundColor = originalBg;
           }, 200);
         } catch (err) {
-          console.warn('Failed to copy:', err);
+          app.sendLog({ level: "warning", data: `Failed to copy: ${err}`, logger: APP_NAME });
         }
       }
     });
@@ -401,9 +415,9 @@ function setupTableInteractivity() {
    ============================================ */
 
 function renderData(data: any) {
-  const app = document.getElementById('app');
-  if (!app) return;
-  
+  const appElement = document.getElementById('app');
+  if (!appElement) return;
+
   if (!data) {
     showEmpty('No sheet data received');
     return;
@@ -412,11 +426,11 @@ function renderData(data: any) {
   try {
     // First, unwrap data but preserve message structure for request info
     const unwrapped = unwrapData(data);
-    
+
     // Extract spreadsheet ID - try multiple methods
     // Check both unwrapped data and original data to catch all cases
     let spreadsheetId = getSpreadsheetId(unwrapped) || getSpreadsheetId(data);
-    
+
     // If not found, try extracting from the entire data structure as JSON string
     if (!spreadsheetId) {
       try {
@@ -429,24 +443,24 @@ function renderData(data: any) {
         // Ignore JSON stringify errors
       }
     }
-    
+
     // Log for debugging
     if (!spreadsheetId) {
-      console.log('Data structure received:', JSON.stringify(data, null, 2).substring(0, 500));
+      app.sendLog({ level: "debug", data: `Data structure received: ${JSON.stringify(data, null, 2).substring(0, 500)}`, logger: APP_NAME });
     }
-    
+
     // Extract sheet data for metadata display
     // Use unwrapped data for sheet content, but keep original for ID extraction
     const sheetData = extractSheetData(unwrapped || data);
     const range = sheetData?.range || 'Sheet';
     const rowCount = sheetData?.values?.length || 0;
     const values = sheetData?.values || [];
-    
+
     // If we have spreadsheet ID, render as iframe
     if (spreadsheetId) {
       const embedUrl = buildEmbedUrl(spreadsheetId);
-      
-      app.innerHTML = `
+
+      appElement.innerHTML = `
         <div class="container">
           <div class="sheet-header">
             <div class="sheet-info">
@@ -459,8 +473,8 @@ function renderData(data: any) {
             </a>
           </div>
           <div class="sheet-container">
-            <iframe 
-              class="sheet-iframe" 
+            <iframe
+              class="sheet-iframe"
               src="${escapeHtml(embedUrl)}"
               frameborder="0"
               allowfullscreen
@@ -475,8 +489,8 @@ function renderData(data: any) {
       // This allows users to at least see the data
       const headers = values.length > 0 ? values[0] : [];
       const rows = values.slice(1);
-      
-      app.innerHTML = `
+
+      appElement.innerHTML = `
         <div class="container">
           <div class="sheet-header">
             <div class="sheet-info">
@@ -493,7 +507,7 @@ function renderData(data: any) {
               ${headers.length > 0 ? `
                 <thead>
                   <tr>
-                    ${headers.map((header: any, idx: number) => 
+                    ${headers.map((header: any, idx: number) =>
                       `<th data-col="${idx}" title="${escapeHtml(String(header || ''))}">${escapeHtml(String(header || ''))}</th>`
                     ).join('')}
                   </tr>
@@ -513,242 +527,121 @@ function renderData(data: any) {
           </div>
         </div>
       `;
-      
+
       // Add interactive features
       setupTableInteractivity();
     }
-    
-    // Notify host of size change after rendering completes
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
-    
+
   } catch (error: any) {
-    console.error('Render error:', error);
+    app.sendLog({ level: "error", data: `Render error: ${error}`, logger: APP_NAME });
     showError(`Error rendering sheet: ${error.message}`);
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
   }
 }
 
 /* ============================================
-   MESSAGE HANDLER (Standardized MCP Protocol)
+   HOST CONTEXT HANDLER
    ============================================ */
 
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
+  }
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
+  }
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
+  }
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
+}
+
+/* ============================================
+   SDK APP INSTANCE (STANDALONE MODE)
+   ============================================ */
+
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  app.sendLog({ level: "info", data: "Resource teardown requested", logger: APP_NAME });
+  // Add any cleanup logic specific to this app
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  app.sendLog({ level: "info", data: `Tool input received: ${JSON.stringify(params.arguments)}`, logger: APP_NAME });
+};
+
+app.ontoolresult = (params) => {
+  app.sendLog({ level: "info", data: "Tool result received", logger: APP_NAME });
+
+  // Check for tool execution errors
+  if (params.isError) {
+    app.sendLog({ level: "error", data: `Tool execution failed: ${JSON.stringify(params.content)}`, logger: APP_NAME });
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
     return;
   }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
-  }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      const data = msg.params?.structuredContent || msg.params;
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      if (msg.params?.theme === 'dark') {
-        document.body.classList.add('dark');
-      } else if (msg.params?.theme === 'light') {
-        document.body.classList.remove('dark');
-      }
-      if (msg.params?.displayMode) {
-        handleDisplayModeChange(msg.params.displayMode);
-      }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      break;
-      
-    case 'ui/notifications/initialized':
-      break;
-      
-    default:
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      }
-  }
-});
 
-/* ============================================
-   MCP COMMUNICATION
-   ============================================ */
-
-let requestIdCounter = 1;
-function sendRequest(method: string, params: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const id = requestIdCounter++;
-    window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, '*');
-    
-    const listener = (event: MessageEvent) => {
-      if (event.data?.id === id) {
-        window.removeEventListener('message', listener);
-        if (event.data?.result) {
-          resolve(event.data.result);
-        } else if (event.data?.error) {
-          reject(new Error(event.data.error.message || 'Unknown error'));
-        }
-      }
-    };
-    window.addEventListener('message', listener);
-    
-    // Reduced timeout for initialization to fail faster and not block
-    const timeout = method === 'ui/initialize' ? 1000 : 5000;
-    setTimeout(() => {
-      window.removeEventListener('message', listener);
-      reject(new Error('Request timeout'));
-    }, timeout);
-  });
-}
-
-function sendNotification(method: string, params: any) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, '*');
-}
-
-/* ============================================
-   DISPLAY MODE HANDLING
-   ============================================ */
-
-let currentDisplayMode = 'inline';
-
-function handleDisplayModeChange(mode: string) {
-  currentDisplayMode = mode;
-  if (mode === 'fullscreen') {
-    document.body.classList.add('fullscreen-mode');
-    const container = document.querySelector('.container');
-    if (container) {
-      (container as HTMLElement).style.maxWidth = '100%';
-      (container as HTMLElement).style.padding = '20px';
-    }
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
   } else {
-    document.body.classList.remove('fullscreen-mode');
-    const container = document.querySelector('.container');
-    if (container) {
-      (container as HTMLElement).style.maxWidth = '';
-      (container as HTMLElement).style.padding = '';
-    }
+    app.sendLog({ level: "warning", data: `Tool result received but no data found: ${JSON.stringify(params)}`, logger: APP_NAME });
+    showEmpty("No data received");
   }
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
+};
 
-function requestDisplayMode(mode: string): Promise<any> {
-  return sendRequest('ui/request-display-mode', { mode: mode })
-    .then(result => {
-      if (result?.mode) {
-        handleDisplayModeChange(result.mode);
-      }
-      return result;
-    })
-    .catch(err => {
-      console.warn('Failed to request display mode:', err);
-      throw err;
-    });
-}
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  app.sendLog({ level: "info", data: `Tool cancelled: ${reason}`, logger: APP_NAME });
+  showError(`Operation cancelled: ${reason}`);
+};
 
-(window as any).requestDisplayMode = requestDisplayMode;
+app.onerror = (error) => {
+  app.sendLog({ level: "error", data: `App error: ${error}`, logger: APP_NAME });
+};
+
+app.onhostcontextchanged = (ctx) => {
+  app.sendLog({ level: "info", data: `Host context changed: ${JSON.stringify(ctx)}`, logger: APP_NAME });
+  handleHostContextChanged(ctx);
+};
 
 /* ============================================
-   SIZE CHANGE NOTIFICATIONS
+   CONNECT TO HOST
    ============================================ */
 
-function notifySizeChanged() {
-  const width = document.body.scrollWidth || document.documentElement.scrollWidth;
-  const height = document.body.scrollHeight || document.documentElement.scrollHeight;
-  
-  sendNotification('ui/notifications/size-changed', {
-    width: width,
-    height: height
+app
+  .connect()
+  .then(() => {
+    app.sendLog({ level: "info", data: "MCP App connected to host", logger: APP_NAME });
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    app.sendLog({ level: "error", data: `Failed to connect to MCP host: ${error}`, logger: APP_NAME });
   });
-}
 
-let sizeChangeTimeout: NodeJS.Timeout | null = null;
-function debouncedNotifySizeChanged() {
-  if (sizeChangeTimeout) {
-    clearTimeout(sizeChangeTimeout);
-  }
-  sizeChangeTimeout = setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
-
-let resizeObserver: ResizeObserver | null = null;
-function setupSizeObserver() {
-  if (typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => {
-      debouncedNotifySizeChanged();
-    });
-    resizeObserver.observe(document.body);
-  } else {
-    window.addEventListener('resize', debouncedNotifySizeChanged);
-    const mutationObserver = new MutationObserver(debouncedNotifySizeChanged);
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['style', 'class']
-    });
-  }
-  
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
-
-/* ============================================
-   INITIALIZATION
-   ============================================ */
-
-// Try to initialize, but don't block if it fails (e.g., in preview/testing environments)
-sendRequest('ui/initialize', {
-  appCapabilities: {
-    availableDisplayModes: ["inline", "fullscreen"]
-  }
-}).then((ctx: any) => {
-  if (ctx?.theme === 'dark') {
-    document.body.classList.add('dark');
-  } else if (ctx?.theme === 'light') {
-    document.body.classList.remove('dark');
-  }
-  if (ctx?.displayMode) {
-    handleDisplayModeChange(ctx.displayMode);
-  }
-  if (ctx?.containerDimensions) {
-    const dims = ctx.containerDimensions;
-    if (dims.width) {
-      document.body.style.width = dims.width + 'px';
-    }
-    if (dims.height) {
-      document.body.style.height = dims.height + 'px';
-    }
-    if (dims.maxWidth) {
-      document.body.style.maxWidth = dims.maxWidth + 'px';
-    }
-    if (dims.maxHeight) {
-      document.body.style.maxHeight = dims.maxHeight + 'px';
-    }
-  }
-}).catch(err => {
-  // Silently fail - this is expected in preview/testing environments
-  // The app will still work for rendering data
-});
-
-initializeDarkMode();
-setupSizeObserver();
+// Export empty object to ensure this file is treated as an ES module
+export {};

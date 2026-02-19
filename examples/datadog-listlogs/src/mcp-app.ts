@@ -1,18 +1,9 @@
 /* ============================================
-   DATADOG LIST LOGS MCP APP (SDK VERSION)
+   DATADOG LIST LOGS MCP APP (STANDALONE MODE)
    ============================================
 
-   This file uses the official @modelcontextprotocol/ext-apps SDK
-   for utilities only (theme helpers, types, auto-resize).
-
-   Benefits of this approach:
-   - SDK utilities for theme, fonts, and styling
-   - Full TypeScript type safety
-   - Manual message handling for proxy compatibility
-   - Works with run-action.html proxy layer
-   - No SDK connection conflicts with proxy initialization
-
-   See README.md for customization guidelines.
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   in standalone mode with app.connect() for direct host communication.
    ============================================ */
 
 /* ============================================
@@ -141,7 +132,7 @@ function unwrapData(data: any): any {
     try {
       data = JSON.parse(data);
     } catch {
-      console.warn('Failed to parse string data as JSON');
+      app.sendLog({ level: "warning", data: "Failed to parse string data as JSON", logger: APP_NAME });
       return null;
     }
   }
@@ -664,7 +655,7 @@ function renderLogsList() {
   navigator.clipboard.writeText(message).then(() => {
     showCopyNotification('Message copied to clipboard');
   }).catch(err => {
-    console.error('Failed to copy:', err);
+    app.sendLog({ level: "error", data: `Failed to copy: ${JSON.stringify(err)}`, logger: APP_NAME });
   });
 };
 
@@ -679,7 +670,7 @@ function renderLogsList() {
   navigator.clipboard.writeText(jsonStr).then(() => {
     showCopyNotification('Log JSON copied to clipboard');
   }).catch(err => {
-    console.error('Failed to copy:', err);
+    app.sendLog({ level: "error", data: `Failed to copy: ${JSON.stringify(err)}`, logger: APP_NAME });
   });
 };
 
@@ -782,7 +773,8 @@ function formatLogForLLM(log: any): string {
     (btn as HTMLButtonElement).disabled = true;
     btn.classList.add('send-loading');
   }
-  sendRequest('ui/message', {
+
+  app.sendMessage({
     role: 'user',
     content: [{ type: 'text', text }],
   })
@@ -797,7 +789,7 @@ function formatLogForLLM(log: any): string {
       showCopyNotification('Sent to LLM for investigation');
     })
     .catch((err: Error) => {
-      console.error('Send to LLM failed:', err);
+      app.sendLog({ level: "error", data: `Send to LLM failed: ${JSON.stringify(err)}`, logger: APP_NAME });
       showCopyNotification('Failed to send. Check console.');
     })
     .finally(() => {
@@ -864,10 +856,8 @@ function dataFromToolResult(result: any): any {
     btn.setAttribute('aria-busy', 'true');
     (btn as HTMLButtonElement).disabled = true;
   }
-  sendRequest('tools/call', {
-    name: 'run_action_ui',
-    arguments: REFRESH_LOGS_TOOL_PARAMS
-  })
+
+  app.callTool('run_action_ui', REFRESH_LOGS_TOOL_PARAMS)
     .then((result: any) => {
       if (result?.isError) {
         showCopyNotification('Refresh returned an error.');
@@ -879,7 +869,7 @@ function dataFromToolResult(result: any): any {
       }
     })
     .catch(err => {
-      console.error('Refresh logs failed:', err);
+      app.sendLog({ level: "error", data: `Refresh logs failed: ${JSON.stringify(err)}`, logger: APP_NAME });
       showCopyNotification('Refresh failed. Check console.');
     })
     .finally(() => {
@@ -898,7 +888,7 @@ function renderData(data: any) {
   const appEl = document.getElementById('app');
 
   if (!appEl) {
-    console.error('App element not found!');
+    app.sendLog({ level: "error", data: "App element not found!", logger: APP_NAME });
     return;
   }
 
@@ -921,7 +911,7 @@ function renderData(data: any) {
     } else if (Array.isArray(unwrapped)) {
       logs = unwrapped;
     } else {
-      console.error('Unable to extract logs. Data structure:', unwrapped);
+      app.sendLog({ level: "error", data: `Unable to extract logs. Data structure: ${JSON.stringify(unwrapped)}`, logger: APP_NAME });
       showError('Unable to extract logs from data structure. Check console for details.');
       return;
     }
@@ -1030,173 +1020,15 @@ function renderData(data: any) {
     appEl.innerHTML = htmlContent;
 
   } catch (error: any) {
-    console.error('Render error:', error);
+    app.sendLog({ level: "error", data: `Render error: ${JSON.stringify(error)}`, logger: APP_NAME });
     showError(`Error rendering data: ${error.message}`);
   }
 
   updateSendToLLMButton();
 
-  // Log data structure to console for debugging
-  console.log("Data rendered:", {
-    original: data,
-    logCount: allLogs.length,
-  });
+  // Log data structure for debugging
+  app.sendLog({ level: "debug", data: `Data rendered: ${JSON.stringify({ original: data, logCount: allLogs.length })}`, logger: APP_NAME });
 }
-
-/* ============================================
-   MCP COMMUNICATION
-   ============================================ */
-
-let requestIdCounter = 1;
-function sendRequest(method: string, params: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const id = requestIdCounter++;
-    window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, '*');
-
-    const listener = (event: MessageEvent) => {
-      if (event.data?.id === id) {
-        window.removeEventListener('message', listener);
-        if (event.data?.result) {
-          resolve(event.data.result);
-        } else if (event.data?.error) {
-          reject(new Error(event.data.error.message || 'Unknown error'));
-        }
-      }
-    };
-    window.addEventListener('message', listener);
-
-    // Timeout after 5 seconds
-    setTimeout(() => {
-      window.removeEventListener('message', listener);
-      reject(new Error('Request timeout'));
-    }, 5000);
-  });
-}
-
-/* ============================================
-   SDK UTILITIES ONLY (NO CONNECTION)
-   ============================================
-
-   We use the SDK only for utilities (theme helpers, types).
-   Message handling is done manually to work with the proxy.
-   ============================================ */
-
-// Create app instance
-const app = new App({
-  name: APP_NAME,
-  version: APP_VERSION,
-});
-
-/* ============================================
-   DIRECT MESSAGE HANDLING
-   ============================================
-
-   Handle messages manually to work with the proxy layer.
-   The proxy already handles ui/initialize, so we listen for notifications.
-   ============================================ */
-
-window.addEventListener("message", (event: MessageEvent) => {
-  const msg = event.data;
-
-  if (!msg) return;
-
-  // Handle JSON-RPC 2.0 protocol messages
-  if (msg.jsonrpc === "2.0") {
-    // Handle tool result notifications
-    if (msg.method === "ui/notifications/tool-result" && msg.params) {
-      console.info("Received tool result from proxy");
-      let data = msg.params.structuredContent || msg.params;
-
-      if (typeof data === 'string') {
-        try {
-          data = JSON.parse(data);
-        } catch {
-          console.warn('Failed to parse data as JSON');
-        }
-      }
-
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      return;
-    }
-
-    // Handle host context changes
-    if (msg.method === "ui/notifications/host-context-changed" && msg.params) {
-      console.info("Host context changed:", msg.params);
-
-      if (msg.params.theme) {
-        applyDocumentTheme(msg.params.theme);
-        document.body.classList.toggle("dark", msg.params.theme === "dark");
-      }
-
-      if (msg.params.styles?.css?.fonts) {
-        applyHostFonts(msg.params.styles.css.fonts);
-      }
-
-      if (msg.params.styles?.variables) {
-        applyHostStyleVariables(msg.params.styles.variables);
-      }
-
-      if (msg.params.displayMode === "fullscreen") {
-        document.body.classList.add("fullscreen-mode");
-      } else if (msg.params.displayMode) {
-        document.body.classList.remove("fullscreen-mode");
-      }
-
-      return;
-    }
-
-    // Handle tool cancellation
-    if (msg.method === "ui/notifications/tool-cancelled") {
-      const reason = msg.params?.reason || "Unknown reason";
-      console.info("Tool cancelled:", reason);
-      showError(`Operation cancelled: ${reason}`);
-      return;
-    }
-
-    // Handle resource teardown
-    if (msg.id !== undefined && msg.method === "ui/resource-teardown") {
-      console.info("Resource teardown requested");
-
-      // Clean up resources
-      cleanupResize();
-
-      window.parent.postMessage(
-        {
-          jsonrpc: "2.0",
-          id: msg.id,
-          result: {},
-        },
-        "*",
-      );
-      return;
-    }
-
-    // Fallback: try to render unknown methods that have data
-    if (msg.method && msg.params) {
-      let fallbackData = msg.params.structuredContent || msg.params;
-
-      if (typeof fallbackData === 'string') {
-        try {
-          fallbackData = JSON.parse(fallbackData);
-        } catch {
-          console.warn('Failed to parse fallback data as JSON');
-        }
-      }
-
-      if (fallbackData && fallbackData !== msg) {
-        console.warn('Unknown method:', msg.method, '- attempting to render data');
-        renderData(fallbackData);
-      }
-    }
-
-    return;
-  }
-});
 
 // Close detail view on escape key
 document.addEventListener('keydown', function(e) {
@@ -1216,27 +1048,122 @@ if (detailViewEl) {
 }
 
 /* ============================================
-   APP INITIALIZATION
-   ============================================
-
-   No SDK connection needed - the proxy handles ui/initialize.
-   We only set up auto-resize and lifecycle cleanup.
+   HOST CONTEXT HANDLER
    ============================================ */
 
-// Setup automatic size change notifications
-// The SDK will monitor DOM changes and notify the host automatically
-const cleanupResize = app.setupSizeChangedNotifications();
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
 
-// Apply initial theme from system preference so the app follows host/system theme from first paint.
-// Host can override later via ui/notifications/host-context-changed.
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
+  }
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
+  }
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
+  }
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
+}
+
+/* ============================================
+   SDK APP INSTANCE (STANDALONE MODE)
+   ============================================ */
+
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  app.sendLog({ level: "info", data: "Resource teardown requested", logger: APP_NAME });
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  app.sendLog({ level: "info", data: `Tool input received: ${JSON.stringify(params.arguments)}`, logger: APP_NAME });
+};
+
+app.ontoolresult = (params) => {
+  app.sendLog({ level: "info", data: "Tool result received", logger: APP_NAME });
+
+  // Check for tool execution errors
+  if (params.isError) {
+    app.sendLog({ level: "error", data: `Tool execution failed: ${JSON.stringify(params.content)}`, logger: APP_NAME });
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  let data = params.structuredContent || params.content;
+
+  if (typeof data === 'string') {
+    try {
+      data = JSON.parse(data);
+    } catch {
+      app.sendLog({ level: "warning", data: "Failed to parse data as JSON", logger: APP_NAME });
+    }
+  }
+
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    app.sendLog({ level: "warning", data: `Tool result received but no data found: ${JSON.stringify(params)}`, logger: APP_NAME });
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  app.sendLog({ level: "info", data: `Tool cancelled: ${reason}`, logger: APP_NAME });
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  app.sendLog({ level: "error", data: `App error: ${JSON.stringify(error)}`, logger: APP_NAME });
+};
+
+app.onhostcontextchanged = (ctx) => {
+  app.sendLog({ level: "info", data: `Host context changed: ${JSON.stringify(ctx)}`, logger: APP_NAME });
+  handleHostContextChanged(ctx);
+};
+
+/* ============================================
+   CONNECT TO HOST
+   ============================================ */
+
+// Apply initial theme from system preference
 const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
 const initialTheme = prefersDark ? "dark" : "light";
 applyDocumentTheme(initialTheme);
 document.body.classList.toggle("dark", prefersDark);
 
-// Clean up on page unload
-window.addEventListener("beforeunload", () => {
-  cleanupResize();
-});
+app
+  .connect()
+  .then(() => {
+    app.sendLog({ level: "info", data: "MCP App connected to host", logger: APP_NAME });
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    app.sendLog({ level: "error", data: `Failed to connect to MCP host: ${JSON.stringify(error)}`, logger: APP_NAME });
+  });
 
-console.info("MCP App initialized (SDK utilities mode)");
+export {};

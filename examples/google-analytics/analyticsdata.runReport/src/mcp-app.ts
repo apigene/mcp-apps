@@ -1,30 +1,34 @@
 /* ============================================
-   BASE TEMPLATE FOR MCP APPS
+   GOOGLE ANALYTICS MCP APP (SDK VERSION)
    ============================================
 
-   This file contains all common logic shared across MCP apps.
-   Customize the sections marked with "TEMPLATE-SPECIFIC" below.
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   for utilities only (theme helpers, types, auto-resize).
 
-   Common Features:
-   - MCP Protocol message handling (JSON-RPC 2.0)
-   - Dark mode support
-   - Display mode handling (inline/fullscreen)
-   - Size change notifications
-   - Data extraction utilities
-   - Error handling
-
-   See README.md for customization guidelines.
+   It does NOT call app.connect() because the proxy handles initialization.
    ============================================ */
 
 /* ============================================
+   SDK IMPORTS
+   ============================================ */
+
+import {
+  App,
+  applyDocumentTheme,
+  applyHostFonts,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
+
+// Import styles (will be bundled by Vite)
+import "./global.css";
+import "./mcp-app.css";
+
+/* ============================================
    APP CONFIGURATION
-   ============================================
-   TEMPLATE-SPECIFIC: Update these values for your app
    ============================================ */
 
 const APP_NAME = "Google Analytics";
 const APP_VERSION = "1.0.0";
-const PROTOCOL_VERSION = "2026-01-26"; // MCP Apps protocol version
 
 /* ============================================
    EXTERNAL DEPENDENCIES
@@ -60,23 +64,25 @@ function extractData(msg: any) {
 function unwrapData(data: any): any {
   if (!data) return null;
 
-  // Format 1: Standard table format { columns: [], rows: [] }
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) ||
-      (typeof data === 'object' && !data.message)) {
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
 
-  // Format 2: Nested in message.template_data (3rd party MCP clients)
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-
-  // Format 3: Nested in message.response_content (3rd party MCP clients)
   if (data.message?.response_content) {
     return data.message.response_content;
   }
 
-  // Format 4: Common nested patterns
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
@@ -84,37 +90,25 @@ function unwrapData(data: any): any {
   if (data.items) return data.items;
   if (data.records) return data.records;
 
-  // Format 5: Direct rows array
+  // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
 
-  // Format 6: If data itself is an array
-  if (Array.isArray(data)) {
-    return { rows: data };
+  // Standard table format
+  if (data.columns) {
+    return data;
   }
 
   return data;
 }
 
-/**
- * Initialize dark mode based on system preference
- */
-function initializeDarkMode() {
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.body.classList.add('dark');
-  }
-
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e: MediaQueryListEvent) => {
-    document.body.classList.toggle('dark', e.matches);
-  });
-}
 
 /**
  * Escape HTML to prevent XSS attacks
  */
 function escapeHtml(str: any): string {
-  if (typeof str !== "string") return str;
+  if (typeof str !== "string") return String(str);
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
@@ -157,7 +151,7 @@ function showEmpty(message: string = 'No data available.') {
  */
 function showChartError(container: Element | null | undefined, message: string) {
   if (!container) {
-    console.warn('Cannot show chart error - container not found');
+    app.sendLog({ level: "warning", data: 'Cannot show chart error - container not found', logger: APP_NAME });
     return;
   }
 
@@ -175,7 +169,7 @@ function showChartError(container: Element | null | undefined, message: string) 
       </div>
     `;
   } else {
-    console.warn('Chart wrapper not found in container');
+    app.sendLog({ level: "warning", data: 'Chart wrapper not found in container', logger: APP_NAME });
   }
 }
 
@@ -728,7 +722,7 @@ function getChartColors() {
  */
 function renderBarChart(canvas: HTMLCanvasElement, labels: string[], values: number[], maxItems: number = 15) {
   if (typeof Chart === 'undefined' || !Chart.Chart) {
-    console.error('Chart.js is not loaded.');
+    app.sendLog({ level: "error", data: 'Chart.js is not loaded.', logger: APP_NAME });
     showChartError(canvas.parentElement?.parentElement, 'Chart.js library not available');
     return;
   }
@@ -873,7 +867,7 @@ function renderBarChart(canvas: HTMLCanvasElement, labels: string[], values: num
  */
 function renderPieChart(canvas: HTMLCanvasElement, values: number[], chartLabels: string[], maxItems: number = 10) {
   if (typeof Chart === 'undefined' || !Chart.Chart) {
-    console.error('Chart.js is not loaded.');
+    app.sendLog({ level: "error", data: 'Chart.js is not loaded.', logger: APP_NAME });
     showChartError(canvas.parentElement?.parentElement, 'Chart.js library not available');
     return;
   }
@@ -1007,7 +1001,7 @@ function renderData(data: any) {
     const tableData = normalizeTableData(data);
 
     if (!tableData || !tableData.rows || tableData.rows.length === 0) {
-      console.warn('Invalid or empty data:', data);
+      app.sendLog({ level: "warning", data: `Invalid or empty data: ${JSON.stringify(data)}`, logger: APP_NAME });
       showEmpty('No valid data available');
       return;
     }
@@ -1339,7 +1333,7 @@ function renderData(data: any) {
           try {
             renderBarChart(barCanvas, chartLabels, chartValues, 15);
           } catch (error) {
-            console.error('Error rendering bar chart:', error);
+            app.sendLog({ level: "error", data: `Error rendering bar chart: ${JSON.stringify(error)}`, logger: APP_NAME });
             showChartError(barCanvas.closest('.chart-card'), 'Failed to render bar chart: ' + (error as Error).message);
           }
         }
@@ -1349,15 +1343,12 @@ function renderData(data: any) {
           try {
             renderPieChart(pieCanvas, chartValues, chartLabels, 10);
           } catch (error) {
-            console.error('Error rendering pie chart:', error);
+            app.sendLog({ level: "error", data: `Error rendering pie chart: ${JSON.stringify(error)}`, logger: APP_NAME });
             showChartError(pieCanvas.closest('.chart-card'), 'Failed to render pie chart: ' + (error as Error).message);
           }
         }
       }
 
-      setTimeout(() => {
-        notifySizeChanged();
-      }, 100);
     };
 
     // Wait for Chart.js to be available, then render charts
@@ -1370,7 +1361,7 @@ function renderData(data: any) {
           renderCharts();
         }, 100);
       } else if (chartJsError) {
-        console.error('Chart.js failed to load');
+        app.sendLog({ level: "error", data: 'Chart.js failed to load', logger: APP_NAME });
         const barCanvas = document.getElementById('barchart');
         const pieCanvas = document.getElementById('piechart');
         if (barCanvas) {
@@ -1379,11 +1370,10 @@ function renderData(data: any) {
         if (pieCanvas) {
           showChartError(pieCanvas.closest('.chart-card'), 'Chart.js library failed to load.');
         }
-        notifySizeChanged();
       } else if (attempts < maxAttempts) {
         setTimeout(() => waitForChartJS(attempts + 1, maxAttempts), 50);
       } else {
-        console.error('Chart.js failed to load after', maxAttempts, 'attempts');
+        app.sendLog({ level: "error", data: `Chart.js failed to load after ${maxAttempts} attempts`, logger: APP_NAME });
         const barCanvas = document.getElementById('barchart');
         const pieCanvas = document.getElementById('piechart');
         if (barCanvas) {
@@ -1392,7 +1382,6 @@ function renderData(data: any) {
         if (pieCanvas) {
           showChartError(pieCanvas.closest('.chart-card'), 'Chart.js library failed to load. Please check your browser security settings.');
         }
-        notifySizeChanged();
       }
     };
 
@@ -1412,18 +1401,14 @@ function renderData(data: any) {
       if (pieCanvas) {
         showChartError(pieCanvas.closest('.chart-card'), 'Chart.js CDN blocked.');
       }
-      notifySizeChanged();
     });
 
     // Start waiting for Chart.js
     waitForChartJS();
 
   } catch (error: any) {
-    console.error('Render error:', error);
+    app.sendLog({ level: "error", data: `Render error: ${JSON.stringify(error)}`, logger: APP_NAME });
     showError(`Error rendering dashboard: ${error.message}`);
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
   }
 }
 
@@ -1444,20 +1429,7 @@ window.addEventListener('message', function(event: MessageEvent) {
 
   // Handle requests that require responses (like ui/resource-teardown)
   if (msg.id !== undefined && msg.method === 'ui/resource-teardown') {
-    const reason = msg.params?.reason || 'Resource teardown requested';
-
-    // Clean up resources
-    if (sizeChangeTimeout) {
-      clearTimeout(sizeChangeTimeout);
-      sizeChangeTimeout = null;
-    }
-
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-
-    // Destroy chart instances
+    // Clean up chart instances
     if (barChartInstance) {
       barChartInstance.destroy();
       barChartInstance = null;
@@ -1487,16 +1459,20 @@ window.addEventListener('message', function(event: MessageEvent) {
       if (data !== undefined) {
         renderData(data);
       } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
+        app.sendLog({ level: "warning", data: `ui/notifications/tool-result received but no data found: ${JSON.stringify(msg)}`, logger: APP_NAME });
         showEmpty('No data received');
       }
       break;
 
     case 'ui/notifications/host-context-changed':
-      if (msg.params?.theme === 'dark') {
-        document.body.classList.add('dark');
-      } else if (msg.params?.theme === 'light') {
-        document.body.classList.remove('dark');
+      if (msg.params?.theme) {
+        applyDocumentTheme(msg.params.theme);
+      }
+      if (msg.params?.styles?.css?.fonts) {
+        applyHostFonts(msg.params.styles.css.fonts);
+      }
+      if (msg.params?.styles?.variables) {
+        applyHostStyleVariables(msg.params.styles.variables);
       }
       if (msg.params?.displayMode) {
         handleDisplayModeChange(msg.params.displayMode);
@@ -1506,7 +1482,7 @@ window.addEventListener('message', function(event: MessageEvent) {
     case 'ui/notifications/tool-input':
       const toolArguments = msg.params?.arguments;
       if (toolArguments) {
-        console.log('Tool input received:', toolArguments);
+        app.sendLog({ level: "debug", data: `Tool input received: ${JSON.stringify(toolArguments)}`, logger: APP_NAME });
       }
       break;
 
@@ -1522,7 +1498,7 @@ window.addEventListener('message', function(event: MessageEvent) {
       if (msg.params) {
         const fallbackData = msg.params.structuredContent || msg.params;
         if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
+          app.sendLog({ level: "warning", data: `Unknown method: ${msg.method} - attempting to render data`, logger: APP_NAME });
           renderData(fallbackData);
         }
       }
@@ -1558,10 +1534,6 @@ function sendRequest(method: string, params: any): Promise<any> {
   });
 }
 
-function sendNotification(method: string, params: any) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, '*');
-}
-
 /* ============================================
    DISPLAY MODE HANDLING
    ============================================ */
@@ -1585,9 +1557,6 @@ function handleDisplayModeChange(mode: string) {
       (container as HTMLElement).style.padding = '';
     }
   }
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
 }
 
 function requestDisplayMode(mode: string): Promise<any> {
@@ -1599,7 +1568,7 @@ function requestDisplayMode(mode: string): Promise<any> {
       return result;
     })
     .catch(err => {
-      console.warn('Failed to request display mode:', err);
+      app.sendLog({ level: "warning", data: `Failed to request display mode: ${JSON.stringify(err)}`, logger: APP_NAME });
       throw err;
     });
 }
@@ -1607,100 +1576,26 @@ function requestDisplayMode(mode: string): Promise<any> {
 (window as any).requestDisplayMode = requestDisplayMode;
 
 /* ============================================
-   SIZE CHANGE NOTIFICATIONS
+   SDK APP INSTANCE (PROXY MODE - NO CONNECT)
    ============================================ */
 
-function notifySizeChanged() {
-  const width = document.body.scrollWidth || document.documentElement.scrollWidth;
-  const height = document.body.scrollHeight || document.documentElement.scrollHeight;
-
-  sendNotification('ui/notifications/size-changed', {
-    width: width,
-    height: height
-  });
-}
-
-let sizeChangeTimeout: NodeJS.Timeout | null = null;
-function debouncedNotifySizeChanged() {
-  if (sizeChangeTimeout) {
-    clearTimeout(sizeChangeTimeout);
-  }
-  sizeChangeTimeout = setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
-
-let resizeObserver: ResizeObserver | null = null;
-function setupSizeObserver() {
-  if (typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => {
-      debouncedNotifySizeChanged();
-    });
-    resizeObserver.observe(document.body);
-  } else {
-    window.addEventListener('resize', debouncedNotifySizeChanged);
-    const mutationObserver = new MutationObserver(debouncedNotifySizeChanged);
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['style', 'class']
-    });
-  }
-
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
-
-/* ============================================
-   INITIALIZATION
-   ============================================ */
-
-sendRequest('ui/initialize', {
-  appCapabilities: {
-    availableDisplayModes: ["inline", "fullscreen"]
-  },
-  clientInfo: {
-    name: APP_NAME,
-    version: APP_VERSION
-  },
-  protocolVersion: PROTOCOL_VERSION
-}).then((result: any) => {
-  const ctx = result.hostContext || result;
-  const hostCapabilities = result.hostCapabilities;
-
-  sendNotification('ui/notifications/initialized', {});
-
-  if (ctx?.theme === 'dark') {
-    document.body.classList.add('dark');
-  } else if (ctx?.theme === 'light') {
-    document.body.classList.remove('dark');
-  }
-  if (ctx?.displayMode) {
-    handleDisplayModeChange(ctx.displayMode);
-  }
-  if (ctx?.containerDimensions) {
-    const dims = ctx.containerDimensions;
-    if (dims.width) {
-      document.body.style.width = dims.width + 'px';
-    }
-    if (dims.height) {
-      document.body.style.height = dims.height + 'px';
-    }
-    if (dims.maxWidth) {
-      document.body.style.maxWidth = dims.maxWidth + 'px';
-    }
-    if (dims.maxHeight) {
-      document.body.style.maxHeight = dims.maxHeight + 'px';
-    }
-  }
-}).catch(err => {
-  console.warn('Failed to initialize MCP App:', err);
+const app = new App({
+  name: APP_NAME,
+  version: APP_VERSION,
 });
 
-initializeDarkMode();
-setupSizeObserver();
+/* ============================================
+   AUTO-RESIZE VIA SDK
+   ============================================ */
+
+const cleanupResize = app.setupSizeChangedNotifications();
+
+// Clean up on page unload
+window.addEventListener("beforeunload", () => {
+  cleanupResize();
+});
+
+app.sendLog({ level: "info", data: "MCP App initialized (proxy mode - SDK utilities only)", logger: APP_NAME });
 
 /* ============================================
    ADVANCED INTERACTIVE FEATURES
@@ -1730,8 +1625,6 @@ function setupToolbarInteractions() {
         if (summaryCards) (summaryCards as HTMLElement).style.display = 'grid';
         if (tableContainer) tableContainer.style.display = 'none';
       }
-
-      setTimeout(() => notifySizeChanged(), 100);
     });
   });
 }

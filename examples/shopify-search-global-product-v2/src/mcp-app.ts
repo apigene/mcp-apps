@@ -1,9 +1,32 @@
 /* ============================================
    SHOPIFY CATALOG MCP APP - ADVANCED
    ============================================
-   
+
    Advanced Shopify catalog with filtering, drill-down, and comparison
    ============================================ */
+
+/* ============================================
+   SHOPIFY SEARCH GLOBAL PRODUCT V2 MCP APP (STANDALONE MODE)
+   ============================================
+
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   in standalone mode with app.connect() for initialization.
+   ============================================ */
+
+/* ============================================
+   SDK IMPORTS
+   ============================================ */
+
+import {
+  App,
+  applyDocumentTheme,
+  applyHostFonts,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
+
+// Import styles (will be bundled by Vite)
+import "./global.css";
+import "./mcp-app.css";
 
 /* ============================================
    APP CONFIGURATION
@@ -11,7 +34,6 @@
 
 const APP_NAME = "Shopify Catalog";
 const APP_VERSION = "2.0.0";
-const PROTOCOL_VERSION = "2026-01-26";
 
 /* ============================================
    GLOBAL STATE
@@ -50,70 +72,52 @@ function extractData(msg: any) {
  */
 function unwrapData(data: any): any {
   if (!data) return null;
-  
-  // Handle Shopify API response format: { status_code: 200, body: { offers: [...] } }
-  if (data.body?.offers) {
-    return data.body.offers;
-  }
-  if (data.offers) {
-    return data.offers;
-  }
-  
-  // Standard table format
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
     return data;
   }
-  
-  // Nested in message.template_data
+
+  // Handle GitHub API response format - check for body array
+  if (data.body && Array.isArray(data.body)) {
+    return data.body;
+  }
+
+  // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
   }
-  
-  // Nested in message.response_content
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
-  // Common nested patterns
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
+
   // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  // If data itself is an array
-  if (Array.isArray(data)) {
+
+  // Standard table format
+  if (data.columns) {
     return data;
   }
-  
+
   return data;
 }
 
-/**
- * Initialize dark mode based on system preference
- */
-function initializeDarkMode() {
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.body.classList.add('dark');
-  }
-  
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e: MediaQueryListEvent) => {
-    document.body.classList.toggle('dark', e.matches);
-  });
-}
 
 /**
  * Escape HTML to prevent XSS attacks
  */
 function escapeHtml(str: any): string {
-  if (typeof str !== "string") return str;
+  if (typeof str !== "string") return String(str);
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
@@ -159,15 +163,15 @@ function formatPrice(amount: number, currency: string = 'USD'): string {
  */
 function formatPriceRange(priceRange: any): string {
   if (!priceRange) return '';
-  
+
   const min = priceRange.min?.amount || 0;
   const max = priceRange.max?.amount || 0;
   const currency = priceRange.min?.currency || priceRange.max?.currency || 'USD';
-  
+
   if (min === max) {
     return formatPrice(min, currency);
   }
-  
+
   return `${formatPrice(min, currency)} - ${formatPrice(max, currency)}`;
 }
 
@@ -176,10 +180,10 @@ function formatPriceRange(priceRange: any): string {
  */
 function renderRating(rating: any): string {
   if (!rating || !rating.rating) return '';
-  
+
   const stars = Math.round(rating.rating);
   const count = rating.count || 0;
-  
+
   return `
     <div class="product-rating">
       <span class="rating-stars">${'★'.repeat(stars)}${'☆'.repeat(5 - stars)}</span>
@@ -193,9 +197,9 @@ function renderRating(rating: any): string {
  */
 function renderFeatures(features: string[]): string {
   if (!features || features.length === 0) return '';
-  
+
   const topFeatures = features.slice(0, 3); // Show first 3 features
-  
+
   return `
     <div class="product-features">
       <div class="product-features-title">Key Features</div>
@@ -210,32 +214,32 @@ function renderFeatures(features: string[]): string {
  * Render product card with compare checkbox
  */
 function renderProductCard(product: any, index: number): string {
-  const imageUrl = product.media && product.media.length > 0 
-    ? product.media[0].url 
+  const imageUrl = product.media && product.media.length > 0
+    ? product.media[0].url
     : 'https://via.placeholder.com/320x240?text=No+Image';
-  
-  const imageAlt = product.media && product.media.length > 0 
-    ? product.media[0].altText || product.title 
+
+  const imageAlt = product.media && product.media.length > 0
+    ? product.media[0].altText || product.title
     : product.title;
-  
+
   const productUrl = product.lookupUrl || '#';
   const priceDisplay = formatPriceRange(product.priceRange);
   const ratingHtml = renderRating(product.rating);
   const featuresHtml = renderFeatures(product.topFeatures);
-  
+
   const variantsCount = product.variants ? product.variants.length : 0;
-  const shopName = product.variants && product.variants.length > 0 
-    ? product.variants[0].shop?.name 
+  const shopName = product.variants && product.variants.length > 0
+    ? product.variants[0].shop?.name
     : '';
-  
+
   const productId = product.id || `product-${index}`;
   const isSelected = selectedProducts.has(productId);
-  
+
   return `
     <div class="product-card" data-product-id="${escapeHtml(productId)}">
       <div class="product-card-header">
         <label class="compare-checkbox">
-          <input type="checkbox" ${isSelected ? 'checked' : ''} 
+          <input type="checkbox" ${isSelected ? 'checked' : ''}
                  onchange="toggleCompare('${escapeHtml(productId)}', this.checked)">
           <span>Compare</span>
         </label>
@@ -274,25 +278,25 @@ function renderProductCard(product: any, index: number): string {
  * Render product in list view
  */
 function renderProductListItem(product: any, index: number): string {
-  const imageUrl = product.media && product.media.length > 0 
-    ? product.media[0].url 
+  const imageUrl = product.media && product.media.length > 0
+    ? product.media[0].url
     : 'https://via.placeholder.com/200x200?text=No+Image';
-  
+
   const productUrl = product.lookupUrl || '#';
   const priceDisplay = formatPriceRange(product.priceRange);
   const ratingHtml = renderRating(product.rating);
-  const shopName = product.variants && product.variants.length > 0 
-    ? product.variants[0].shop?.name 
+  const shopName = product.variants && product.variants.length > 0
+    ? product.variants[0].shop?.name
     : '';
-  
+
   const productId = product.id || `product-${index}`;
   const isSelected = selectedProducts.has(productId);
-  
+
   return `
     <div class="product-list-item" data-product-id="${escapeHtml(productId)}">
       <div class="list-item-checkbox">
         <label class="compare-checkbox">
-          <input type="checkbox" ${isSelected ? 'checked' : ''} 
+          <input type="checkbox" ${isSelected ? 'checked' : ''}
                  onchange="toggleCompare('${escapeHtml(productId)}', this.checked)">
           <span>Compare</span>
         </label>
@@ -331,18 +335,18 @@ function renderProductListItem(product: any, index: number): string {
 
 function filterProducts(): any[] {
   let filtered = [...allProducts];
-  
+
   // Search filter
   if (searchQuery) {
     const query = searchQuery.toLowerCase();
-    filtered = filtered.filter(p => 
+    filtered = filtered.filter(p =>
       (p.title || '').toLowerCase().includes(query) ||
       (p.description || '').toLowerCase().includes(query) ||
       (p.uniqueSellingPoint || '').toLowerCase().includes(query) ||
       (p.topFeatures || []).some((f: string) => f.toLowerCase().includes(query))
     );
   }
-  
+
   // Price range filter
   filtered = filtered.filter(p => {
     const min = p.priceRange?.min?.amount || 0;
@@ -351,7 +355,7 @@ function filterProducts(): any[] {
     const productMax = Math.max(min, max || min);
     return productMin >= priceRange[0] && productMax <= priceRange[1];
   });
-  
+
   // Rating filter
   if (minRating > 0) {
     filtered = filtered.filter(p => {
@@ -359,7 +363,7 @@ function filterProducts(): any[] {
       return rating >= minRating;
     });
   }
-  
+
   // Shop filter
   if (selectedShops.size > 0) {
     filtered = filtered.filter(p => {
@@ -367,17 +371,17 @@ function filterProducts(): any[] {
       return selectedShops.has(shopName);
     });
   }
-  
+
   // Attribute filter
   if (selectedAttributes.size > 0) {
     filtered = filtered.filter(p => {
       const attrs = p.attributes || [];
-      return attrs.some((attr: any) => 
+      return attrs.some((attr: any) =>
         (attr.values || []).some((val: string) => selectedAttributes.has(val))
       );
     });
   }
-  
+
   // Sort
   filtered.sort((a, b) => {
     switch (currentSort) {
@@ -395,7 +399,7 @@ function filterProducts(): any[] {
         return 0;
     }
   });
-  
+
   return filtered;
 }
 
@@ -420,17 +424,17 @@ function getAvailableAttributes(): string[] {
 
 function getPriceRange(): [number, number] {
   if (allProducts.length === 0) return [0, 100000];
-  
+
   let min = Infinity;
   let max = 0;
-  
+
   allProducts.forEach(p => {
     const pMin = p.priceRange?.min?.amount || 0;
     const pMax = p.priceRange?.max?.amount || pMin;
     min = Math.min(min, pMin);
     max = Math.max(max, pMax);
   });
-  
+
   return [min, max];
 }
 
@@ -441,13 +445,13 @@ function getPriceRange(): [number, number] {
 function renderCatalog() {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   filteredProducts = filterProducts();
-  
+
   const maxPrice = getPriceRange()[1];
   const shops = getAvailableShops();
   const attributes = getAvailableAttributes();
-  
+
   app.innerHTML = `
     <div class="container">
       <div class="header">
@@ -493,29 +497,29 @@ function renderCatalog() {
           </div>
         </div>
       </div>
-      
+
       <div class="catalog-layout">
         <div class="filters-sidebar">
           <div class="filters-header">
             <h3>Filters</h3>
             <button class="clear-filters" onclick="clearFilters()">Clear All</button>
           </div>
-          
+
           <div class="filter-section">
             <label class="filter-label">Search</label>
-            <input type="text" id="search-input" placeholder="Search products..." 
-                   value="${escapeHtml(searchQuery)}" 
+            <input type="text" id="search-input" placeholder="Search products..."
+                   value="${escapeHtml(searchQuery)}"
                    oninput="setSearchQuery(this.value)">
           </div>
-          
+
           <div class="filter-section">
             <label class="filter-label">Price Range</label>
             <div class="price-range-inputs">
-              <input type="number" id="price-min" placeholder="Min" 
+              <input type="number" id="price-min" placeholder="Min"
                      value="${priceRange[0] === 0 ? '' : priceRange[0] / 100}"
                      onchange="updatePriceRange('min', this.value)">
               <span>to</span>
-              <input type="number" id="price-max" placeholder="Max" 
+              <input type="number" id="price-max" placeholder="Max"
                      value="${priceRange[1] === Infinity ? '' : priceRange[1] / 100}"
                      onchange="updatePriceRange('max', this.value)">
             </div>
@@ -523,7 +527,7 @@ function renderCatalog() {
               ${formatPrice(priceRange[0])} - ${priceRange[1] === Infinity ? '∞' : formatPrice(priceRange[1])}
             </div>
           </div>
-          
+
           <div class="filter-section">
             <label class="filter-label">Minimum Rating</label>
             <div class="rating-filter">
@@ -542,7 +546,7 @@ function renderCatalog() {
               </label>
             </div>
           </div>
-          
+
           ${shops.length > 0 ? `
             <div class="filter-section">
               <label class="filter-label">Shops</label>
@@ -557,7 +561,7 @@ function renderCatalog() {
               </div>
             </div>
           ` : ''}
-          
+
           ${attributes.length > 0 ? `
             <div class="filter-section">
               <label class="filter-label">Attributes</label>
@@ -573,7 +577,7 @@ function renderCatalog() {
             </div>
           ` : ''}
         </div>
-        
+
         <div class="catalog-content">
           ${filteredProducts.length === 0 ? `
             <div class="empty-results">
@@ -592,14 +596,14 @@ function renderCatalog() {
         </div>
       </div>
     </div>
-    
+
     <div id="product-modal" class="modal" onclick="closeProductModal(event)">
       <div class="modal-content" onclick="event.stopPropagation()">
         <button class="modal-close" onclick="closeProductModal(event)">×</button>
         <div id="product-modal-body"></div>
       </div>
     </div>
-    
+
     <div id="compare-modal" class="modal" onclick="closeCompareModal(event)">
       <div class="modal-content compare-modal-content" onclick="event.stopPropagation()">
         <button class="modal-close" onclick="closeCompareModal(event)">×</button>
@@ -607,16 +611,12 @@ function renderCatalog() {
       </div>
     </div>
   `;
-  
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 50);
 }
 
 function renderData(data: any) {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   if (!data) {
     showEmpty('No data received');
     return;
@@ -625,7 +625,7 @@ function renderData(data: any) {
   try {
     // Unwrap nested structures
     const unwrapped = unwrapData(data);
-    
+
     // Handle array of products
     let products: any[] = [];
     if (Array.isArray(unwrapped)) {
@@ -636,20 +636,14 @@ function renderData(data: any) {
       products = unwrapped.body.offers;
     } else {
       showEmpty('No products found in the catalog');
-      setTimeout(() => {
-        notifySizeChanged();
-      }, 50);
       return;
     }
-    
+
     if (products.length === 0) {
       showEmpty('No products available');
-      setTimeout(() => {
-        notifySizeChanged();
-      }, 50);
       return;
     }
-    
+
     // Store all products and reset filters
     allProducts = products;
     selectedProducts.clear();
@@ -660,286 +654,14 @@ function renderData(data: any) {
     selectedShops.clear();
     selectedAttributes.clear();
     currentSort = 'relevance';
-    
+
     renderCatalog();
-    
+
   } catch (error: any) {
-    console.error('Render error:', error);
+    app.sendLog({ level: "error", data: `Render error: ${JSON.stringify(error)}`, logger: APP_NAME });
     showError(`Error rendering catalog: ${error.message}`);
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
   }
 }
-
-/* ============================================
-   MESSAGE HANDLER (Standardized MCP Protocol)
-   ============================================ */
-
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    return;
-  }
-  
-  // Handle requests that require responses (like ui/resource-teardown)
-  if (msg.id !== undefined && msg.method === 'ui/resource-teardown') {
-    const reason = msg.params?.reason || 'Resource teardown requested';
-    
-    // Clean up resources
-    if (sizeChangeTimeout) {
-      clearTimeout(sizeChangeTimeout);
-      sizeChangeTimeout = null;
-    }
-    
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-    
-    // Send response to host
-    window.parent.postMessage({
-      jsonrpc: "2.0",
-      id: msg.id,
-      result: {}
-    }, '*');
-    
-    return;
-  }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
-  }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      const data = msg.params?.structuredContent || msg.params;
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      if (msg.params?.theme === 'dark') {
-        document.body.classList.add('dark');
-      } else if (msg.params?.theme === 'light') {
-        document.body.classList.remove('dark');
-      }
-      if (msg.params?.displayMode) {
-        handleDisplayModeChange(msg.params.displayMode);
-      }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      const toolArguments = msg.params?.arguments;
-      if (toolArguments) {
-        console.log('Tool input received:', toolArguments);
-      }
-      break;
-      
-    case 'ui/notifications/tool-cancelled':
-      const reason = msg.params?.reason || 'Tool execution was cancelled';
-      showError(`Operation cancelled: ${reason}`);
-      break;
-      
-    case 'ui/notifications/initialized':
-      break;
-      
-    default:
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      }
-  }
-});
-
-/* ============================================
-   MCP COMMUNICATION
-   ============================================ */
-
-let requestIdCounter = 1;
-function sendRequest(method: string, params: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const id = requestIdCounter++;
-    window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, '*');
-    
-    const listener = (event: MessageEvent) => {
-      if (event.data?.id === id) {
-        window.removeEventListener('message', listener);
-        if (event.data?.result) {
-          resolve(event.data.result);
-        } else if (event.data?.error) {
-          reject(new Error(event.data.error.message || 'Unknown error'));
-        }
-      }
-    };
-    window.addEventListener('message', listener);
-    
-    setTimeout(() => {
-      window.removeEventListener('message', listener);
-      reject(new Error('Request timeout'));
-    }, 5000);
-  });
-}
-
-function sendNotification(method: string, params: any) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, '*');
-}
-
-/**
- * Request the host to open a URL in the default browser (MCP ui/open-link).
- * Use for product lookup URLs and variant URLs so the host can apply policy.
- */
-function openLink(url: string): void {
-  if (!url || url === '#' || !url.startsWith('http')) return;
-  sendRequest('ui/open-link', { url })
-    .then((result: any) => {
-      if (result?.isError) {
-        console.warn('Host denied open link request');
-      }
-    })
-    .catch((err) => {
-      console.warn('Open link failed:', err);
-    });
-}
-
-/* ============================================
-   DISPLAY MODE HANDLING
-   ============================================ */
-
-let currentDisplayMode = 'inline';
-
-function handleDisplayModeChange(mode: string) {
-  currentDisplayMode = mode;
-  if (mode === 'fullscreen') {
-    document.body.classList.add('fullscreen-mode');
-    document.documentElement.classList.add('fullscreen-mode');
-  } else {
-    document.body.classList.remove('fullscreen-mode');
-    document.documentElement.classList.remove('fullscreen-mode');
-  }
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
-
-function requestDisplayMode(mode: string): Promise<any> {
-  return sendRequest('ui/request-display-mode', { mode: mode })
-    .then(result => {
-      if (result?.mode) {
-        handleDisplayModeChange(result.mode);
-      }
-      return result;
-    })
-    .catch(err => {
-      console.warn('Failed to request display mode:', err);
-      throw err;
-    });
-}
-
-(window as any).requestDisplayMode = requestDisplayMode;
-
-/* ============================================
-   SIZE CHANGE NOTIFICATIONS
-   ============================================ */
-
-function notifySizeChanged() {
-  const width = document.body.scrollWidth || document.documentElement.scrollWidth;
-  const height = document.body.scrollHeight || document.documentElement.scrollHeight;
-  
-  sendNotification('ui/notifications/size-changed', {
-    width: width,
-    height: height
-  });
-}
-
-let sizeChangeTimeout: NodeJS.Timeout | null = null;
-function debouncedNotifySizeChanged() {
-  if (sizeChangeTimeout) {
-    clearTimeout(sizeChangeTimeout);
-  }
-  sizeChangeTimeout = setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
-
-let resizeObserver: ResizeObserver | null = null;
-function setupSizeObserver() {
-  if (typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => {
-      debouncedNotifySizeChanged();
-    });
-    resizeObserver.observe(document.body);
-  } else {
-    window.addEventListener('resize', debouncedNotifySizeChanged);
-    const mutationObserver = new MutationObserver(debouncedNotifySizeChanged);
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['style', 'class']
-    });
-  }
-  
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
-
-/* ============================================
-   INITIALIZATION
-   ============================================ */
-
-sendRequest('ui/initialize', {
-  appCapabilities: {
-    availableDisplayModes: ["inline", "fullscreen"]
-  },
-  appInfo: {
-    name: APP_NAME,
-    version: APP_VERSION
-  },
-  protocolVersion: PROTOCOL_VERSION
-}).then((result: any) => {
-  const ctx = result.hostContext || result;
-  const hostCapabilities = result.hostCapabilities;
-  
-  sendNotification('ui/notifications/initialized', {});
-  
-  if (ctx?.theme === 'dark') {
-    document.body.classList.add('dark');
-  } else if (ctx?.theme === 'light') {
-    document.body.classList.remove('dark');
-  }
-  
-  if (ctx?.displayMode) {
-    handleDisplayModeChange(ctx.displayMode);
-  }
-  
-  if (ctx?.containerDimensions) {
-    const dims = ctx.containerDimensions;
-    if (dims.width) {
-      document.body.style.width = dims.width + 'px';
-    }
-    if (dims.height) {
-      document.body.style.height = dims.height + 'px';
-    }
-    if (dims.maxWidth) {
-      document.body.style.maxWidth = dims.maxWidth + 'px';
-    }
-    if (dims.maxHeight) {
-      document.body.style.maxHeight = dims.maxHeight + 'px';
-    }
-  }
-}).catch(err => {
-  console.warn('Failed to initialize MCP App:', err);
-});
 
 /* ============================================
    GLOBAL FUNCTIONS (for onclick handlers)
@@ -957,15 +679,15 @@ sendRequest('ui/initialize', {
 (window as any).showProductDetails = function(index: number) {
   const product = filteredProducts[index];
   if (!product) return;
-  
+
   const modal = document.getElementById('product-modal');
   const modalBody = document.getElementById('product-modal-body');
   if (!modal || !modalBody) return;
-  
+
   const images = product.media || [];
   const variants = product.variants || [];
   const shopName = variants[0]?.shop?.name || '';
-  
+
   modalBody.innerHTML = `
     <div class="product-detail">
       <div class="product-detail-images">
@@ -1056,9 +778,8 @@ sendRequest('ui/initialize', {
       </div>
     </div>
   `;
-  
+
   modal.classList.add('active');
-  setTimeout(() => notifySizeChanged(), 50);
 };
 
 (window as any).closeProductModal = function(event: Event) {
@@ -1066,19 +787,18 @@ sendRequest('ui/initialize', {
   if (modal) {
     modal.classList.remove('active');
   }
-  setTimeout(() => notifySizeChanged(), 50);
 };
 
 (window as any).showCompareView = function() {
   if (selectedProducts.size === 0) return;
-  
+
   const productsToCompare = allProducts.filter(p => selectedProducts.has(p.id || ''));
   if (productsToCompare.length === 0) return;
-  
+
   const modal = document.getElementById('compare-modal');
   const modalBody = document.getElementById('compare-modal-body');
   if (!modal || !modalBody) return;
-  
+
   // Get all unique attributes/fields for comparison
   const allFields = new Set<string>();
   productsToCompare.forEach(p => {
@@ -1090,7 +810,7 @@ sendRequest('ui/initialize', {
     if (p.techSpecs) allFields.add('specs');
     if (p.variants) allFields.add('variants');
   });
-  
+
   modalBody.innerHTML = `
     <h2>Compare Products (${productsToCompare.length})</h2>
     <div class="compare-table-wrapper">
@@ -1161,9 +881,8 @@ sendRequest('ui/initialize', {
       </table>
     </div>
   `;
-  
+
   modal.classList.add('active');
-  setTimeout(() => notifySizeChanged(), 50);
 };
 
 (window as any).closeCompareModal = function(event: Event) {
@@ -1171,7 +890,6 @@ sendRequest('ui/initialize', {
   if (modal) {
     modal.classList.remove('active');
   }
-  setTimeout(() => notifySizeChanged(), 50);
 };
 
 (window as any).setView = function(view: 'grid' | 'list') {
@@ -1238,17 +956,108 @@ sendRequest('ui/initialize', {
   renderCatalog();
 };
 
-(window as any).openLink = openLink;
+/* ============================================
+   HOST CONTEXT HANDLER
+   ============================================ */
 
-/* Delegated click: open external links via host ui/open-link */
-document.addEventListener('click', (e: MouseEvent) => {
-  const a = (e.target as Element).closest('a[href^="http"]');
-  if (!a || !(a as HTMLAnchorElement).href) return;
-  e.preventDefault();
-  openLink((a as HTMLAnchorElement).href);
-});
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
 
-initializeDarkMode();
-setupSizeObserver();
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
+    }
+  }
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
+  }
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
+  }
+
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
+  } else {
+    document.body.classList.remove("fullscreen-mode");
+  }
+}
+
+/* ============================================
+   SDK APP INSTANCE (STANDALONE MODE)
+   ============================================ */
+
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
+
+app.onteardown = async () => {
+  app.sendLog({ level: "info", data: "Resource teardown requested", logger: APP_NAME });
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  app.sendLog({ level: "info", data: `Tool input received: ${JSON.stringify(params.arguments)}`, logger: APP_NAME });
+};
+
+app.ontoolresult = (params) => {
+  app.sendLog({ level: "info", data: "Tool result received", logger: APP_NAME });
+
+  // Check for tool execution errors
+  if (params.isError) {
+    app.sendLog({ level: "error", data: `Tool execution failed: ${JSON.stringify(params.content)}`, logger: APP_NAME });
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
+  }
+
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
+  } else {
+    app.sendLog({ level: "warning", data: `Tool result received but no data found: ${JSON.stringify(params)}`, logger: APP_NAME });
+    showEmpty("No data received");
+  }
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  app.sendLog({ level: "info", data: `Tool cancelled: ${reason}`, logger: APP_NAME });
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  app.sendLog({ level: "error", data: `App error: ${JSON.stringify(error)}`, logger: APP_NAME });
+};
+
+app.onhostcontextchanged = (ctx) => {
+  app.sendLog({ level: "info", data: `Host context changed: ${JSON.stringify(ctx)}`, logger: APP_NAME });
+  handleHostContextChanged(ctx);
+};
+
+/* ============================================
+   CONNECT TO HOST
+   ============================================ */
+
+app
+  .connect()
+  .then(() => {
+    app.sendLog({ level: "info", data: "MCP App connected to host", logger: APP_NAME });
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
+    }
+  })
+  .catch((error) => {
+    app.sendLog({ level: "error", data: `Failed to connect to MCP host: ${JSON.stringify(error)}`, logger: APP_NAME });
+  });
 
 export {};

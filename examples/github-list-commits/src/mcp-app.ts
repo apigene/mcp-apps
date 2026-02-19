@@ -1,7 +1,7 @@
 /* ============================================
    GITHUB COMMITS VIEWER MCP APP
    ============================================
-   
+
    Displays GitHub commits in a GitHub-style interface
    with expandable diff views
    ============================================ */
@@ -11,8 +11,38 @@
    ============================================ */
 
 const APP_NAME = "GitHub Commits Viewer";
-const APP_VERSION = "1.0.0";
+
 const PROTOCOL_VERSION = "2026-01-26";
+
+/* ============================================
+   GITHUB LIST COMMITS MCP APP (STANDALONE MODE)
+   ============================================
+
+   This app uses the official @modelcontextprotocol/ext-apps SDK
+   with app.connect() for standalone initialization.
+   ============================================ */
+
+/* ============================================
+   SDK IMPORTS
+   ============================================ */
+
+import {
+  App,
+  applyDocumentTheme,
+  applyHostFonts,
+  applyHostStyleVariables,
+} from "@modelcontextprotocol/ext-apps";
+
+// Import styles (will be bundled by Vite)
+import "./global.css";
+import "./mcp-app.css";
+
+/* ============================================
+   APP CONFIGURATION
+   ============================================ */
+
+
+const APP_VERSION = "1.0.0";
 
 /* ============================================
    COMMON UTILITY FUNCTIONS
@@ -30,18 +60,17 @@ function extractData(msg: any) {
 
 function unwrapData(data: any): any {
   if (!data) return null;
-  
+
+  // If data itself is an array, return it directly
+  if (Array.isArray(data)) {
+    return data;
+  }
+
   // Handle GitHub API response format - check for body array
   if (data.body && Array.isArray(data.body)) {
     return data.body;
   }
-  
-  // Standard table format
-  if (data.columns || (Array.isArray(data.rows) && data.rows.length > 0) || 
-      (typeof data === 'object' && !data.message)) {
-    return data;
-  }
-  
+
   // Nested formats
   if (data.message?.template_data) {
     return data.message.template_data;
@@ -49,40 +78,31 @@ function unwrapData(data: any): any {
   if (data.message?.response_content) {
     return data.message.response_content;
   }
-  
-  // Common nested patterns
+
+  // Common nested patterns - check these BEFORE generic object check
   if (data.data?.results) return data.data.results;
   if (data.data?.items) return data.data.items;
   if (data.data?.records) return data.data.records;
   if (data.results) return data.results;
   if (data.items) return data.items;
   if (data.records) return data.records;
-  
+
   // Direct rows array
   if (Array.isArray(data.rows)) {
     return data;
   }
-  
-  // If data itself is an array
-  if (Array.isArray(data)) {
+
+  // Standard table format
+  if (data.columns) {
     return data;
   }
-  
+
   return data;
 }
 
-function initializeDarkMode() {
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    document.body.classList.add('dark');
-  }
-  
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e: MediaQueryListEvent) => {
-    document.body.classList.toggle('dark', e.matches);
-  });
-}
 
 function escapeHtml(str: any): string {
-  if (typeof str !== "string") return str;
+  if (typeof str !== "string") return String(str);
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
@@ -135,9 +155,9 @@ function formatRelativeTime(dateString: string): string {
  */
 function formatDate(dateString: string): string {
   const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', { 
-    month: 'short', 
-    day: 'numeric', 
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit'
@@ -156,11 +176,11 @@ function shortSha(sha: string): string {
  */
 function parseCommitMessage(message: string): { title: string; body: string } {
   if (!message) return { title: '', body: '' };
-  
+
   const lines = message.split('\n');
   const title = lines[0] || '';
   const body = lines.slice(1).filter(l => l.trim()).join('\n');
-  
+
   return { title, body };
 }
 
@@ -185,7 +205,7 @@ function renderCommit(commit: any, index: number): string {
   const authorName = author.name || authorUser.login || 'Unknown';
   const authorAvatar = authorUser.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(authorName)}&size=40`;
   const authorDate = author.date || commitData.committer?.date || '';
-  
+
   const committerName = committer.name || committerUser.login || 'Unknown';
   const committerAvatar = committerUser.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(committerName)}&size=40`;
   const committerDate = committer.date || '';
@@ -311,7 +331,7 @@ function renderDiff(diffData: any): string {
 
   // Handle different diff formats
   let files: any[] = [];
-  
+
   // Format 1: GitHub API commit response with files array
   if (diffData.files && Array.isArray(diffData.files)) {
     files = diffData.files;
@@ -421,8 +441,8 @@ function renderPatch(patch: string): string {
           </div>
           <div class="diff-hunk-content">
             ${hunk.lines.map((line, idx) => {
-              const lineClass = line.startsWith('+') ? 'diff-line-added' : 
-                               line.startsWith('-') ? 'diff-line-deleted' : 
+              const lineClass = line.startsWith('+') ? 'diff-line-added' :
+                               line.startsWith('-') ? 'diff-line-deleted' :
                                line.startsWith('\\') ? 'diff-line-escape' : 'diff-line-context';
               const lineNum = idx + 1;
               return `
@@ -456,9 +476,9 @@ function extractRepoInfo(url: string): { owner: string; repo: string } | null {
 (window as any).loadDiff = async function(sha: string, index: number) {
   const diffContent = document.getElementById(`diff-${index}`);
   const loadBtn = document.querySelector(`[data-sha="${sha}"]`) as HTMLElement;
-  
+
   if (!diffContent) return;
-  
+
   // Check if already loaded
   if (diffContent.dataset.loaded === 'true') {
     return;
@@ -473,7 +493,7 @@ function extractRepoInfo(url: string): { owner: string; repo: string } | null {
   const commitItem = document.querySelector(`[data-index="${index}"]`);
   const commitLink = commitItem?.querySelector('.commit-link') as HTMLAnchorElement;
   let repoInfo: { owner: string; repo: string } | null = null;
-  
+
   if (commitLink && commitLink.href) {
     repoInfo = extractRepoInfo(commitLink.href);
   }
@@ -495,22 +515,13 @@ function extractRepoInfo(url: string): { owner: string; repo: string } | null {
       requestParams.params.repo = repoInfo.repo;
     }
 
-    const result = await sendRequest('ui/request-data', requestParams);
+    // Note: In standalone mode, diff loading would need to be handled differently
+    // This is a placeholder for now - the host would need to provide this capability
+    throw new Error('Diff loading requires host support');
 
-    if (result && result.data) {
-      const diffHtml = renderDiff(result.data);
-      diffContent.innerHTML = diffHtml;
-      diffContent.dataset.loaded = 'true';
-      
-      if (loadBtn) {
-        loadBtn.style.display = 'none';
-      }
-    } else {
-      throw new Error('No diff data received');
-    }
   } catch (error: any) {
-    console.error('Failed to load diff:', error);
-    
+    app.sendLog({ level: "error", data: `Failed to load diff: ${JSON.stringify(error)}`, logger: APP_NAME });
+
     // Show error with helpful message
     if (commitLink && commitLink.href && repoInfo) {
       diffContent.innerHTML = `
@@ -521,7 +532,7 @@ function extractRepoInfo(url: string): { owner: string; repo: string } | null {
             View diff on GitHub →
           </a>
           <p class="diff-note">
-            To enable diff loading, configure your MCP server to handle 
+            To enable diff loading, configure your MCP server to handle
             <code>ui/request-data</code> requests for <code>github-commit-diff</code> type.
           </p>
           <p class="diff-note">
@@ -534,7 +545,7 @@ function extractRepoInfo(url: string): { owner: string; repo: string } | null {
         <div class="diff-placeholder">
           <p>Failed to load diff: ${escapeHtml(error.message || 'Unknown error')}</p>
           <p class="diff-note">
-            To enable diff loading, configure your MCP server to handle 
+            To enable diff loading, configure your MCP server to handle
             <code>ui/request-data</code> requests for <code>github-commit-diff</code> type.
           </p>
           ${commitLink && commitLink.href ? `
@@ -547,16 +558,12 @@ function extractRepoInfo(url: string): { owner: string; repo: string } | null {
         </div>
       `;
     }
-    
+
     if (loadBtn) {
       loadBtn.textContent = 'Retry';
       loadBtn.removeAttribute('disabled');
     }
   }
-  
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
 };
 
 /**
@@ -566,11 +573,11 @@ function extractRepoInfo(url: string): { owner: string; repo: string } | null {
   const commitItem = document.querySelector(`[data-index="${index}"]`);
   const details = document.getElementById(`commit-details-${index}`);
   const expandIcon = commitItem?.querySelector('.expand-icon');
-  
+
   if (!commitItem || !details) return;
-  
+
   const isExpanded = commitItem.classList.contains('expanded');
-  
+
   if (isExpanded) {
     commitItem.classList.remove('expanded');
     details.style.display = 'none';
@@ -584,10 +591,6 @@ function extractRepoInfo(url: string): { owner: string; repo: string } | null {
       expandIcon.style.transform = 'rotate(180deg)';
     }
   }
-  
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
 };
 
 /**
@@ -612,7 +615,7 @@ function extractRepoInfo(url: string): { owner: string; repo: string } | null {
 function renderData(data: any) {
   const app = document.getElementById('app');
   if (!app) return;
-  
+
   if (!data) {
     showEmpty('No data received');
     return;
@@ -621,9 +624,9 @@ function renderData(data: any) {
   try {
     // Unwrap data - handle GitHub API response format
     let commits: any[] = [];
-    
+
     const unwrapped = unwrapData(data);
-    
+
     if (Array.isArray(unwrapped)) {
       commits = unwrapped;
     } else if (unwrapped?.body && Array.isArray(unwrapped.body)) {
@@ -633,12 +636,12 @@ function renderData(data: any) {
     } else {
       commits = [];
     }
-    
+
     if (commits.length === 0) {
       showEmpty('No commits found');
       return;
     }
-    
+
     app.innerHTML = `
       <div class="github-container">
         <div class="commits-header">
@@ -655,275 +658,115 @@ function renderData(data: any) {
         </div>
       </div>
     `;
-    
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
-    
+
   } catch (error: any) {
-    console.error('Render error:', error);
+    app.sendLog({ level: "error", data: `Render error: ${JSON.stringify(error)}`, logger: APP_NAME });
     showError(`Error rendering commits: ${error.message}`);
-    setTimeout(() => {
-      notifySizeChanged();
-    }, 50);
   }
 }
 
 /* ============================================
-   MESSAGE HANDLER (Standardized MCP Protocol)
+   HOST CONTEXT HANDLER
    ============================================ */
 
-window.addEventListener('message', function(event: MessageEvent) {
-  const msg = event.data;
-  
-  if (!msg || msg.jsonrpc !== '2.0') {
-    return;
-  }
-  
-  if (msg.id !== undefined && msg.method === 'ui/resource-teardown') {
-    const reason = msg.params?.reason || 'Resource teardown requested';
-    
-    if (sizeChangeTimeout) {
-      clearTimeout(sizeChangeTimeout);
-      sizeChangeTimeout = null;
+function handleHostContextChanged(ctx: any) {
+  if (!ctx) return;
+
+  if (ctx.theme) {
+    applyDocumentTheme(ctx.theme);
+    // Also toggle body.dark class for CSS compatibility
+    if (ctx.theme === "dark") {
+      document.body.classList.add("dark");
+    } else {
+      document.body.classList.remove("dark");
     }
-    
-    if (resizeObserver) {
-      resizeObserver.disconnect();
-      resizeObserver = null;
-    }
-    
-    window.parent.postMessage({
-      jsonrpc: "2.0",
-      id: msg.id,
-      result: {}
-    }, '*');
-    
-    return;
   }
-  
-  if (msg.id !== undefined && !msg.method) {
-    return;
+
+  if (ctx.styles?.css?.fonts) {
+    applyHostFonts(ctx.styles.css.fonts);
   }
-  
-  switch (msg.method) {
-    case 'ui/notifications/tool-result':
-      const data = msg.params?.structuredContent || msg.params;
-      if (data !== undefined) {
-        renderData(data);
-      } else {
-        console.warn('ui/notifications/tool-result received but no data found:', msg);
-        showEmpty('No data received');
-      }
-      break;
-      
-    case 'ui/notifications/host-context-changed':
-      if (msg.params?.theme === 'dark') {
-        document.body.classList.add('dark');
-      } else if (msg.params?.theme === 'light') {
-        document.body.classList.remove('dark');
-      }
-      if (msg.params?.displayMode) {
-        handleDisplayModeChange(msg.params.displayMode);
-      }
-      break;
-      
-    case 'ui/notifications/tool-input':
-      const toolArguments = msg.params?.arguments;
-      if (toolArguments) {
-        console.log('Tool input received:', toolArguments);
-      }
-      break;
-      
-    case 'ui/notifications/tool-cancelled':
-      const reason = msg.params?.reason || 'Tool execution was cancelled';
-      showError(`Operation cancelled: ${reason}`);
-      break;
-      
-    case 'ui/notifications/initialized':
-      break;
-      
-    default:
-      if (msg.params) {
-        const fallbackData = msg.params.structuredContent || msg.params;
-        if (fallbackData && fallbackData !== msg) {
-          console.warn('Unknown method:', msg.method, '- attempting to render data');
-          renderData(fallbackData);
-        }
-      }
+
+  if (ctx.styles?.variables) {
+    applyHostStyleVariables(ctx.styles.variables);
   }
-});
 
-/* ============================================
-   MCP COMMUNICATION
-   ============================================ */
-
-let requestIdCounter = 1;
-function sendRequest(method: string, params: any): Promise<any> {
-  return new Promise((resolve, reject) => {
-    const id = requestIdCounter++;
-    window.parent.postMessage({ jsonrpc: "2.0", id, method, params }, '*');
-    
-    const listener = (event: MessageEvent) => {
-      if (event.data?.id === id) {
-        window.removeEventListener('message', listener);
-        if (event.data?.result) {
-          resolve(event.data.result);
-        } else if (event.data?.error) {
-          reject(new Error(event.data.error.message || 'Unknown error'));
-        }
-      }
-    };
-    window.addEventListener('message', listener);
-    
-    setTimeout(() => {
-      window.removeEventListener('message', listener);
-      reject(new Error('Request timeout'));
-    }, 5000);
-  });
-}
-
-function sendNotification(method: string, params: any) {
-  window.parent.postMessage({ jsonrpc: "2.0", method, params }, '*');
-}
-
-/* ============================================
-   DISPLAY MODE HANDLING
-   ============================================ */
-
-let currentDisplayMode = 'inline';
-
-function handleDisplayModeChange(mode: string) {
-  currentDisplayMode = mode;
-  if (mode === 'fullscreen') {
-    document.body.classList.add('fullscreen-mode');
-    const container = document.querySelector('.github-container');
-    if (container) {
-      (container as HTMLElement).style.maxWidth = '100%';
-      (container as HTMLElement).style.padding = '20px';
-    }
+  if (ctx.displayMode === "fullscreen") {
+    document.body.classList.add("fullscreen-mode");
   } else {
-    document.body.classList.remove('fullscreen-mode');
-    const container = document.querySelector('.github-container');
-    if (container) {
-      (container as HTMLElement).style.maxWidth = '';
-      (container as HTMLElement).style.padding = '';
-    }
+    document.body.classList.remove("fullscreen-mode");
   }
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
 }
-
-function requestDisplayMode(mode: string): Promise<any> {
-  return sendRequest('ui/request-display-mode', { mode: mode })
-    .then(result => {
-      if (result?.mode) {
-        handleDisplayModeChange(result.mode);
-      }
-      return result;
-    })
-    .catch(err => {
-      console.warn('Failed to request display mode:', err);
-      throw err;
-    });
-}
-
-(window as any).requestDisplayMode = requestDisplayMode;
 
 /* ============================================
-   SIZE CHANGE NOTIFICATIONS
+   SDK APP INSTANCE (STANDALONE MODE)
    ============================================ */
 
-function notifySizeChanged() {
-  const width = document.body.scrollWidth || document.documentElement.scrollWidth;
-  const height = document.body.scrollHeight || document.documentElement.scrollHeight;
-  
-  sendNotification('ui/notifications/size-changed', {
-    width: width,
-    height: height
-  });
-}
+const app = new App(
+  { name: APP_NAME, version: APP_VERSION },
+  { availableDisplayModes: ["inline", "fullscreen"] }
+);
 
-let sizeChangeTimeout: NodeJS.Timeout | null = null;
-function debouncedNotifySizeChanged() {
-  if (sizeChangeTimeout) {
-    clearTimeout(sizeChangeTimeout);
+app.onteardown = async () => {
+  app.sendLog({ level: "info", data: "Resource teardown requested", logger: APP_NAME });
+  return {};
+};
+
+app.ontoolinput = (params) => {
+  app.sendLog({ level: "info", data: `Tool input received: ${JSON.stringify(params.arguments)}`, logger: APP_NAME });
+};
+
+app.ontoolresult = (params) => {
+  app.sendLog({ level: "info", data: "Tool result received", logger: APP_NAME });
+
+  // Check for tool execution errors
+  if (params.isError) {
+    app.sendLog({ level: "error", data: `Tool execution failed: ${JSON.stringify(params.content)}`, logger: APP_NAME });
+    const errorText =
+      params.content?.map((c: any) => c.text || "").join("\n") ||
+      "Tool execution failed";
+    showError(errorText);
+    return;
   }
-  sizeChangeTimeout = setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
 
-let resizeObserver: ResizeObserver | null = null;
-function setupSizeObserver() {
-  if (typeof ResizeObserver !== 'undefined') {
-    resizeObserver = new ResizeObserver(() => {
-      debouncedNotifySizeChanged();
-    });
-    resizeObserver.observe(document.body);
+  const data = params.structuredContent || params.content;
+  if (data !== undefined) {
+    renderData(data);
   } else {
-    window.addEventListener('resize', debouncedNotifySizeChanged);
-    const mutationObserver = new MutationObserver(debouncedNotifySizeChanged);
-    mutationObserver.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['style', 'class']
-    });
+    app.sendLog({ level: "warning", data: `Tool result received but no data found: ${JSON.stringify(params)}`, logger: APP_NAME });
+    showEmpty("No data received");
   }
-  
-  setTimeout(() => {
-    notifySizeChanged();
-  }, 100);
-}
+};
+
+app.ontoolcancelled = (params) => {
+  const reason = params.reason || "Unknown reason";
+  app.sendLog({ level: "info", data: `Tool cancelled: ${reason}`, logger: APP_NAME });
+  showError(`Operation cancelled: ${reason}`);
+};
+
+app.onerror = (error) => {
+  app.sendLog({ level: "error", data: `App error: ${JSON.stringify(error)}`, logger: APP_NAME });
+};
+
+app.onhostcontextchanged = (ctx) => {
+  app.sendLog({ level: "info", data: `Host context changed: ${JSON.stringify(ctx)}`, logger: APP_NAME });
+  handleHostContextChanged(ctx);
+};
 
 /* ============================================
-   INITIALIZATION
+   CONNECT TO HOST
    ============================================ */
 
-sendRequest('ui/initialize', {
-  appCapabilities: {
-    availableDisplayModes: ["inline", "fullscreen"]
-  },
-  appInfo: {
-    name: APP_NAME,
-    version: APP_VERSION
-  },
-  protocolVersion: PROTOCOL_VERSION
-}).then((result: any) => {
-  const ctx = result.hostContext || result;
-  const hostCapabilities = result.hostCapabilities;
-  
-  sendNotification('ui/notifications/initialized', {});
-  if (ctx?.theme === 'dark') {
-    document.body.classList.add('dark');
-  } else if (ctx?.theme === 'light') {
-    document.body.classList.remove('dark');
-  }
-  if (ctx?.displayMode) {
-    handleDisplayModeChange(ctx.displayMode);
-  }
-  if (ctx?.containerDimensions) {
-    const dims = ctx.containerDimensions;
-    if (dims.width) {
-      document.body.style.width = dims.width + 'px';
+app
+  .connect()
+  .then(() => {
+    app.sendLog({ level: "info", data: "MCP App connected to host", logger: APP_NAME });
+    const ctx = app.getHostContext();
+    if (ctx) {
+      handleHostContextChanged(ctx);
     }
-    if (dims.height) {
-      document.body.style.height = dims.height + 'px';
-    }
-    if (dims.maxWidth) {
-      document.body.style.maxWidth = dims.maxWidth + 'px';
-    }
-    if (dims.maxHeight) {
-      document.body.style.maxHeight = dims.maxHeight + 'px';
-    }
-  }
-}).catch(err => {
-  console.warn('Failed to initialize MCP App:', err);
-});
-
-initializeDarkMode();
-setupSizeObserver();
+  })
+  .catch((error) => {
+    app.sendLog({ level: "error", data: `Failed to connect to MCP host: ${JSON.stringify(error)}`, logger: APP_NAME });
+  });
 
 export {};
