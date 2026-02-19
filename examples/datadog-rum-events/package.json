@@ -1,0 +1,20 @@
+{
+  "name": "mcp-app-datadog-rum-events",
+  "version": "1.0.0",
+  "description": "Datadog RUM events viewer – list and detail view with Datadog-style UI",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vite": "^6.0.0",
+    "vite-plugin-singlefile": "^2.0.0"
+  }
+}
