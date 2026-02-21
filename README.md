@@ -10,7 +10,7 @@
 
 ## What is MCP App Playground?
 
-**MCP App Playground** is this repository: a collection of **dozens of mock MCP App examples** inspired by real-world services (GitHub, Slack, Google Analytics, Shopify, Datadog, and many more). Each example is a small, self-contained UI that shows how to build an [MCP App](https://modelcontextprotocol.io) — an interactive HTML/TypeScript/CSS component that runs inside iframes in Claude and other AI hosts and displays tool results.
+**MCP App Playground** is a collection of **dozens of mock MCP App examples** inspired by real-world services (GitHub, Slack, Google Analytics, Shopify, Datadog, and many more). Each example is a small, self-contained UI that shows how to build an [MCP App](https://modelcontextprotocol.io) — an interactive HTML/TypeScript/CSS component that runs inside iframes in Claude and other AI hosts and displays tool results.
 
 Use this repo to **see how MCP Apps are implemented** and to **simulate and evaluate** them locally. It ships with **one MCP server** you can run on your machine: point your AI client (e.g. Claude, Cursor) at it, invoke the demo tools, and see how the apps render and behave — no need to build your own server or real integrations first.
 
