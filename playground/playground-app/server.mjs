@@ -11,7 +11,8 @@ const examplesRoot = path.join(repoRoot, "examples");
 const publicDir = path.join(__dirname, "public");
 const mockDir = path.join(__dirname, "mock-data");
 const port = Number(process.env.PORT || 4311);
-const host = process.env.HOST || "127.0.0.1";
+// Listen on all interfaces so both http://localhost and http://127.0.0.1 work
+const host = process.env.HOST || "0.0.0.0";
 
 function sendJson(res, status, data) {
   res.writeHead(status, {
@@ -301,5 +302,6 @@ const dim = (s) => (tty ? `\x1b[2m${s}\x1b[0m` : s);
 const cyan = (s) => (tty ? `\x1b[36m${s}\x1b[0m` : s);
 
 server.listen(port, host, () => {
-  console.log(cyan(`Playground: http://${host}:${port}`));
+  const url = host === "0.0.0.0" ? `http://localhost:${port}` : `http://${host}:${port}`;
+  console.log(cyan(`Playground: ${url}`));
 });

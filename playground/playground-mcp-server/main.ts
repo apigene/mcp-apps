@@ -20,6 +20,21 @@ async function startHttp(createMcpServer: () => McpServer): Promise<void> {
   await server.connect(transport);
 
   app.all("/mcp", async (req: Request, res: Response) => {
+    // GET (e.g. user opened URL in browser): show short explanation
+    if (req.method === "GET") {
+      res.setHeader("Content-Type", "text/plain; charset=utf-8");
+      res.status(200).send(
+        "MCP server (Model Context Protocol)\n\n" +
+          "This URL is an MCP endpoint — it is not a webpage.\n" +
+          "Add it to your AI client (Cursor, Claude Desktop, etc.) as an MCP server:\n" +
+          "  http://localhost:" +
+          port +
+          "/mcp\n\n" +
+          "Then use the demo tools (e.g. list_demo_apps, show_demo_app) from your AI host.\n" +
+          "Preview templates in the browser at: http://localhost:4311\n",
+      );
+      return;
+    }
     try {
       await transport.handleRequest(req, res, req.body);
     } catch (error) {
@@ -43,7 +58,7 @@ async function startHttp(createMcpServer: () => McpServer): Promise<void> {
       console.error("Failed to start server:", err);
       process.exit(1);
     }
-    console.log(cyan(`MCP server: http://127.0.0.1:${port}/mcp`));
+    console.log(cyan(`MCP server: http://localhost:${port}/mcp`));
     console.log(dim("Tools:"));
     console.log(dim(`  • list_demo_apps — list all demo apps (no args)`));
     console.log(dim(`  • show_demo_app  — open a demo (args: template name or request like "show demo app xyz-users")`));
