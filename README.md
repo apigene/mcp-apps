@@ -5,59 +5,19 @@
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen)](https://nodejs.org)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-> Open-source collection of **MCP App templates** and local development tooling — interactive UI components that run inside Claude and other MCP-compatible AI hosts.
-
-**Source:** [github.com/apigene/mcp-apps](https://github.com/apigene/mcp-apps)
 
 ---
 
-## What are MCP Apps?
+## What is MCP App Playground?
 
-MCP Apps are interactive HTML/TypeScript/CSS components that render inside iframes in Claude and other AI hosts. They receive tool results via the [Model Context Protocol](https://modelcontextprotocol.io) and display rich, interactive UIs — think GitHub commit timelines, Slack search results, Google Analytics dashboards, and more.
+**MCP App Playground** is this repository: a collection of **dozens of mock MCP App examples** inspired by real-world services (GitHub, Slack, Google Analytics, Shopify, Datadog, and many more). Each example is a small, self-contained UI that shows how to build an [MCP App](https://modelcontextprotocol.io) — an interactive HTML/TypeScript/CSS component that runs inside iframes in Claude and other AI hosts and displays tool results.
 
-```
-AI Host (Claude)
-    ↓ JSON-RPC 2.0 (postMessage)
-MCP App iframe
-    ↓ renders rich UI
-    ↑ size change notifications
-AI Host
-```
+Use this repo to **see how MCP Apps are implemented** and to **simulate and evaluate** them locally. It ships with **one MCP server** you can run on your machine: point your AI client (e.g. Claude, Cursor) at it, invoke the demo tools, and see how the apps render and behave — no need to build your own server or real integrations first.
 
----
-
-## Repository Structure
-
-```
-mcp-apps/
-├── examples/                  # 49 ready-to-use MCP app templates
-│   ├── base-template/         # Minimal manual protocol template
-│   ├── base-template-sdk/     # ★ Recommended starting point (SDK utilities)
-│   ├── github-list-commits/
-│   ├── google-analytics/
-│   ├── slack-search-messages/
-│   └── ...                    # 44 more examples
-├── playground/
-│   ├── playground-app/        # Local web preview server
-│   └── playground-mcp-server/ # Local MCP server for integration testing
-├── docs/                      # Documentation
-├── bin/                       # CLI entrypoint
-└── tools/                     # Development utilities
-```
-
----
 
 ## Quick Start
 
 ### Run the Playground (preview any template instantly)
-
-**From the repo (after cloning):**
-
-```bash
-cd mcp-apps
-npm install
-npm start
-```
 
 **Without cloning (from anywhere):**
 
@@ -68,6 +28,17 @@ npx @apigene/mcp-app-playground
 Opens:
 - **MCP Apps Playground** at `http://localhost:4311` — preview templates with mock data
 - **MCP HTTP endpoint** at `http://127.0.0.1:3001/mcp` — for full host integration
+
+
+**From the repo (after cloning):**
+
+```bash
+cd mcp-apps
+npm install
+npm start
+```
+
+
 
 ### Create a New Template
 
