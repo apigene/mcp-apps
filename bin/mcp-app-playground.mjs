@@ -84,6 +84,7 @@ function runDev(shouldOpenBrowser = false) {
       cwd,
       stdio: "inherit",
       shell: process.platform === "win32",
+      env: { ...process.env, MCP_APP_PLAYGROUND_SUPPRESS_BANNER: "1" },
     });
 
     child.on("exit", (code) => {
@@ -115,7 +116,7 @@ function runDev(shouldOpenBrowser = false) {
   console.log(style(c.bold, "\n MCP Apps Playground\n"));
   console.log(style(c.dim, " Starting servers...\n"));
   console.log("  " + style(c.cyan, "Playground") + "  " + style(c.blue, "http://localhost:4311") + style(c.dim, "  — preview examples in the browser"));
-  console.log("  " + style(c.cyan, "MCP server") + "  " + style(c.blue, "http://127.0.0.1:3001/mcp") + style(c.dim, "  — add this URL in Cursor / Claude / your MCP client\n"));
+  console.log("  " + style(c.cyan, "MCP server") + "  " + style(c.blue, "http://localhost:3001/mcp") + style(c.dim, "  — add this URL in Cursor / Claude / your MCP client\n"));
   console.log(style(c.bold, " MCP tools (use after adding the server URL above):\n"));
   console.log("  " + style(c.green, "list_demo_apps") + style(c.dim, "  — list all demo apps you can try; call this first to see available apps"));
   console.log("  " + style(c.green, "show_demo_app") + style(c.dim, "  — open a demo by name, e.g. show_demo_app with template: \"xyz-users\" or say \"show demo app xyz-users\"\n"));
@@ -254,7 +255,7 @@ if (cmd === "list") {
     run("node", ["--import", "tsx", mcpMain, "--stdio"], repoRoot);
   } else {
     console.log(style(c.bold, "\n MCP server (HTTP)\n"));
-    console.log("  " + style(c.blue, "http://127.0.0.1:3001/mcp") + style(c.dim, "  — connect MCP clients to this endpoint\n"));
+    console.log("  " + style(c.blue, "http://localhost:3001/mcp") + style(c.dim, "  — connect MCP clients to this endpoint\n"));
     console.log(style(c.dim, " Press Ctrl+C to stop.\n"));
     run("node", ["--import", "tsx", mcpMain], repoRoot);
   }

@@ -302,6 +302,7 @@ const dim = (s) => (tty ? `\x1b[2m${s}\x1b[0m` : s);
 const cyan = (s) => (tty ? `\x1b[36m${s}\x1b[0m` : s);
 
 server.listen(port, host, () => {
+  if (process.env.MCP_APP_PLAYGROUND_SUPPRESS_BANNER) return;
   const url = host === "0.0.0.0" ? `http://localhost:${port}` : `http://${host}:${port}`;
   console.log(cyan(`Playground: ${url}`));
 });

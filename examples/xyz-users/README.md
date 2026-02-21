@@ -8,7 +8,7 @@ It is intentionally clean:
 - no mock host/dev preview logic
 - no app-specific parsing/helpers
 
-If you need local mock preview, use `tools/template-lab`.
+If you need local mock preview, use the playground: `npm run lab` or `npx @apigene/mcp-app-playground lab`.
 
 ## What This Template Includes
 
@@ -126,4 +126,4 @@ Keep as-is unless you know why:
 - `response.json` is optional for MCP runtime, but recommended for local preview in MCP Apps Playground.
 - MCP Apps Playground mock payload resolution:
   - `<template>/response.json` if present
-  - fallback to `tools/template-lab/mock-data/default.json`
+  - fallback to `playground/playground-app/mock-data/default.json`

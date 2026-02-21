@@ -5,7 +5,7 @@ const filterUiContainer = document.getElementById("filter-ui-elements");
 const filterMcpContainer = document.getElementById("filter-mcp-features");
 const filterClearBtn = document.getElementById("filter-clear");
 
-const MCP_SERVER_URL = "http://127.0.0.1:3001/mcp";
+const MCP_SERVER_URL = "http://localhost:3001/mcp";
 
 /** Canonical UI element and MCP feature tags (match TEMPLATE_METADATA.md) */
 const UI_ELEMENT_OPTIONS = [

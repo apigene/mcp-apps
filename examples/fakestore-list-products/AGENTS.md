@@ -7,7 +7,7 @@ Purpose: guide coding agents when cloning and customizing `base-template-sdk`.
 `base-template-sdk` is the **clean source template** for new MCP app templates.
 Do not add playground/mock-host logic here.
 
-For local preview tooling and mock event simulation, use `tools/template-lab`.
+For local preview tooling and mock event simulation, use the playground (`npm run lab` or `npx @apigene/mcp-app-playground lab`).
 
 ## Architecture Contract
 

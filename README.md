@@ -27,7 +27,7 @@ npx @apigene/mcp-app-playground
 
 Opens:
 - **MCP Apps Playground** at `http://localhost:4311` — preview templates with mock data
-- **MCP HTTP endpoint** at `http://127.0.0.1:3001/mcp` — for full host integration
+- **MCP HTTP endpoint** at `http://localhost:3001/mcp` — for full host integration
 
 
 **From the repo (after cloning):**

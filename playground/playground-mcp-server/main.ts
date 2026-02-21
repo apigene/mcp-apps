@@ -58,10 +58,12 @@ async function startHttp(createMcpServer: () => McpServer): Promise<void> {
       console.error("Failed to start server:", err);
       process.exit(1);
     }
-    console.log(cyan(`MCP server: http://localhost:${port}/mcp`));
-    console.log(dim("Tools:"));
-    console.log(dim(`  • list_demo_apps — list all demo apps (no args)`));
-    console.log(dim(`  • show_demo_app  — open a demo (args: template name or request like "show demo app xyz-users")`));
+    if (!process.env.MCP_APP_PLAYGROUND_SUPPRESS_BANNER) {
+      console.log(cyan(`MCP server: http://localhost:${port}/mcp`));
+      console.log(dim("Tools:"));
+      console.log(dim(`  • list_demo_apps — list all demo apps (no args)`));
+      console.log(dim(`  • show_demo_app  — open a demo (args: template name or request like "show demo app xyz-users")`));
+    }
   });
 
   const shutdown = () => {

@@ -49,7 +49,7 @@
               <h3 class="panel-subtitle">How to change the mock response</h3>
               <ul class="list">
                 <li><strong>Per template:</strong> add <code>response.json</code> in the template folder (<code>templates/&lt;name&gt;/response.json</code>). The lab uses this as the <code>structuredContent</code> payload for that template.</li>
-                <li><strong>Default for all:</strong> edit <code>tools/template-lab/mock-data/default.json</code> in the repo. Used when a template has no <code>response.json</code>.</li>
+                <li><strong>Default for all:</strong> edit <code>playground/playground-app/mock-data/default.json</code> in the repo. Used when a template has no <code>response.json</code>.</li>
               </ul>
             </div>
           </details>
@@ -61,7 +61,7 @@
             <div class="collapsible-body">
               <p class="prose">To use the demo templates in Claude, Cursor, or another MCP client, add this local MCP server (HTTP):</p>
               <div class="mcp-server-row">
-                <code class="mcp-server-url" id="mcp-server-url">http://127.0.0.1:3001/mcp</code>
+                <code class="mcp-server-url" id="mcp-server-url">http://localhost:3001/mcp</code>
                 <button type="button" class="mcp-server-copy" id="mcp-server-copy" aria-label="Copy MCP server URL">Copy</button>
               </div>
               <p class="mcp-server-hint">Paste this URL in your client’s MCP server configuration (e.g. Cursor Settings → MCP, or Claude Desktop config).</p>

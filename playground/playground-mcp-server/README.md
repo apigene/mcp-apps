@@ -104,8 +104,8 @@ All tools are registered with `visibility: ["model", "app"]` allowing them to be
 - These tools open template-specific resource URIs, so UI does not get stuck on the previous template.
 - Missing `dist/mcp-app.html` is auto-generated on first call (`npm run build`, fallback `npm install` + build).
 - Payload source:
-  1. `templates/<template>/response.json`
-  2. fallback: `tools/template-lab/mock-data/default.json`
+  1. `examples/<name>/response.json`
+  2. fallback: `playground/playground-app/mock-data/default.json`
 
 Example tool calls:
 
@@ -126,7 +126,7 @@ Example tool calls:
 ```bash
 cd tools/template-mcp-server
 npm install
-npm run server:http    # http://127.0.0.1:3001/mcp
+npm run server:http    # http://localhost:3001/mcp
 ```
 
 For stdio clients:
